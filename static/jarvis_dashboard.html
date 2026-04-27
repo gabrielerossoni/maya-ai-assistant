@@ -118,6 +118,10 @@
                             class="bg-white/5 border border-white/5 rounded-2xl py-4 pl-14 pr-6 w-80 outline-none focus:border-maya-red/30 transition-all text-sm font-medium"
                             onkeydown="if(event.key==='Enter')submitCmd()">
                     </div>
+                    <div id="ollama-status" class="flex items-center gap-2 glass-card px-4 h-12 border-yellow-500/20">
+                        <div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+                        <span class="text-[10px] font-bold uppercase text-yellow-500">Ollama Sync</span>
+                    </div>
                     <div class="w-12 h-12 glass-card flex items-center justify-center border-white/5 cursor-pointer">
                         <i data-lucide="bell" class="w-5 h-5 text-white/40"></i>
                     </div>
@@ -304,14 +308,39 @@
                 </div>
 
                 <!-- SETTINGS VIEW -->
-                <div id="view-settings" class="view-section">
-                    <div class="grid grid-cols-2 gap-6 flex-1">
+                <div id="view-settings" class="view-section h-full">
+                    <div class="grid grid-cols-2 gap-6 h-full">
                         <div class="glass-card p-8 flex flex-col gap-6">
-                            <h2 class="text-xl font-bold">Sistema</h2>
+                            <h2 class="text-xl font-bold flex items-center gap-2">
+                                <i data-lucide="cpu" class="text-maya-red"></i>
+                                Neural Core Status
+                            </h2>
+                            <div class="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar" id="model-list-container">
+                                <!-- I modelli verranno inseriti qui dallo script -->
+                                <div class="p-4 bg-white/5 rounded-2xl flex items-center justify-between animate-pulse">
+                                    <span class="opacity-40">Caricamento modelli...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-8 flex flex-col gap-6">
+                            <h2 class="text-xl font-bold flex items-center gap-2">
+                                <i data-lucide="settings-2" class="text-maya-red"></i>
+                                Info Sistema
+                            </h2>
                             <div class="space-y-4">
-                                <div class="p-4 bg-white/5 rounded-xl flex justify-between"><span>Model</span><span class="text-maya-red font-bold">PHI-4</span></div>
-                                <div class="p-4 bg-white/5 rounded-xl flex justify-between"><span>Assistente</span><span class="text-maya-red font-bold uppercase">Maya</span></div>
-                                <div class="p-4 bg-white/5 rounded-xl flex justify-between"><span>Versione</span><span class="opacity-40">1.2.0</span></div>
+                                <div class="p-4 bg-white/5 rounded-xl flex justify-between">
+                                    <span class="opacity-40">Assistente</span>
+                                    <span id="settings-name" class="text-maya-red font-bold uppercase">MAYA</span>
+                                </div>
+                                <div class="p-4 bg-white/5 rounded-xl flex justify-between">
+                                    <span class="opacity-40">Versione</span>
+                                    <span id="settings-version" class="font-mono opacity-60">1.2.0</span>
+                                </div>
+                                <div class="p-4 bg-white/5 rounded-xl flex justify-between">
+                                    <span class="opacity-40">Health Check</span>
+                                    <span class="text-green-500 font-bold">OTTIMALE</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -471,6 +500,58 @@
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
                 if(d.type === 'log') addLog(d.text, d.level);
+                if(d.type === 'state') {
+                    if(d.system) {
+                        document.getElementById('settings-name').innerText = d.system.name;
+                        document.getElementById('settings-version').innerText = d.system.version;
+                    }
+                    // Gestione Modelli Dinamici
+                    if(d.models) {
+                        const container = document.getElementById('model-list-container');
+                        if(container) {
+                            container.innerHTML = ''; // Pulisci caricamento
+                            Object.entries(d.models).forEach(([key, info]) => {
+                                const isOnline = info.online === true;
+                                const statusColor = isOnline ? 'bg-green-500' : 'bg-red-500';
+                                const statusText = isOnline ? 'ONLINE' : 'OFFLINE';
+                                const statusTextColor = isOnline ? 'text-green-500' : 'text-red-500';
+                                const shadowGlow = isOnline ? 'shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'shadow-[0_0_15px_rgba(239,68,68,0.2)]';
+                                const borderColor = isOnline ? 'border-green-500/30' : 'border-red-500/20';
+                                
+                                const item = document.createElement('div');
+                                item.className = `p-5 bg-white/5 rounded-2xl flex items-center justify-between border ${borderColor} transition-all hover:bg-white/8`;
+                                item.innerHTML = `
+                                    <div class="flex flex-col gap-1">
+                                        <span class="text-[9px] font-black uppercase opacity-30 tracking-tighter">${key}</span>
+                                        <span class="font-bold text-sm">${info.name}</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[8px] font-black uppercase tracking-tight ${statusTextColor}">${statusText}</span>
+                                        <div class="w-3 h-3 rounded-full ${statusColor} ${shadowGlow} ${isOnline ? 'animate-pulse' : ''}"></div>
+                                    </div>
+                                `;
+                                container.appendChild(item);
+                            });
+                            lucide.createIcons();
+                        }
+                    }
+                    if(d.ollama) {
+                        const s = document.getElementById('ollama-status');
+                        const dot = s.querySelector('div');
+                        const txt = s.querySelector('span');
+                        if(d.ollama === 'ONLINE') {
+                            s.className = "flex items-center gap-2 glass-card px-4 h-12 border-green-500/20";
+                            dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]";
+                            txt.className = "text-[10px] font-bold uppercase text-green-500";
+                            txt.innerText = "LLM Online";
+                        } else {
+                            s.className = "flex items-center gap-2 glass-card px-4 h-12 border-red-500/20";
+                            dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]";
+                            txt.className = "text-[10px] font-bold uppercase text-red-500";
+                            txt.innerText = "LLM Offline";
+                        }
+                    }
+                }
                 if(d.type === 'stats') {
                     // Il grafico si aggiorna sempre alla massima frequenza (0.33s)
                     updateChart(d.neural_load, d.memory);
