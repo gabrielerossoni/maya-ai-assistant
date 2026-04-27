@@ -71,6 +71,7 @@ async def lifespan(app: FastAPI):
     # Avvia la console e i broadcaster in background
     asyncio.create_task(interactive_console())
     asyncio.create_task(stats_broadcaster())
+    asyncio.create_task(spotify_broadcaster())
     yield
     # Shutdown
     display.stop()
@@ -103,6 +104,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Invia la richiesta dell'utente alla dashboard tramite print (che passa dal filtro)
                     print(f"Richiesta: {cmd}")
                     asyncio.create_task(execute_and_broadcast(cmd))
+            elif data.get("type") == "tool":
+                # Esecuzione diretta tool, bypassa LLM
+                action = data.get("action", {})
+                if action:
+                    result = await agent.tool_manager.execute(action)
+                    await manager.broadcast({"type": "log", "text": result.get("message", ""), "level": "ok"})
+                    await broadcast_state()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
@@ -194,6 +202,25 @@ async def stats_broadcaster():
         except:
             pass
         await asyncio.sleep(0.33)
+        
+async def spotify_broadcaster():
+    while True:
+        try:
+            spotify_tool = agent.tool_manager.tools.get("spotify")
+            if spotify_tool and spotify_tool.sp:
+                result = spotify_tool._current_track()
+                if result["status"] == "ok":
+                    await manager.broadcast({
+                        "type": "spotify",
+                        "message": result.get("message", ""),
+                        "track": result.get("track", ""),
+                        "artist": result.get("artist", ""),
+                        "is_playing": result.get("is_playing", False),
+                        "album_art": result.get("album_art", ""),
+                    })
+        except Exception:
+            pass
+        await asyncio.sleep(3)      
 
 async def interactive_console():
     """Legge i comandi dal terminale e li processa."""

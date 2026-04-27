@@ -28,6 +28,7 @@ Thumbs.db
 
 # Ignore VSCode settings
 .vscode/
+static/.prettierrc
 
 # History file
 .history
