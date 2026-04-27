@@ -35,12 +35,16 @@ Il tuo compito è aiutare l'utente gestendo la casa, cercando informazioni e for
 REGOLE DI COMPORTAMENTO:
 1. TOOL USAGE: Usa i tool SOLO se strettamente necessario per rispondere. Se l'utente ti saluta o fa chiacchiere, rispondi normalmente senza attivare tool a caso.
 2. PERSONALITÀ: Sei sicura di te, un po' distaccata ma impeccabile nel servizio. Niente emoji eccessive, sii professionale e "tough".
-3. FORMATO: Rispondi SEMPRE in formato JSON:
+3. FORMATO JSON (OBBLIGATORIO): Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. È CRITICO che la chiave "reply" contenga la tua risposta completa per l'utente.
+Struttura:
 {
-  "intent": "descrizione breve",
-  "actions": [{"tool": "nome_tool", ...} o {"tool": "none", "response": "..."}],
-  "reply": "Tua risposta naturale in italiano"
+  "intent": "cosa vuole l'utente",
+  "actions": [{"tool": "nome_tool", "parametro": "valore"}],
+  "reply": "Tua risposta discorsiva e naturale in italiano"
 }
+SE NON HAI BISOGNO DI TOOL, lascia "actions" come lista vuota [].
+NON aggiungere testo fuori dal JSON.
+NON inventare dati: se usi un tool informativo, scrivi nella reply che stai controllando.
 
 Tool disponibili:
 - arduino: comandi hardware (LIGHT_ON, LIGHT_OFF, SERVO_OPEN, SERVO_CLOSE, RELAY_ON, RELAY_OFF)
@@ -184,10 +188,17 @@ class AgentCore:
                 prompt=prompt,
                 format="json",
                 stream=False,
+                options={"temperature": 0.4} # Rende l'output più prevedibile
             )
 
             text = response.get("response", "{}")
-            return json.loads(text)
+            result = json.loads(text)
+            
+            # Se l'LLM ha risposto ma manca la chiave reply, proviamo a recuperare
+            if "reply" not in result and "response" in result:
+                result["reply"] = result["response"]
+            
+            return result
 
         except Exception as e:
             print(f"[LLM] Errore di comunicazione con Ollama: {e}")
@@ -272,9 +283,16 @@ class AgentCore:
             print("[PLANNER] Consultando LLM...")
             plan = await self._call_llm(user_input, progress_cb)
 
-        intent = plan.get("intent", "")
+        intent = plan.get("intent", "conversazione")
         actions = plan.get("actions", [])
-        reply = plan.get("reply", "Fatto.")
+        reply = plan.get("reply")
+
+        # Se l'LLM non ha fornito una risposta testuale, generiamone una di emergenza
+        if not reply:
+            if actions:
+                reply = "Ho eseguito le azioni richieste."
+            else:
+                reply = "Mi dispiace, non sono riuscita a generare una risposta valida. Puoi ripetere?"
 
         print(f"[PLANNER] Intent: {intent} | Azioni: {len(actions)}")
 
