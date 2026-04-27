@@ -64,6 +64,34 @@
         
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        
+        /* SIDEBAR ANIMATIONS DISABILITATI
+        .sidebar { 
+            transition: transform 0.3s ease;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            z-index: 50;
+        }
+        .sidebar.collapsed { 
+            transform: translateX(-150%);
+        }
+        
+        .sidebar-overlay {
+            transition: opacity 0.3s ease;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 40;
+            pointer-events: none;
+        }
+        .sidebar-overlay.show {
+            opacity: 1;
+        }
+        */
     </style>
 </head>
 <body class="text-white font-sans p-6">
@@ -71,7 +99,7 @@
     
     <div class="flex h-full gap-6 max-w-[1600px] mx-auto">
         <!-- Sidebar -->
-        <aside class="w-20 flex flex-col items-center py-8 glass-card">
+        <aside class="w-20 flex flex-col items-center py-8 glass-card" id="sidebar">
             <div class="w-12 h-12 bg-maya-red/10 rounded-2xl flex items-center justify-center mb-10 overflow-hidden border border-maya-red/20">
                 <img src="/static/maya_logo.png" alt="MAYA Logo" class="w-full h-full object-cover">
             </div>
@@ -122,7 +150,7 @@
                         <div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
                         <span class="text-[10px] font-bold uppercase text-yellow-500">Ollama Sync</span>
                     </div>
-                    <div class="w-12 h-12 glass-card flex items-center justify-center border-white/5 cursor-pointer">
+                    <div class="w-12 h-12 glass-card flex items-center justify-center border-white/5 cursor-pointer hover:bg-white/5 transition-all" onclick="showNotifications()" title="Notifiche">
                         <i data-lucide="bell" class="w-5 h-5 text-white/40"></i>
                     </div>
                 </div>
@@ -142,13 +170,23 @@
                             <div class="p-3 bg-blue-500/10 rounded-xl"><i data-lucide="clock" class="text-blue-500 w-5 h-5"></i></div>
                             <div><p class="text-xl font-bold font-mono" id="clock">--:--:--</p><p class="text-[9px] text-white/20 font-bold uppercase tracking-widest">TIME</p></div>
                         </div>
-                        <div class="glass-card flex items-center gap-4 px-6">
-                            <div class="p-3 bg-green-500/10 rounded-xl"><i data-lucide="check-circle" class="text-green-500 w-5 h-5"></i></div>
-                            <div><p class="text-xl font-bold uppercase">Ready</p><p class="text-[9px] text-white/20 font-bold uppercase tracking-widest">SYSTEM</p></div>
+                        <!-- Widget Meteo -->
+                        <div class="glass-card flex items-center gap-3 px-4 border-blue-500/20 hover:border-blue-500/40 transition-all cursor-pointer">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[9px] text-blue-400 font-bold uppercase tracking-wider mb-0.5">Meteo</p>
+                                <p class="text-lg font-black text-white" id="widget-weather-temp">22°C</p>
+                                <p class="text-[7px] text-white/40 leading-none" id="widget-weather-desc">Sereno</p>
+                            </div>
+                            <i data-lucide="cloud-sun" class="w-6 h-6 text-blue-400 flex-shrink-0"></i>
                         </div>
-                        <div class="glass-card flex items-center gap-4 px-6">
-                            <div class="p-3 bg-yellow-500/10 rounded-xl"><i data-lucide="shield" class="text-yellow-500 w-5 h-5"></i></div>
-                            <div><p class="text-xl font-bold uppercase">Secured</p><p class="text-[9px] text-white/20 font-bold uppercase tracking-widest">CORE</p></div>
+                        <!-- Widget Musica -->
+                        <div class="glass-card flex items-center gap-3 px-4 border-green-500/20 hover:border-green-500/40 transition-all cursor-pointer">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[9px] text-green-400 font-bold uppercase tracking-wider mb-0.5">Musica</p>
+                                <p class="text-lg font-black text-white" id="widget-music-track">Offline</p>
+                                <p class="text-[7px] text-white/40 leading-none" id="widget-music-artist">--</p>
+                            </div>
+                            <i data-lucide="music" class="w-6 h-6 text-green-400 flex-shrink-0"></i>
                         </div>
                     </div>
 
@@ -175,15 +213,9 @@
                         </div>
                     </div>
 
-                    <div class="h-32 grid grid-cols-6 gap-4">
+                    <div class="h-32 grid grid-cols-4 gap-4">
                         <div onclick="switchView('domotica')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
                             <i data-lucide="home" class="text-maya-red w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">Casa</span>
-                        </div>
-                        <div onclick="switchView('spotify')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
-                            <i data-lucide="music" class="text-green-400 w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">Spotify</span>
-                        </div>
-                        <div onclick="switchView('weather')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
-                            <i data-lucide="cloud-sun" class="text-blue-400 w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">Meteo</span>
                         </div>
                         <div onclick="switchView('news')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
                             <i data-lucide="newspaper" class="text-white w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">News</span>
@@ -352,6 +384,7 @@
 
     <script>
         lucide.createIcons();
+        let greetingUpdated = false;
         const greetings = [
             "Bentornato, Gab. Come posso esserti utile? 🐺",
             "Maya online. Dimmi pure cosa ti serve.",
@@ -362,7 +395,10 @@
             "In attesa dei tuoi comandi. Cosa posso fare per te?"
         ];
         function updateGreeting() {
-            document.getElementById('greeting-text').innerText = greetings[Math.floor(Math.random() * greetings.length)];
+            if(!greetingUpdated) {
+                document.getElementById('greeting-text').innerText = greetings[Math.floor(Math.random() * greetings.length)];
+                greetingUpdated = true;
+            }
         }
 
         function switchView(viewId) {
@@ -486,20 +522,39 @@
         function sendPrompt(text) {
             if(ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({type: 'command', text: text}));
-                addLog(text, 'info');
             }
         }
 
         function fireTool(t) { sendPrompt(t); }
 
+        // TOGGLE SIDEBAR DISABILITATO
+        /*
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            // Chiudi la sidebar e rimetti il focus al main content
+            if(sidebar.classList.contains('collapsed')) {
+                document.querySelector('main').style.opacity = '1';
+            }
+        }
+        */
+        
+        function showNotifications() {
+            addLog('📬 Nessuna nuova notifica al momento', 'info');
+        }
+
         let ws;
         function initWS() {
             ws = new WebSocket("ws://127.0.0.1:8000/ws");
-            ws.onopen = () => { addLog('Nucleo Maya Connesso'); updateGreeting(); };
+            ws.onopen = () => { addLog('⚙️ Sincronizzazione e accensione sistema...', 'ok'); updateGreeting(); };
             let lastTextUpdate = 0;
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
-                if(d.type === 'log') addLog(d.text, d.level);
+                if(d.type === 'log') {
+                    // Filtra messaggi specifici
+                    if(d.text === 'Nucleo Maya Connesso' || d.text.includes('Nucleo Maya')) return;
+                    addLog(d.text, d.level);
+                }
                 if(d.type === 'state') {
                     if(d.system) {
                         document.getElementById('settings-name').innerText = d.system.name;

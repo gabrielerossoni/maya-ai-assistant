@@ -93,8 +93,6 @@ async def websocket_endpoint(websocket: WebSocket):
         setup_dashboard_log_filter(manager)
         _log_filter_applied = True
     
-    # Segnale di connessione riuscita
-    await manager.broadcast({"type": "log", "text": "Nucleo Maya Connesso", "level": "ok"})
     await broadcast_state()
     try:
         while True:
@@ -113,7 +111,11 @@ async def execute_and_broadcast(cmd: str):
     Esegue il comando tramite agent.process() e trasmette la risposta.
     La risposta passa attraverso il filtro log che la invia alla dashboard.
     """
-    response = await agent.process(cmd)
+    # Callback per inviare il filler message al frontend quando elabora
+    async def send_progress(msg: str):
+        await manager.broadcast({"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"})
+    
+    response = await agent.process(cmd, progress_cb=send_progress)
     
     # Stampa nel terminale con il prefisso "MAYA >" che viene catturato dal filtro
     print(f"MAYA > {response}")
