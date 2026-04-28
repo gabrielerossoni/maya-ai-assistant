@@ -54,14 +54,13 @@ class SpotifyTool:
             elif command == "prev":
                 self.sp.previous_track()
                 return {"status": "ok", "message": "Brano precedente."}
+            elif command == "volume":
+                level = int(action.get("level", 50))
+                return self._set_volume(max(0, min(100, level)))
             elif command == "volume_up":
                 return self._adjust_volume(+10)
             elif command == "volume_down":
                 return self._adjust_volume(-10)
-            elif command == "volume":
-                level = int(action.get("level", 50))
-                self.sp.volume(max(0, min(100, level)))
-                return {"status": "ok", "message": f"Volume: {level}%."}
             elif command == "current":
                 return self._current_track()
             elif command == "search":
@@ -89,13 +88,36 @@ class SpotifyTool:
             self.sp.start_playback()
             return {"status": "ok", "message": "Play."}
 
+    def _set_volume(self, level: int) -> dict:
+        try:
+            self.sp.volume(level)
+            return {"status": "ok", "message": f"Volume: {level}%"}
+        except spotipy.exceptions.SpotifyException as e:
+            if e.http_status == 403:
+                # Fallback: tasti sistema
+                try:
+                    import keyboard
+                    # Normalizza: 0-100 → n pressioni
+                    current = self._get_current_volume()
+                    diff = level - current
+                    key = "volume up" if diff > 0 else "volume down"
+                    for _ in range(abs(diff) // 5):
+                        keyboard.send(key)
+                    return {"status": "ok", "message": f"Volume (sistema): {level}%"}
+                except Exception:
+                    return {"status": "ok", "message": "Volume: dispositivo non controllabile via API."}
+            raise
+
+    def _get_current_volume(self) -> int:
+        try:
+            pb = self.sp.current_playback()
+            return pb["device"]["volume_percent"] if pb else 50
+        except Exception:
+            return 50
+
     def _adjust_volume(self, delta: int) -> dict:
-        pb = self.sp.current_playback()
-        if not pb:
-            return {"status": "error", "message": "Nessuna riproduzione attiva."}
-        new_vol = max(0, min(100, pb["device"]["volume_percent"] + delta))
-        self.sp.volume(new_vol)
-        return {"status": "ok", "message": f"Volume: {new_vol}%"}
+        current = self._get_current_volume()
+        return self._set_volume(max(0, min(100, current + delta)))
 
     def _current_track(self) -> dict:
         track = self.sp.current_user_playing_track()

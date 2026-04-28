@@ -87,31 +87,40 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global _log_filter_applied
-    await manager.connect(websocket)
-    
-    # Applica il filtro log al primo collegamento del client (una sola volta)
-    if not _log_filter_applied:
-        setup_dashboard_log_filter(manager)
-        _log_filter_applied = True
-    
-    await broadcast_state()
     try:
+        await manager.connect(websocket)
+        
+        # Applica il filtro log al primo collegamento del client (una sola volta)
+        if not _log_filter_applied:
+            setup_dashboard_log_filter(manager)
+            _log_filter_applied = True
+        
+        await broadcast_state()
+        
         while True:
-            data = await websocket.receive_json()
-            if data.get("type") == "command":
-                cmd = data.get("text", "")
-                if cmd:
-                    # Invia la richiesta dell'utente alla dashboard tramite print (che passa dal filtro)
-                    print(f"Richiesta: {cmd}")
-                    asyncio.create_task(execute_and_broadcast(cmd))
-            elif data.get("type") == "tool":
-                # Esecuzione diretta tool, bypassa LLM
-                action = data.get("action", {})
-                if action:
-                    result = await agent.tool_manager.execute(action)
-                    await manager.broadcast({"type": "log", "text": result.get("message", ""), "level": "ok"})
-                    await broadcast_state()
-    except WebSocketDisconnect:
+            try:
+                data = await websocket.receive_json()
+                if data.get("type") == "command":
+                    cmd = data.get("text", "")
+                    if cmd:
+                        # Invia la richiesta dell'utente alla dashboard tramite print (che passa dal filtro)
+                        print(f"Richiesta: {cmd}")
+                        asyncio.create_task(execute_and_broadcast(cmd))
+                elif data.get("type") == "tool":
+                    # Esecuzione diretta tool, bypassa LLM
+                    action = data.get("action", {})
+                    if action:
+                        result = await agent.tool_manager.execute(action)
+                        await manager.broadcast({"type": "log", "text": result.get("message", ""), "level": "ok"})
+                        await broadcast_state()
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                print(f"[WebSocket] Errore durante receive: {e}")
+                break
+    except Exception as e:
+        print(f"[WebSocket] Errore connessione: {e}")
+    finally:
         manager.disconnect(websocket)
 
 async def execute_and_broadcast(cmd: str):

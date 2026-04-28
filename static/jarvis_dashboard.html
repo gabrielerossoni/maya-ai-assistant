@@ -234,7 +234,7 @@
         <div class="flex-1 min-h-0">
           <!-- DASHBOARD VIEW -->
           <div id="view-dashboard" class="view-section active">
-            <div class="grid grid-cols-4 gap-4 h-28">
+            <div class="grid grid-cols-3 gap-4 h-28">
               <div class="glass-card flex items-center gap-4 px-6">
                 <div class="p-3 bg-maya-red/10 rounded-xl">
                   <i data-lucide="cpu" class="text-maya-red w-5 h-5"></i>
@@ -267,19 +267,6 @@
                   </p>
                 </div>
                 <i data-lucide="cloud-sun" class="w-6 h-6 text-blue-400 flex-shrink-0"></i>
-              </div>
-              <!-- Widget Musica -->
-              <div
-                class="glass-card flex items-center gap-3 px-4 border-green-500/20 hover:border-green-500/40 transition-all cursor-pointer"
-              >
-                <div class="flex-1 min-w-0">
-                  <p class="text-[9px] text-green-400 font-bold uppercase tracking-wider mb-0.5">
-                    Musica
-                  </p>
-                  <p class="text-lg font-black text-white" id="widget-music-track">Offline</p>
-                  <p class="text-[7px] text-white/40 leading-none" id="widget-music-artist">--</p>
-                </div>
-                <i data-lucide="music" class="w-6 h-6 text-green-400 flex-shrink-0"></i>
               </div>
             </div>
 
@@ -317,7 +304,32 @@
               </div>
             </div>
 
-            <div class="h-32 grid grid-cols-4 gap-4">
+            <div class="h-32 grid grid-cols-6 gap-4">
+              <div
+                onclick="switchView('spotify')"
+                class="glass-card col-span-2 p-4 flex items-center gap-4 hover:bg-white/5 cursor-pointer transition-all"
+              >
+                <div class="relative w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-green-500/10 flex items-center justify-center">
+                  <img id="home-spotify-art" src="" alt="" class="hidden w-full h-full object-cover">
+                  <i id="home-spotify-icon" data-lucide="music" class="w-5 h-5 text-green-400"></i>
+                  <div id="home-spotify-dot" class="hidden absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full shadow-[0_0_6px_rgba(74,222,128,0.8)]"></div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p id="home-spotify-track" class="text-xs font-bold truncate">—</p>
+                  <p id="home-spotify-artist" class="text-[10px] text-white/30 truncate">Spotify</p>
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="event.stopPropagation(); spotifyCmd('prev')" class="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/15">
+                    <i data-lucide="skip-back" class="w-3 h-3"></i>
+                  </button>
+                  <button onclick="event.stopPropagation(); spotifyCmd('play_pause')" id="home-spotify-playbtn" class="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center hover:scale-105 transition-all">
+                    <i data-lucide="play" class="w-3 h-3 fill-white"></i>
+                  </button>
+                  <button onclick="event.stopPropagation(); spotifyCmd('next')" class="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/15">
+                    <i data-lucide="skip-forward" class="w-3 h-3"></i>
+                  </button>
+                </div>
+              </div>
               <div
                 onclick="switchView('domotica')"
                 class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all"
@@ -658,15 +670,19 @@
         }
       }
 
+      let volumeDebounce = null;
       function spotifyVolume(level) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "tool",
-              action: { tool: "spotify", command: "volume", level: parseInt(level) },
-            }),
-          );
-        }
+        clearTimeout(volumeDebounce);
+        volumeDebounce = setTimeout(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: "tool",
+                action: { tool: "spotify", command: "volume", level: parseInt(level) },
+              }),
+            );
+          }
+        }, 300); // aspetta 300ms dopo l'ultimo movimento
       }
 
       function switchView(viewId) {
@@ -922,6 +938,29 @@
             btn.innerHTML = d.is_playing
               ? '<i data-lucide="pause" class="w-6 h-6 fill-white"></i>'
               : '<i data-lucide="play" class="w-6 h-6 fill-white"></i>';
+            lucide.createIcons();
+
+            // Aggiorna anche widget home
+            document.getElementById('home-spotify-track').innerText = d.track || '—';
+            document.getElementById('home-spotify-artist').innerText = d.artist || 'Spotify';
+
+            const homeArt = document.getElementById('home-spotify-art');
+            const homeIcon = document.getElementById('home-spotify-icon');
+            if(d.album_art) {
+              homeArt.src = d.album_art;
+              homeArt.classList.remove('hidden');
+              homeIcon.classList.add('hidden');
+            } else {
+              homeArt.classList.add('hidden');
+              homeIcon.classList.remove('hidden');
+            }
+
+            document.getElementById('home-spotify-dot').classList.toggle('hidden', !d.is_playing);
+
+            const homeBtn = document.getElementById('home-spotify-playbtn');
+            homeBtn.innerHTML = d.is_playing
+              ? '<i data-lucide="pause" class="w-3 h-3 fill-white"></i>'
+              : '<i data-lucide="play" class="w-3 h-3 fill-white"></i>';
             lucide.createIcons();
           }
         };
