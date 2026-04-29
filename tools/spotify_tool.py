@@ -10,11 +10,13 @@ SCOPE = " ".join([
     "user-read-playback-state",
     "user-modify-playback-state",
     "user-read-currently-playing",
+    "user-read-private",
 ])
 
 class SpotifyTool:
     def __init__(self):
         self.sp: spotipy.Spotify | None = None
+        self.current_device_id: str | None = None
 
     def initialize(self):
         try:
@@ -43,10 +45,10 @@ class SpotifyTool:
             if command == "play_pause":
                 return self._toggle_play_pause()
             elif command == "play":
-                self.sp.start_playback()
+                self.sp.start_playback(device_id=self.current_device_id)
                 return {"status": "ok", "message": "Play."}
             elif command == "pause":
-                self.sp.pause_playback()
+                self.sp.pause_playback(device_id=self.current_device_id)
                 return {"status": "ok", "message": "Pausa."}
             elif command == "next":
                 self.sp.next_track()
@@ -65,6 +67,13 @@ class SpotifyTool:
                 return self._current_track()
             elif command == "search":
                 return self._search_and_play(action.get("query", ""))
+            elif command == "devices":
+                return self._list_devices()
+            elif command == "set_device":
+                device_id = action.get("device_id", "")
+                return self._set_device(device_id)
+            elif command == "set_device_pc":
+                return self._set_device_pc()
             else:
                 return {"status": "error", "message": f"Comando '{command}' non riconosciuto."}
 
@@ -82,10 +91,10 @@ class SpotifyTool:
     def _toggle_play_pause(self) -> dict:
         pb = self.sp.current_playback()
         if pb and pb.get("is_playing"):
-            self.sp.pause_playback()
+            self.sp.pause_playback(device_id=self.current_device_id)
             return {"status": "ok", "message": "Pausa."}
         else:
-            self.sp.start_playback()
+            self.sp.start_playback(device_id=self.current_device_id)
             return {"status": "ok", "message": "Play."}
 
     def _set_volume(self, level: int) -> dict:
@@ -150,5 +159,55 @@ class SpotifyTool:
         uri = tracks[0]["uri"]
         name = tracks[0]["name"]
         artist = tracks[0]["artists"][0]["name"]
-        self.sp.start_playback(uris=[uri])
+        self.sp.start_playback(uris=[uri], device_id=self.current_device_id)
         return {"status": "ok", "message": f"▶ {name} — {artist}"}
+
+    def _list_devices(self) -> dict:
+        try:
+            devices = self.sp.devices()
+            device_list = devices.get("devices", [])
+            if not device_list:
+                return {"status": "ok", "message": "Nessun dispositivo trovato. Apri Spotify su un device."}
+            
+            msg = "Dispositivi disponibili:\n"
+            for dev in device_list:
+                icon = "💻" if dev["type"] == "Computer" else "📱" if dev["type"] == "Smartphone" else "🔊"
+                status = "✓ Attivo" if dev.get("is_active") else "○"
+                msg += f"{icon} {dev['name']} ({dev['type']}) {status}\n"
+            
+            return {"status": "ok", "message": msg.strip(), "devices": device_list}
+        except Exception as e:
+            return {"status": "error", "message": f"Errore nel leggere dispositivi: {e}"}
+
+    def _set_device(self, device_id: str) -> dict:
+        try:
+            if not device_id:
+                return {"status": "error", "message": "Device ID non fornito."}
+            
+            devices = self.sp.devices()
+            device_list = devices.get("devices", [])
+            matching_device = next((d for d in device_list if d["id"] == device_id), None)
+            
+            if not matching_device:
+                return {"status": "error", "message": "Dispositivo non trovato."}
+            
+            self.current_device_id = device_id
+            return {"status": "ok", "message": f"Dispositivo selezionato: {matching_device['name']}"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _set_device_pc(self) -> dict:
+        try:
+            devices = self.sp.devices()
+            device_list = devices.get("devices", [])
+            
+            # Cerca il primo dispositivo Computer
+            pc_device = next((d for d in device_list if d["type"] == "Computer"), None)
+            
+            if not pc_device:
+                return {"status": "error", "message": "Nessun PC trovato. Apri Spotify Desktop su questo computer."}
+            
+            self.current_device_id = pc_device["id"]
+            return {"status": "ok", "message": f"✓ PC selezionato: {pc_device['name']}"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
