@@ -21,3 +21,5 @@ yfinance
 psutil
 keyboard
 python-dotenv
+chromadb>=0.4.0     # Vector database per memoria semantica
+# nomic-embed-text viene usato via Ollama (non serve package Python separato)

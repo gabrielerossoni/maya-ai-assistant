@@ -47,14 +47,6 @@ import uvicorn
 from websocket_manager import manager
 from contextlib import asynccontextmanager
 
-app = FastAPI()
-agent = AgentCore()
-display = DisplayTool()
-
-# Applica il filtro dei log della dashboard SUBITO dopo l'inizializzazione FastAPI
-# Questo permette ai log di sistema di passare al terminale durante l'avvio
-_log_filter_applied = False
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -62,7 +54,7 @@ async def lifespan(app: FastAPI):
     print("\n[SYSTEM] Avvio dei sistemi MAYA...\n")
     await agent.initialize()
     print("\n[SYSTEM] Sistemi operativi. Avvio interfaccia visiva...\n")
-    display.start()
+    # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
 
     dashboard_path = os.path.abspath("static/jarvis_dashboard.html")
     print(f"[MAYA] Apertura dashboard: {dashboard_path}")
@@ -76,7 +68,13 @@ async def lifespan(app: FastAPI):
     # Shutdown
     display.stop()
 
-app.router.lifespan_context = lifespan
+app = FastAPI(lifespan=lifespan)
+agent = AgentCore()
+display = DisplayTool()
+
+# Applica il filtro dei log della dashboard SUBITO dopo l'inizializzazione FastAPI
+# Questo permette ai log di sistema di passare al terminale durante l'avvio
+_log_filter_applied = False
 
 @app.get("/")
 async def get_dashboard():
@@ -195,6 +193,10 @@ async def broadcast_state():
 
 async def stats_broadcaster():
     import psutil
+    # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
+    psutil.cpu_percent(interval=None)
+    await asyncio.sleep(0.1)
+    
     while True:
         try:
             cpu_load = psutil.cpu_percent(interval=None)
@@ -237,6 +239,8 @@ async def interactive_console():
     loop = asyncio.get_running_loop()
     while True:
         try:
+            sys.stdout.write("MAYA > ")
+            sys.stdout.flush()
             user_input = await loop.run_in_executor(None, sys.stdin.readline)
             user_input = user_input.strip()
             if not user_input:

@@ -5,6 +5,8 @@ Gestisce: LLM (Ollama), Planner, Executor, Validator
 
 import os
 import json
+import re
+import random
 import ollama
 import asyncio
 from tool_manager import ToolManager
@@ -72,6 +74,15 @@ REGOLE CRITICHE:
 
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
 
+# Messaggi di filler per il feedback durante l'elaborazione (zero latenza aggiuntiva)
+FILLER_MESSAGES = [
+    "Certamente, recupero i dati...",
+    "Un attimo, sto elaborando...",
+    "Controllo subito...",
+    "Accesso ai dati in corso...",
+    "Elaborazione in corso...",
+]
+
 
 # ──────────────────────────────────────────────
 # AUTOMAZIONI PREDEFINITE
@@ -125,60 +136,60 @@ class AgentCore:
         return None
 
     def _select_model(self, user_input: str) -> str:
-        """Seleziona il modello in base alla complessità."""
-        complex_keywords = [
-            "spiega",
-            "traduci",
-            "riassumi",
-            "cerca",
-            "notizie",
-            "perché",
-            "come",
-            "significato",
-            "wikipedia",
-            "trading",
-            "prezzo",
-            "valore",
-            "meteo",
-            "tempo fa",
-            "bitcoin",
-            "btc",
-            "eth",
-            "crypto",
-            "vale",
-        ]
+        """
+        Seleziona il modello in base alla complessità della query.
+        - balanced (mistral-small): compiti cognitivi pesanti (analisi, riassunti, Wikipedia)
+        - fast (phi4): tool informativi veloci (prezzo, meteo, notizie)
+        - ultra-fast (llama3.2): comandi rapidi e conversazione
+        """
         lower = user_input.lower()
-        if len(user_input.split()) > 8 or any(k in lower for k in complex_keywords):
-            return "fast"
-        return "ultra-fast"
+        
+        # Compiti cognitivi pesanti → mistral-small (balanced)
+        heavy_keywords = [
+            "spiega", "riassumi", "analizza", "significato", 
+            "wikipedia", "traduci", "background", "storia", "origine"
+        ]
+        
+        # Tool informativi veloci → phi4 (fast)
+        fast_keywords = [
+            "prezzo", "meteo", "bitcoin", "btc", "eth", "notizie", 
+            "vale", "crypto", "trading", "azioni", "cerca", "news"
+        ]
+        
+        if any(k in lower for k in heavy_keywords):
+            return "balanced"  # mistral-small per compiti cognitivi
+        if any(k in lower for k in fast_keywords) or len(user_input.split()) > 8:
+            return "fast"  # phi4 per tool informativi
+        return "ultra-fast"  # llama3.2 per comandi rapidi
 
-    async def _generate_filler(self, user_input: str) -> str:
-        """Genera una frase di attesa veloce con llama3.2."""
-        prompt = f"L'utente ha chiesto: '{user_input}'. Rispondi come JARVIS. Dì che stai recuperando i dati richiesti. NON inventare MAI numeri, prezzi o dati. NON dare risposte finali. Limitati a una frase di attesa (max 10 parole). Solo testo."
+    def _clean_json(self, text: str) -> dict:
+        """
+        Pulisce il testo dalla formattazione markdown (code fences)
+        e ritorna un JSON valido. Fallback a _fallback_parse se parse fallisce.
+        """
+        # Rimuovi markdown code fences
+        text = re.sub(r"```(?:json)?\s*", "", text).strip()
+        # Estrai il primo oggetto JSON completo
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            text = match.group(0)
         try:
-            client = ollama.AsyncClient()
-            response = await client.generate(
-                model=MODELS["ultra-fast"],
-                prompt=prompt,
-                stream=False,
-            )
-            return response.get("response", "Un attimo, controllo...").strip()
-        except:
-            return "Un attimo, controllo..."
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return self._fallback_parse(text)
 
     async def _call_llm(self, user_input: str, progress_cb=None) -> dict:
         """Chiama Ollama e ottieni JSON strutturato."""
-        # Aggiungi contesto dalla memoria
-        context = self.memory.get_context()
+        # Aggiungi contesto dalla memoria (retrieval semantico)
+        context = await self.memory.get_context(query=user_input, top_k=5)
         prompt = f"{context}\nUtente: {user_input}"
 
         model_type = self._select_model(user_input)
         model_name = MODELS[model_type]
         print(f"[ROUTER] Modello selezionato: {model_name} ({model_type})")
 
-        if model_type == "fast" and progress_cb:
-            filler = await self._generate_filler(user_input)
-            await progress_cb(filler)
+        if model_type in ("fast", "balanced") and progress_cb:
+            await progress_cb(random.choice(FILLER_MESSAGES))
 
         try:
             client = ollama.AsyncClient()
@@ -192,7 +203,7 @@ class AgentCore:
             )
 
             text = response.get("response", "{}")
-            result = json.loads(text)
+            result = self._clean_json(text)
             
             # Se l'LLM ha risposto ma manca la chiave reply, proviamo a recuperare
             if "reply" not in result and "response" in result:
@@ -318,6 +329,6 @@ class AgentCore:
 
         # Salva risposta nella memoria
         self.memory.add_turn("jarvis", reply)
-        self.memory.save()
+        await self.memory.save()
 
         return reply
