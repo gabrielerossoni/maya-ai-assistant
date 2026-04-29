@@ -42,16 +42,13 @@ class VoiceManager:
         # STT: faster-whisper (tiny per velocità estrema)
         self.stt_model = WhisperModel("tiny", device="cpu", compute_type="int8")
         
-        # Wake Word: Cerchiamo il modello personalizzato 'hey_maya.onnx'
-        custom_ww = os.path.join("voice", "hey_maya.onnx")
-        if os.path.exists(custom_ww):
-            self.oww_model = Model(wakeword_models=[custom_ww], inference_framework="onnx")
-            print(f"[VOICE] Wake Word personalizzata caricata: {custom_ww}")
-        else:
-            # Fallback se non esiste ancora
-            self.oww_model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
-            print("[VOICE] Modello 'hey_maya.onnx' non trovato. Uso fallback 'hey_jarvis'.")
-        
+        # Wake Word: usiamo hey_mycroft (suona simile a "Hey Maya")
+        # Percorso assoluto al modello che sappiamo funzionare
+        oww_path = r"C:\Users\Gab\AppData\Local\Programs\Python\Python313\Lib\site-packages\openwakeword\resources\models\hey_mycroft_v0.1.onnx"
+        if not os.path.exists(oww_path):
+            raise FileNotFoundError(f"Modello wake word non trovato: {oww_path}")
+        self.oww_model = Model(wakeword_models=[oww_path], inference_framework="onnx")
+        print("[VOICE] Wake Word 'hey_mycroft' caricata (risponde anche a 'Hey Maya').")
         print("[VOICE] Modelli caricati con successo.")
 
     async def broadcast_status(self, status):
@@ -60,6 +57,14 @@ class VoiceManager:
                 "type": "voice_status",
                 "status": status
             })
+
+    def _broadcast(self, status):
+        """Helper sincrono per broadcast da thread."""
+        try:
+            if hasattr(self.agent, 'loop') and self.agent.loop:
+                asyncio.run_coroutine_threadsafe(self.broadcast_status(status), self.agent.loop)
+        except Exception:
+            pass  # Non crashare mai per un broadcast fallito
 
     def start(self):
         self.is_running = True
@@ -84,27 +89,32 @@ class VoiceManager:
                 # 1. Controllo Wake Word
                 prediction = self.oww_model.predict(audio_data)
                 
-                # Soglia abbassata a 0.3 per aumentare la sensibilità
-                if any(prediction[mdl] > 0.3 for mdl in prediction):
+                # Soglia 0.5 - standard per evitare falsi positivi
+                if any(prediction[mdl] > 0.5 for mdl in prediction):
                     score = max(prediction[mdl] for mdl in prediction)
-                    print(f"[VOICE] Wake Word rilevata! (score: {score:.2f})")
-                    if self.agent.loop:
-                        asyncio.run_coroutine_threadsafe(self.broadcast_status("LISTENING"), self.agent.loop)
+                    print(f"[VOICE] Wake Word 'Hey Maya' rilevata! (score: {score:.2f})")
+                    
+                    # Reset del modello per evitare attivazioni consecutive
+                    self.oww_model.reset()
+                    
+                    self._broadcast("LISTENING")
                     self._handle_voice_command(stream)
+                    self._broadcast("IDLE")
                     
             stream.stop_stream()
             stream.close()
             audio.terminate()
         except Exception as e:
             print(f"[VOICE] ERRORE CRITICO nel loop vocale: {e}")
+            import traceback
+            traceback.print_exc()
             self.is_running = False
 
     def _handle_voice_command(self, stream):
-        import asyncio
         self.is_listening = True
-        print("[VOICE] Ascolto in corso...")
+        print("[VOICE] Ascolto in corso (5 secondi)...")
         
-        # Registra per 5 secondi (semplificazione, poi aggiungeremo VAD)
+        # Registra per 5 secondi
         frames = []
         for _ in range(0, int(self.RATE / self.CHUNK * 5)):
             data = stream.read(self.CHUNK, exception_on_overflow=False)
@@ -115,12 +125,14 @@ class VoiceManager:
         
         # Converti in wav temporaneo per Whisper
         temp_wav = "voice/temp_command.wav"
+        p_temp = pyaudio.PyAudio()
         wf = wave.open(temp_wav, 'wb')
         wf.setnchannels(self.CHANNELS)
-        wf.setsampwidth(pyaudio.PyAudio().get_sample_size(self.FORMAT))
+        wf.setsampwidth(p_temp.get_sample_size(self.FORMAT))
         wf.setframerate(self.RATE)
         wf.writeframes(b''.join(frames))
         wf.close()
+        p_temp.terminate()
         
         # 2. Trascrizione (STT)
         segments, _ = self.stt_model.transcribe(temp_wav, beam_size=5)
@@ -128,13 +140,19 @@ class VoiceManager:
         
         if text:
             print(f"[VOICE] Trascrizione: {text}")
-            asyncio.run_coroutine_threadsafe(self.broadcast_status("PROCESSING"), self.agent.loop)
+            self._broadcast("PROCESSING")
             
-            # 3. Processa con l'agente
-            response = asyncio.run_coroutine_threadsafe(self.agent.process(text), self.agent.loop).result()
-            
-            # 4. Parla (TTS)
-            self.speak(response)
+            try:
+                # 3. Processa con l'agente
+                response = asyncio.run_coroutine_threadsafe(
+                    self.agent.process(text), self.agent.loop
+                ).result(timeout=30)
+                
+                # 4. Parla (TTS)
+                if response:
+                    self.speak(response)
+            except Exception as e:
+                print(f"[VOICE] Errore durante l'elaborazione: {e}")
         else:
             print("[VOICE] Nessun comando rilevato.")
 
@@ -143,29 +161,27 @@ class VoiceManager:
             print(f"[VOICE] ERRORE: Piper non trovato in {self.piper_exe}")
             return
             
-        print(f"[VOICE] Sintesi vocale: {text}")
+        print(f"[VOICE] Sintesi vocale: {text[:80]}...")
         self.is_speaking = True
-        if self.agent.loop:
-            asyncio.run_coroutine_threadsafe(self.broadcast_status("SPEAKING"), self.agent.loop)
+        self._broadcast("SPEAKING")
         
         try:
             output_wav = "voice/response.wav"
             # Comando per Piper: passa il testo e genera il wav
             command = f'echo {text} | "{self.piper_exe}" --model "{self.piper_model}" --output_file {output_wav}'
-            subprocess.run(command, shell=True, check=True)
+            subprocess.run(command, shell=True, check=True,
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            # Riproduzione controllata via PyAudio (evita loop e lettori esterni)
+            # Riproduzione controllata via PyAudio (niente lettore multimediale)
             self._play_wav(output_wav)
             
         except Exception as e:
             print(f"[VOICE] Errore TTS: {e}")
             
         self.is_speaking = False
-        if self.agent.loop:
-            asyncio.run_coroutine_threadsafe(self.broadcast_status("IDLE"), self.agent.loop)
 
     def _play_wav(self, file_path):
-        """Riproduce un file WAV usando PyAudio in modo sincrono."""
+        """Riproduce un file WAV usando PyAudio in modo sincrono e controllato."""
         try:
             wf = wave.open(file_path, 'rb')
             p = pyaudio.PyAudio()
@@ -174,16 +190,24 @@ class VoiceManager:
                             rate=wf.getframerate(),
                             output=True)
             
-            data = wf.readframes(self.CHUNK)
-            while data:
+            chunk_size = 4096
+            data = wf.readframes(chunk_size)
+            while len(data) > 0:
                 stream.write(data)
-                data = wf.readframes(self.CHUNK)
+                data = wf.readframes(chunk_size)
             
             stream.stop_stream()
             stream.close()
+            wf.close()
             p.terminate()
         except Exception as e:
             print(f"[VOICE] Errore riproduzione audio: {e}")
+
+    def stop(self):
+        self.is_running = False
+        if hasattr(self, 'thread'):
+            self.thread.join(timeout=2)
+        print("[VOICE] Sistema vocale fermato.")
 
 if __name__ == "__main__":
     # Test stub

@@ -6,6 +6,8 @@ Punto di ingresso principale
 import asyncio
 import sys
 import os
+import time
+import threading
 import webbrowser
 import ollama
 from agent_core import AgentCore, MODELS
@@ -69,16 +71,25 @@ async def lifespan(app: FastAPI):
 
     dashboard_path = os.path.abspath("static/jarvis_dashboard.html")
     print(f"[MAYA] Apertura dashboard: {dashboard_path}")
-    webbrowser.open(f"http://127.0.0.1:8000")
 
     # Avvia la console e i broadcaster in background
     asyncio.create_task(interactive_console())
     asyncio.create_task(stats_broadcaster())
     asyncio.create_task(spotify_broadcaster())
     
-    # Avvia il sistema vocale dopo un piccolo delay per assicurarsi che tutto sia pronto
-    await asyncio.sleep(1)
-    voice_manager.start()
+    # Apri il browser con un piccolo ritardo (il server deve essere pronto)
+    def _open_browser():
+        time.sleep(1.5)
+        webbrowser.open("http://127.0.0.1:8000")
+    threading.Thread(target=_open_browser, daemon=True).start()
+
+    # Avvia il sistema vocale
+    try:
+        voice_manager.start()
+    except Exception as e:
+        print(f"[VOICE] Impossibile avviare il sistema vocale: {e}")
+        import traceback
+        traceback.print_exc()
     
     yield
     # Shutdown
