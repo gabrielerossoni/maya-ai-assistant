@@ -1,71 +1,99 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M.A.Y.A. | Home Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
-    
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono&display=swap"
+      rel="stylesheet"
+    />
+
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        maya: {
-                            red: '#FF4B4B',
-                            dark: '#0A0A0C',
-                            surface: 'rgba(255, 255, 255, 0.03)',
-                            border: 'rgba(255, 255, 255, 0.08)'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace']
-                    }
-                }
-            }
-        }
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              maya: {
+                red: "#FF4B4B",
+                dark: "#0A0A0C",
+                surface: "rgba(255, 255, 255, 0.03)",
+                border: "rgba(255, 255, 255, 0.08)",
+              },
+            },
+            fontFamily: {
+              sans: ["Plus Jakarta Sans", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
+            },
+          },
+        },
+      };
     </script>
 
     <style>
-        body { 
-            background: #0A0A0C;
-            background-image: radial-gradient(circle at 50% -20%, #1a1a2e 0%, #0a0a0c 100%);
-            height: 100vh;
-            overflow: hidden;
+      body {
+        background: #0a0a0c;
+        background-image: radial-gradient(circle at 50% -20%, #1a1a2e 0%, #0a0a0c 100%);
+        height: 100vh;
+        overflow: hidden;
+      }
+      .glass-card {
+        background: var(--maya-surface);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--maya-border);
+        border-radius: 24px;
+        position: relative;
+      }
+      .active-tab {
+        background: #ff4b4b;
+        color: white;
+        box-shadow: 0 8px 24px rgba(255, 75, 75, 0.3);
+      }
+      .view-section {
+        display: none;
+        height: 100%;
+        width: 100%;
+      }
+      .view-section.active {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .scanline {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 1px;
+        background: rgba(255, 75, 75, 0.05);
+        z-index: 100;
+        pointer-events: none;
+        animation: scan 12s linear infinite;
+      }
+      @keyframes scan {
+        from {
+          top: 0%;
         }
-        .glass-card {
-            background: var(--maya-surface);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border: 1px solid var(--maya-border);
-            border-radius: 24px;
-            position: relative;
+        to {
+          top: 100%;
         }
-        .active-tab {
-            background: #FF4B4B;
-            color: white;
-            box-shadow: 0 8px 24px rgba(255, 75, 75, 0.3);
-        }
-        .view-section { display: none; height: 100%; width: 100%; }
-        .view-section.active { display: flex; flex-direction: column; gap: 1.5rem; }
-        
-        .scanline {
-            position: fixed; top: 0; left: 0; width: 100%; height: 1px;
-            background: rgba(255, 75, 75, 0.05);
-            z-index: 100; pointer-events: none;
-            animation: scan 12s linear infinite;
-        }
-        @keyframes scan { from { top: 0%; } to { top: 100%; } }
-        
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        
-        /* SIDEBAR ANIMATIONS DISABILITATI
+      }
+
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+
+      /* SIDEBAR ANIMATIONS DISABILITATI
         .sidebar { 
             transition: transform 0.3s ease;
             position: fixed;
@@ -93,409 +121,667 @@
         }
         */
     </style>
-</head>
-<body class="text-white font-sans p-6">
+  </head>
+  <body class="text-white font-sans p-6">
     <div class="scanline"></div>
-    
+
     <div class="flex h-full gap-6 max-w-[1600px] mx-auto">
-        <!-- Sidebar -->
-        <aside class="w-20 flex flex-col items-center py-8 glass-card" id="sidebar">
-            <div class="w-12 h-12 bg-maya-red/10 rounded-2xl flex items-center justify-center mb-10 overflow-hidden border border-maya-red/20">
-                <img src="/static/maya_logo.png" alt="MAYA Logo" class="w-full h-full object-cover">
+      <!-- Sidebar -->
+      <aside class="w-20 flex flex-col items-center py-8 glass-card" id="sidebar">
+        <div
+          class="w-12 h-12 bg-maya-red/10 rounded-2xl flex items-center justify-center mb-10 overflow-hidden border border-maya-red/20"
+        >
+          <img src="/static/maya_logo.png" alt="MAYA Logo" class="w-full h-full object-cover" />
+        </div>
+
+        <nav class="flex-1 flex flex-col gap-4" id="sidebar-nav">
+          <button
+            onclick="switchView('dashboard')"
+            class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl active-tab"
+            data-view="dashboard"
+          >
+            <i data-lucide="layout-grid" class="w-5 h-5"></i>
+          </button>
+          <button
+            onclick="switchView('domotica')"
+            class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all"
+            data-view="domotica"
+          >
+            <i data-lucide="home" class="w-5 h-5"></i>
+          </button>
+          <button
+            onclick="switchView('spotify')"
+            class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all"
+            data-view="spotify"
+          >
+            <i data-lucide="music" class="w-5 h-5"></i>
+          </button>
+          <button
+            onclick="switchView('weather')"
+            class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all"
+            data-view="weather"
+          >
+            <i data-lucide="cloud-sun" class="w-5 h-5"></i>
+          </button>
+          <button
+            onclick="switchView('news')"
+            class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all"
+            data-view="news"
+          >
+            <i data-lucide="newspaper" class="w-5 h-5"></i>
+          </button>
+          <button
+            onclick="switchView('trading')"
+            class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all"
+            data-view="trading"
+          >
+            <i data-lucide="trending-up" class="w-5 h-5"></i>
+          </button>
+        </nav>
+
+        <button
+          onclick="switchView('settings')"
+          class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all mt-auto"
+          data-view="settings"
+        >
+          <i data-lucide="settings" class="w-5 h-5"></i>
+        </button>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="flex-1 flex flex-col gap-6 min-w-0">
+        <!-- Header Section -->
+        <header class="flex items-center justify-between">
+          <div class="flex flex-col">
+            <h1 id="greeting-text" class="text-3xl font-extrabold tracking-tight">
+              Sincronizzazione...
+            </h1>
+            <p class="text-white/40 text-sm font-medium">M.A.Y.A. Intelligent Assistant Online</p>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <div class="relative group">
+              <i
+                data-lucide="terminal"
+                class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-maya-red"
+              ></i>
+              <input
+                id="cmd-input"
+                type="text"
+                placeholder="Chiedi qualcosa a Maya..."
+                class="bg-white/5 border border-white/5 rounded-2xl py-4 pl-14 pr-6 w-80 outline-none focus:border-maya-red/30 transition-all text-sm font-medium"
+                onkeydown="if (event.key === 'Enter') submitCmd();"
+              />
             </div>
-            
-            <nav class="flex-1 flex flex-col gap-4" id="sidebar-nav">
-                <button onclick="switchView('dashboard')" class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl active-tab" data-view="dashboard">
-                    <i data-lucide="layout-grid" class="w-5 h-5"></i>
-                </button>
-                <button onclick="switchView('domotica')" class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all" data-view="domotica">
-                    <i data-lucide="home" class="w-5 h-5"></i>
-                </button>
-                <button onclick="switchView('spotify')" class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all" data-view="spotify">
-                    <i data-lucide="music" class="w-5 h-5"></i>
-                </button>
-                <button onclick="switchView('weather')" class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all" data-view="weather">
-                    <i data-lucide="cloud-sun" class="w-5 h-5"></i>
-                </button>
-                <button onclick="switchView('news')" class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all" data-view="news">
-                    <i data-lucide="newspaper" class="w-5 h-5"></i>
-                </button>
-                <button onclick="switchView('trading')" class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all" data-view="trading">
-                    <i data-lucide="trending-up" class="w-5 h-5"></i>
-                </button>
-            </nav>
-
-            <button onclick="switchView('settings')" class="nav-btn w-12 h-12 flex items-center justify-center rounded-2xl text-white/30 hover:bg-white/5 transition-all mt-auto" data-view="settings">
-                <i data-lucide="settings" class="w-5 h-5"></i>
-            </button>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="flex-1 flex flex-col gap-6 min-w-0">
-            <!-- Header Section -->
-            <header class="flex items-center justify-between">
-                <div class="flex flex-col">
-                    <h1 id="greeting-text" class="text-3xl font-extrabold tracking-tight">Sincronizzazione...</h1>
-                    <p class="text-white/40 text-sm font-medium">M.A.Y.A. Intelligent Assistant Online</p>
-                </div>
-                
-                <div class="flex items-center gap-4">
-                    <div class="relative group">
-                        <i data-lucide="terminal" class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-maya-red"></i>
-                        <input id="cmd-input" type="text" placeholder="Chiedi qualcosa a Maya..." 
-                            class="bg-white/5 border border-white/5 rounded-2xl py-4 pl-14 pr-6 w-80 outline-none focus:border-maya-red/30 transition-all text-sm font-medium"
-                            onkeydown="if(event.key==='Enter')submitCmd()">
-                    </div>
-                    <div id="ollama-status" class="flex items-center gap-2 glass-card px-4 h-12 border-yellow-500/20">
-                        <div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
-                        <span class="text-[10px] font-bold uppercase text-yellow-500">Ollama Sync</span>
-                    </div>
-                    <div class="w-12 h-12 glass-card flex items-center justify-center border-white/5 cursor-pointer hover:bg-white/5 transition-all" onclick="showNotifications()" title="Notifiche">
-                        <i data-lucide="bell" class="w-5 h-5 text-white/40"></i>
-                    </div>
-                </div>
-            </header>
-
-            <!-- VIEW CONTAINER -->
-            <div class="flex-1 min-h-0">
-                
-                <!-- DASHBOARD VIEW -->
-                <div id="view-dashboard" class="view-section active">
-                    <div class="grid grid-cols-4 gap-4 h-28">
-                        <div class="glass-card flex items-center gap-4 px-6">
-                            <div class="p-3 bg-maya-red/10 rounded-xl"><i data-lucide="cpu" class="text-maya-red w-5 h-5"></i></div>
-                            <div><p class="text-xl font-bold font-mono" id="neural-load">12%</p><p class="text-[9px] text-white/20 font-bold uppercase tracking-widest">LOAD</p></div>
-                        </div>
-                        <div class="glass-card flex items-center gap-4 px-6">
-                            <div class="p-3 bg-blue-500/10 rounded-xl"><i data-lucide="clock" class="text-blue-500 w-5 h-5"></i></div>
-                            <div><p class="text-xl font-bold font-mono" id="clock">--:--:--</p><p class="text-[9px] text-white/20 font-bold uppercase tracking-widest">TIME</p></div>
-                        </div>
-                        <!-- Widget Meteo -->
-                        <div class="glass-card flex items-center gap-3 px-4 border-blue-500/20 hover:border-blue-500/40 transition-all cursor-pointer">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-[9px] text-blue-400 font-bold uppercase tracking-wider mb-0.5">Meteo</p>
-                                <p class="text-lg font-black text-white" id="widget-weather-temp">22°C</p>
-                                <p class="text-[7px] text-white/40 leading-none" id="widget-weather-desc">Sereno</p>
-                            </div>
-                            <i data-lucide="cloud-sun" class="w-6 h-6 text-blue-400 flex-shrink-0"></i>
-                        </div>
-                        <!-- Widget Musica -->
-                        <div class="glass-card flex items-center gap-3 px-4 border-green-500/20 hover:border-green-500/40 transition-all cursor-pointer">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-[9px] text-green-400 font-bold uppercase tracking-wider mb-0.5">Musica</p>
-                                <p class="text-lg font-black text-white" id="widget-music-track">Offline</p>
-                                <p class="text-[7px] text-white/40 leading-none" id="widget-music-artist">--</p>
-                            </div>
-                            <i data-lucide="music" class="w-6 h-6 text-green-400 flex-shrink-0"></i>
-                        </div>
-                    </div>
-
-                    <div class="flex-1 grid grid-cols-3 gap-4 min-h-0">
-                        <div class="col-span-2 glass-card p-6 flex flex-col gap-4">
-                            <div class="flex justify-between items-center">
-                                <h3 class="font-bold text-sm text-white/60 uppercase tracking-widest">Attività Sistema</h3>
-                                <div class="flex gap-4 text-[9px] text-white/20 font-bold uppercase">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-2 h-2 rounded-full bg-maya-red shadow-[0_0_8px_rgba(255,75,75,0.5)]"></div>
-                                        <span>CARICO</span>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
-                                        <span>MEMORIA</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex-1 relative"><canvas id="mainChart"></canvas></div>
-                        </div>
-                        <div class="glass-card p-6 flex flex-col gap-4 overflow-hidden">
-                            <h3 class="font-bold text-sm text-white/60 uppercase tracking-widest">Feed Recente</h3>
-                            <div id="log-container" class="flex-1 overflow-y-auto space-y-3 text-[10px] pr-2 custom-scrollbar"></div>
-                        </div>
-                    </div>
-
-                    <div class="h-32 grid grid-cols-4 gap-4">
-                        <div onclick="switchView('domotica')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
-                            <i data-lucide="home" class="text-maya-red w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">Casa</span>
-                        </div>
-                        <div onclick="switchView('news')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
-                            <i data-lucide="newspaper" class="text-white w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">News</span>
-                        </div>
-                        <div onclick="switchView('trading')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
-                            <i data-lucide="trending-up" class="text-yellow-400 w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">Trading</span>
-                        </div>
-                        <div onclick="switchView('settings')" class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all">
-                            <i data-lucide="settings" class="text-white/40 w-6 h-6"></i><span class="text-[10px] font-bold uppercase opacity-40">Set</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- DOMOTICA VIEW -->
-                <div id="view-domotica" class="view-section">
-                    <div class="grid grid-cols-2 gap-6 flex-1">
-                        <div class="glass-card p-8 flex flex-col gap-6">
-                            <h2 class="text-xl font-bold">Controllo Dispositivi</h2>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="bg-white/5 p-6 rounded-2xl flex flex-col gap-4">
-                                    <div class="flex justify-between items-center"><i data-lucide="lightbulb" class="text-maya-red"></i><div class="w-3 h-3 bg-maya-red rounded-full"></div></div>
-                                    <p class="font-bold">Luci Soggiorno</p>
-                                    <button onclick="fireTool('luce')" class="py-2 bg-maya-red/20 rounded-lg text-xs font-bold uppercase">Toggle</button>
-                                </div>
-                                <div class="bg-white/5 p-6 rounded-2xl flex flex-col gap-4">
-                                    <div class="flex justify-between items-center"><i data-lucide="fan" class="text-blue-400"></i><div class="w-3 h-3 bg-blue-400 rounded-full"></div></div>
-                                    <p class="font-bold">Clima</p>
-                                    <button onclick="fireTool('temperatura')" class="py-2 bg-blue-400/20 rounded-lg text-xs font-bold uppercase">Auto</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="glass-card p-8 flex flex-col gap-4">
-                            <h2 class="text-xl font-bold">Stato Sensori</h2>
-                            <div class="space-y-4">
-                                <div class="flex justify-between p-4 bg-white/5 rounded-xl"><span>Temperatura</span><span class="font-mono text-maya-red">22.5°C</span></div>
-                                <div class="flex justify-between p-4 bg-white/5 rounded-xl"><span>Umidità</span><span class="font-mono text-blue-400">45%</span></div>
-                                <div class="flex justify-between p-4 bg-white/5 rounded-xl"><span>Aria (CO2)</span><span class="font-mono text-green-400">400 ppm</span></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SPOTIFY VIEW -->
-                <div id="view-spotify" class="view-section">
-                    <div class="glass-card p-8 flex flex-col gap-8 flex-1 items-center justify-center">
-                        <div class="w-64 h-64 bg-green-500/10 rounded-3xl flex items-center justify-center mb-4">
-                            <i data-lucide="music" class="w-32 h-32 text-green-500"></i>
-                        </div>
-                        <div class="text-center">
-                            <h2 class="text-2xl font-bold">In riproduzione</h2>
-                            <p class="text-white/40 italic">Nessun brano selezionato</p>
-                        </div>
-                        <div class="flex gap-8">
-                            <button onclick="fireTool('skip previous')" class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10"><i data-lucide="skip-back"></i></button>
-                            <button onclick="fireTool('play spotify')" class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center hover:scale-105 transition-all"><i data-lucide="play" class="fill-white"></i></button>
-                            <button onclick="fireTool('skip next')" class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10"><i data-lucide="skip-forward"></i></button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- WEATHER VIEW -->
-                <div id="view-weather" class="view-section">
-                    <div class="grid grid-cols-3 gap-6 flex-1">
-                        <div class="col-span-2 glass-card p-8 flex flex-col justify-between">
-                            <div>
-                                <h2 class="text-4xl font-black">22°C</h2>
-                                <p class="text-white/40 font-bold uppercase tracking-widest mt-2">Milano, Italia</p>
-                            </div>
-                            <div class="flex gap-12">
-                                <div class="text-center"><p class="text-xs font-bold text-white/20 mb-2 uppercase">Vento</p><p class="font-bold">12 km/h</p></div>
-                                <div class="text-center"><p class="text-xs font-bold text-white/20 mb-2 uppercase">Umidità</p><p class="font-bold">45%</p></div>
-                                <div class="text-center"><p class="text-xs font-bold text-white/20 mb-2 uppercase">UV</p><p class="font-bold">Basso</p></div>
-                            </div>
-                        </div>
-                        <div class="glass-card p-8 flex flex-col gap-6">
-                            <h3 class="font-bold text-sm opacity-40 uppercase tracking-widest">Previsioni</h3>
-                            <div class="space-y-4">
-                                <div class="flex justify-between items-center p-3 bg-white/5 rounded-xl"><span>Domani</span><i data-lucide="cloud-sun" class="text-yellow-400"></i><span>21°</span></div>
-                                <div class="flex justify-between items-center p-3 bg-white/5 rounded-xl"><span>Mercoledì</span><i data-lucide="sun" class="text-yellow-500"></i><span>24°</span></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- NEWS VIEW -->
-                <div id="view-news" class="view-section">
-                    <div class="glass-card p-8 flex flex-col gap-6 flex-1 overflow-hidden">
-                        <h2 class="text-xl font-bold">Ultime Notizie</h2>
-                        <div class="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-                            <div class="p-6 bg-white/5 rounded-2xl border-l-4 border-maya-red">
-                                <h3 class="font-bold text-lg">IA e Futuro: Maya Core v1.2 Rilasciata</h3>
-                                <p class="text-sm text-white/40 mt-2">La nuova versione del nucleo promette prestazioni superiori...</p>
-                            </div>
-                            <div class="p-6 bg-white/5 rounded-2xl">
-                                <h3 class="font-bold text-lg">Mercati Crypto in fermento</h3>
-                                <p class="text-sm text-white/40 mt-2">Bitcoin tocca nuovi massimi storici mentre gli investitori...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TRADING VIEW -->
-                <div id="view-trading" class="view-section">
-                    <div class="glass-card p-8 flex flex-col gap-8 flex-1">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-xl font-bold">Mercati Crypto</h2>
-                            <button onclick="fireTool('prezzo bitcoin')" class="px-6 py-2 bg-maya-red rounded-xl text-xs font-bold uppercase tracking-widest">Aggiorna Dati</button>
-                        </div>
-                        <div class="grid grid-cols-2 gap-6">
-                            <div class="p-6 bg-white/5 rounded-3xl border border-white/5">
-                                <p class="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-2">Bitcoin / USD</p>
-                                <p class="text-3xl font-bold font-mono">$--.---</p>
-                                <p class="text-xs text-green-500 mt-2 font-bold">+2.4%</p>
-                            </div>
-                            <div class="p-6 bg-white/5 rounded-3xl border border-white/5">
-                                <p class="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-2">Ethereum / USD</p>
-                                <p class="text-3xl font-bold font-mono">$--.---</p>
-                                <p class="text-xs text-red-500 mt-2 font-bold">-0.8%</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SETTINGS VIEW -->
-                <div id="view-settings" class="view-section h-full">
-                    <div class="grid grid-cols-2 gap-6 h-full">
-                        <div class="glass-card p-8 flex flex-col gap-6">
-                            <h2 class="text-xl font-bold flex items-center gap-2">
-                                <i data-lucide="cpu" class="text-maya-red"></i>
-                                Neural Core Status
-                            </h2>
-                            <div class="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar" id="model-list-container">
-                                <!-- I modelli verranno inseriti qui dallo script -->
-                                <div class="p-4 bg-white/5 rounded-2xl flex items-center justify-between animate-pulse">
-                                    <span class="opacity-40">Caricamento modelli...</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-8 flex flex-col gap-6">
-                            <h2 class="text-xl font-bold flex items-center gap-2">
-                                <i data-lucide="settings-2" class="text-maya-red"></i>
-                                Info Sistema
-                            </h2>
-                            <div class="space-y-4">
-                                <div class="p-4 bg-white/5 rounded-xl flex justify-between">
-                                    <span class="opacity-40">Assistente</span>
-                                    <span id="settings-name" class="text-maya-red font-bold uppercase">MAYA</span>
-                                </div>
-                                <div class="p-4 bg-white/5 rounded-xl flex justify-between">
-                                    <span class="opacity-40">Versione</span>
-                                    <span id="settings-version" class="font-mono opacity-60">1.2.0</span>
-                                </div>
-                                <div class="p-4 bg-white/5 rounded-xl flex justify-between">
-                                    <span class="opacity-40">Health Check</span>
-                                    <span class="text-green-500 font-bold">OTTIMALE</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
+            <div
+              id="ollama-status"
+              class="flex items-center gap-2 glass-card px-4 h-12 border-yellow-500/20"
+            >
+              <div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+              <span class="text-[10px] font-bold uppercase text-yellow-500">Ollama Sync</span>
             </div>
-        </main>
+            <div
+              class="w-12 h-12 glass-card flex items-center justify-center border-white/5 cursor-pointer hover:bg-white/5 transition-all"
+              onclick="showNotifications()"
+              title="Notifiche"
+            >
+              <i data-lucide="bell" class="w-5 h-5 text-white/40"></i>
+            </div>
+          </div>
+        </header>
+
+        <!-- VIEW CONTAINER -->
+        <div class="flex-1 min-h-0">
+          <!-- DASHBOARD VIEW -->
+          <div id="view-dashboard" class="view-section active">
+            <div class="grid grid-cols-3 gap-4 h-28">
+              <div class="glass-card flex items-center gap-4 px-6">
+                <div class="p-3 bg-maya-red/10 rounded-xl">
+                  <i data-lucide="cpu" class="text-maya-red w-5 h-5"></i>
+                </div>
+                <div>
+                  <p class="text-xl font-bold font-mono" id="neural-load">12%</p>
+                  <p class="text-[9px] text-white/20 font-bold uppercase tracking-widest">LOAD</p>
+                </div>
+              </div>
+              <div class="glass-card flex items-center gap-4 px-6">
+                <div class="p-3 bg-blue-500/10 rounded-xl">
+                  <i data-lucide="clock" class="text-blue-500 w-5 h-5"></i>
+                </div>
+                <div>
+                  <p class="text-xl font-bold font-mono" id="clock">--:--:--</p>
+                  <p class="text-[9px] text-white/20 font-bold uppercase tracking-widest">TIME</p>
+                </div>
+              </div>
+              <!-- Widget Meteo -->
+              <div
+                class="glass-card flex items-center gap-3 px-4 border-blue-500/20 hover:border-blue-500/40 transition-all cursor-pointer"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[9px] text-blue-400 font-bold uppercase tracking-wider mb-0.5">
+                    Meteo
+                  </p>
+                  <p class="text-lg font-black text-white" id="widget-weather-temp">22°C</p>
+                  <p class="text-[7px] text-white/40 leading-none" id="widget-weather-desc">
+                    Sereno
+                  </p>
+                </div>
+                <i data-lucide="cloud-sun" class="w-6 h-6 text-blue-400 flex-shrink-0"></i>
+              </div>
+            </div>
+
+            <div class="flex-1 grid grid-cols-3 gap-4 min-h-0">
+              <div class="col-span-2 glass-card p-6 flex flex-col gap-4">
+                <div class="flex justify-between items-center">
+                  <h3 class="font-bold text-sm text-white/60 uppercase tracking-widest">
+                    Attività Sistema
+                  </h3>
+                  <div class="flex gap-4 text-[9px] text-white/20 font-bold uppercase">
+                    <div class="flex items-center gap-2">
+                      <div
+                        class="w-2 h-2 rounded-full bg-maya-red shadow-[0_0_8px_rgba(255,75,75,0.5)]"
+                      ></div>
+                      <span>CARICO</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <div
+                        class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                      ></div>
+                      <span>MEMORIA</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex-1 relative"><canvas id="mainChart"></canvas></div>
+              </div>
+              <div class="glass-card p-6 flex flex-col gap-4 overflow-hidden">
+                <h3 class="font-bold text-sm text-white/60 uppercase tracking-widest">
+                  Feed Recente
+                </h3>
+                <div
+                  id="log-container"
+                  class="flex-1 overflow-y-auto space-y-3 text-[10px] pr-2 custom-scrollbar"
+                ></div>
+              </div>
+            </div>
+
+            <div class="h-32 grid grid-cols-6 gap-4">
+              <div
+                onclick="switchView('spotify')"
+                class="glass-card col-span-2 p-4 flex items-center gap-4 hover:bg-white/5 cursor-pointer transition-all"
+              >
+                <div class="relative w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-green-500/10 flex items-center justify-center">
+                  <img id="home-spotify-art" src="" alt="" class="hidden w-full h-full object-cover">
+                  <i id="home-spotify-icon" data-lucide="music" class="w-5 h-5 text-green-400"></i>
+                  <div id="home-spotify-dot" class="hidden absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full shadow-[0_0_6px_rgba(74,222,128,0.8)]"></div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p id="home-spotify-track" class="text-xs font-bold truncate">—</p>
+                  <p id="home-spotify-artist" class="text-[10px] text-white/30 truncate">Spotify</p>
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="event.stopPropagation(); spotifyCmd('prev')" class="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/15">
+                    <i data-lucide="skip-back" class="w-3 h-3"></i>
+                  </button>
+                  <button onclick="event.stopPropagation(); spotifyCmd('play_pause')" id="home-spotify-playbtn" class="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center hover:scale-105 transition-all">
+                    <i data-lucide="play" class="w-3 h-3 fill-white"></i>
+                  </button>
+                  <button onclick="event.stopPropagation(); spotifyCmd('next')" class="w-7 h-7 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/15">
+                    <i data-lucide="skip-forward" class="w-3 h-3"></i>
+                  </button>
+                </div>
+              </div>
+              <div
+                onclick="switchView('domotica')"
+                class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all"
+              >
+                <i data-lucide="home" class="text-maya-red w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase opacity-40">Casa</span>
+              </div>
+              <div
+                onclick="switchView('news')"
+                class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all"
+              >
+                <i data-lucide="newspaper" class="text-white w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase opacity-40">News</span>
+              </div>
+              <div
+                onclick="switchView('trading')"
+                class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all"
+              >
+                <i data-lucide="trending-up" class="text-yellow-400 w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase opacity-40">Trading</span>
+              </div>
+              <div
+                onclick="switchView('settings')"
+                class="glass-card p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 cursor-pointer transition-all"
+              >
+                <i data-lucide="settings" class="text-white/40 w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase opacity-40">Set</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- DOMOTICA VIEW -->
+          <div id="view-domotica" class="view-section">
+            <div class="grid grid-cols-2 gap-6 flex-1">
+              <div class="glass-card p-8 flex flex-col gap-6">
+                <h2 class="text-xl font-bold">Controllo Dispositivi</h2>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-white/5 p-6 rounded-2xl flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                      <i data-lucide="lightbulb" class="text-maya-red"></i>
+                      <div class="w-3 h-3 bg-maya-red rounded-full"></div>
+                    </div>
+                    <p class="font-bold">Luci Soggiorno</p>
+                    <button
+                      onclick="fireTool('luce')"
+                      class="py-2 bg-maya-red/20 rounded-lg text-xs font-bold uppercase"
+                    >
+                      Toggle
+                    </button>
+                  </div>
+                  <div class="bg-white/5 p-6 rounded-2xl flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                      <i data-lucide="fan" class="text-blue-400"></i>
+                      <div class="w-3 h-3 bg-blue-400 rounded-full"></div>
+                    </div>
+                    <p class="font-bold">Clima</p>
+                    <button
+                      onclick="fireTool('temperatura')"
+                      class="py-2 bg-blue-400/20 rounded-lg text-xs font-bold uppercase"
+                    >
+                      Auto
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="glass-card p-8 flex flex-col gap-4">
+                <h2 class="text-xl font-bold">Stato Sensori</h2>
+                <div class="space-y-4">
+                  <div class="flex justify-between p-4 bg-white/5 rounded-xl">
+                    <span>Temperatura</span>
+                    <span class="font-mono text-maya-red">22.5°C</span>
+                  </div>
+                  <div class="flex justify-between p-4 bg-white/5 rounded-xl">
+                    <span>Umidità</span>
+                    <span class="font-mono text-blue-400">45%</span>
+                  </div>
+                  <div class="flex justify-between p-4 bg-white/5 rounded-xl">
+                    <span>Aria (CO2)</span>
+                    <span class="font-mono text-green-400">400 ppm</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SPOTIFY VIEW -->
+          <div id="view-spotify" class="view-section">
+            <div class="glass-card p-8 flex flex-col gap-8 flex-1 items-center justify-center">
+              <!-- Album Art -->
+              <div class="relative w-56 h-56 rounded-3xl overflow-hidden shadow-2xl">
+                <div
+                  id="spotify-art-placeholder"
+                  class="absolute inset-0 bg-green-500/10 flex items-center justify-center"
+                >
+                  <i data-lucide="music" class="w-24 h-24 text-green-500/40"></i>
+                </div>
+                <img
+                  id="spotify-art"
+                  src=""
+                  alt=""
+                  class="hidden w-full h-full object-cover rounded-3xl"
+                />
+                <div
+                  id="spotify-playing-dot"
+                  class="hidden absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.8)]"
+                ></div>
+              </div>
+
+              <!-- Track Info -->
+              <div class="text-center">
+                <h2 id="spotify-track" class="text-2xl font-bold">—</h2>
+                <p id="spotify-artist" class="text-white/40 italic mt-1">
+                  Nessun brano selezionato
+                </p>
+              </div>
+
+              <!-- Controlli principali -->
+              <div class="flex gap-8 items-center">
+                <button
+                  onclick="spotifyCmd('prev')"
+                  class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-all active:scale-95"
+                >
+                  <i data-lucide="skip-back" class="w-5 h-5"></i>
+                </button>
+                <button
+                  onclick="spotifyCmd('play_pause')"
+                  id="spotify-playbtn"
+                  class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center hover:scale-105 transition-all active:scale-95 shadow-[0_0_24px_rgba(74,222,128,0.4)]"
+                >
+                  <i data-lucide="play" class="w-6 h-6 fill-white"></i>
+                </button>
+                <button
+                  onclick="spotifyCmd('next')"
+                  class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-all active:scale-95"
+                >
+                  <i data-lucide="skip-forward" class="w-5 h-5"></i>
+                </button>
+              </div>
+
+              <!-- Volume -->
+              <div class="flex gap-4 items-center">
+                <button
+                  onclick="spotifyCmd('volume_down')"
+                  class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-all active:scale-95"
+                >
+                  <i data-lucide="volume-1" class="w-4 h-4"></i>
+                </button>
+                <input
+                  id="spotify-volume-slider"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value="50"
+                  class="w-32 accent-green-500 cursor-pointer"
+                  oninput="spotifyVolume(this.value)"
+                  onchange="spotifyVolume(this.value)"
+                />
+                <button
+                  onclick="spotifyCmd('volume_up')"
+                  class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-all active:scale-95"
+                >
+                  <i data-lucide="volume-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- WEATHER VIEW -->
+          <div id="view-weather" class="view-section">
+            <div class="grid grid-cols-3 gap-6 flex-1">
+              <div class="col-span-2 glass-card p-8 flex flex-col justify-between">
+                <div>
+                  <h2 class="text-4xl font-black">22°C</h2>
+                  <p class="text-white/40 font-bold uppercase tracking-widest mt-2">
+                    Milano, Italia
+                  </p>
+                </div>
+                <div class="flex gap-12">
+                  <div class="text-center">
+                    <p class="text-xs font-bold text-white/20 mb-2 uppercase">Vento</p>
+                    <p class="font-bold">12 km/h</p>
+                  </div>
+                  <div class="text-center">
+                    <p class="text-xs font-bold text-white/20 mb-2 uppercase">Umidità</p>
+                    <p class="font-bold">45%</p>
+                  </div>
+                  <div class="text-center">
+                    <p class="text-xs font-bold text-white/20 mb-2 uppercase">UV</p>
+                    <p class="font-bold">Basso</p>
+                  </div>
+                </div>
+              </div>
+              <div class="glass-card p-8 flex flex-col gap-6">
+                <h3 class="font-bold text-sm opacity-40 uppercase tracking-widest">Previsioni</h3>
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center p-3 bg-white/5 rounded-xl">
+                    <span>Domani</span>
+                    <i data-lucide="cloud-sun" class="text-yellow-400"></i>
+                    <span>21°</span>
+                  </div>
+                  <div class="flex justify-between items-center p-3 bg-white/5 rounded-xl">
+                    <span>Mercoledì</span>
+                    <i data-lucide="sun" class="text-yellow-500"></i>
+                    <span>24°</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NEWS VIEW -->
+          <div id="view-news" class="view-section">
+            <div class="glass-card p-8 flex flex-col gap-6 flex-1 overflow-hidden">
+              <h2 class="text-xl font-bold">Ultime Notizie</h2>
+              <div class="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+                <div class="p-6 bg-white/5 rounded-2xl border-l-4 border-maya-red">
+                  <h3 class="font-bold text-lg">IA e Futuro: Maya Core v1.2 Rilasciata</h3>
+                  <p class="text-sm text-white/40 mt-2">
+                    La nuova versione del nucleo promette prestazioni superiori...
+                  </p>
+                </div>
+                <div class="p-6 bg-white/5 rounded-2xl">
+                  <h3 class="font-bold text-lg">Mercati Crypto in fermento</h3>
+                  <p class="text-sm text-white/40 mt-2">
+                    Bitcoin tocca nuovi massimi storici mentre gli investitori...
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TRADING VIEW -->
+          <div id="view-trading" class="view-section">
+            <div class="glass-card p-8 flex flex-col gap-8 flex-1">
+              <div class="flex justify-between items-center">
+                <h2 class="text-xl font-bold">Mercati Crypto</h2>
+                <button
+                  onclick="fireTool('prezzo bitcoin')"
+                  class="px-6 py-2 bg-maya-red rounded-xl text-xs font-bold uppercase tracking-widest"
+                >
+                  Aggiorna Dati
+                </button>
+              </div>
+              <div class="grid grid-cols-2 gap-6">
+                <div class="p-6 bg-white/5 rounded-3xl border border-white/5">
+                  <p class="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-2">
+                    Bitcoin / USD
+                  </p>
+                  <p class="text-3xl font-bold font-mono">$--.---</p>
+                  <p class="text-xs text-green-500 mt-2 font-bold">+2.4%</p>
+                </div>
+                <div class="p-6 bg-white/5 rounded-3xl border border-white/5">
+                  <p class="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-2">
+                    Ethereum / USD
+                  </p>
+                  <p class="text-3xl font-bold font-mono">$--.---</p>
+                  <p class="text-xs text-red-500 mt-2 font-bold">-0.8%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SETTINGS VIEW -->
+          <div id="view-settings" class="view-section h-full">
+            <div class="grid grid-cols-2 gap-6 h-full">
+              <div class="glass-card p-8 flex flex-col gap-6">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                  <i data-lucide="cpu" class="text-maya-red"></i>
+                  Neural Core Status
+                </h2>
+                <div
+                  class="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar"
+                  id="model-list-container"
+                >
+                  <!-- I modelli verranno inseriti qui dallo script -->
+                  <div
+                    class="p-4 bg-white/5 rounded-2xl flex items-center justify-between animate-pulse"
+                  >
+                    <span class="opacity-40">Caricamento modelli...</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="glass-card p-8 flex flex-col gap-6">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                  <i data-lucide="settings-2" class="text-maya-red"></i>
+                  Info Sistema
+                </h2>
+                <div class="space-y-4">
+                  <div class="p-4 bg-white/5 rounded-xl flex justify-between">
+                    <span class="opacity-40">Assistente</span>
+                    <span id="settings-name" class="text-maya-red font-bold uppercase">MAYA</span>
+                  </div>
+                  <div class="p-4 bg-white/5 rounded-xl flex justify-between">
+                    <span class="opacity-40">Versione</span>
+                    <span id="settings-version" class="font-mono opacity-60">1.2.0</span>
+                  </div>
+                  <div class="p-4 bg-white/5 rounded-xl flex justify-between">
+                    <span class="opacity-40">Health Check</span>
+                    <span class="text-green-500 font-bold">OTTIMALE</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
 
     <script>
-        lucide.createIcons();
-        let greetingUpdated = false;
-        const greetings = [
-            "Bentornato, Gab. Come posso esserti utile? 🐺",
-            "Maya online. Dimmi pure cosa ti serve.",
-            "Sono pronta. Hai qualche comando per me?",
-            "Sempre operativa. Cosa facciamo oggi?",
-            "Tutto sotto controllo. Sono ai tuoi ordini.",
-            "MAYA attiva. Pronto a gestire i tuoi task.",
-            "In attesa dei tuoi comandi. Cosa posso fare per te?"
-        ];
-        function updateGreeting() {
-            if(!greetingUpdated) {
-                document.getElementById('greeting-text').innerText = greetings[Math.floor(Math.random() * greetings.length)];
-                greetingUpdated = true;
-            }
+      lucide.createIcons();
+      let greetingUpdated = false;
+      const greetings = [
+        "Bentornato, Gab. Come posso esserti utile? 🐺",
+        "Maya online. Dimmi pure cosa ti serve.",
+        "Sono pronta. Hai qualche comando per me?",
+        "Sempre operativa. Cosa facciamo oggi?",
+        "Tutto sotto controllo. Sono ai tuoi ordini.",
+        "MAYA attiva. Pronto a gestire i tuoi task.",
+        "In attesa dei tuoi comandi. Cosa posso fare per te?",
+      ];
+      function updateGreeting() {
+        if (!greetingUpdated) {
+          document.getElementById("greeting-text").innerText =
+            greetings[Math.floor(Math.random() * greetings.length)];
+          greetingUpdated = true;
         }
-
-        function switchView(viewId) {
-            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-            document.getElementById('view-' + viewId).classList.add('active');
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-tab', 'text-white/30'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.add('text-white/30'));
-            const activeBtn = document.querySelector(`[data-view="${viewId}"]`);
-            if(activeBtn) {
-                activeBtn.classList.add('active-tab');
-                activeBtn.classList.remove('text-white/30');
-            }
-            gsap.from('#view-' + viewId, { opacity: 0, x: 15, duration: 0.4 });
+      }
+      // Comando Spotify diretto (bypassa LLM)
+      function spotifyCmd(command) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "tool",
+              action: { tool: "spotify", command: command },
+            }),
+          );
         }
+      }
 
-        // Chart Initialization
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        const mainChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: Array(60).fill(''),
-                datasets: [
-                    {
-                        label: 'Neural Load',
-                        data: Array(60).fill(0),
-                        borderColor: '#FF4B4B',
-                        backgroundColor: 'rgba(255, 75, 75, 0.05)',
-                        fill: true,
-                        tension: 0.4,
-                        borderWidth: 2,
-                        pointRadius: 0
-                    },
-                    {
-                        label: 'Memory',
-                        data: Array(60).fill(0),
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                        fill: true,
-                        tension: 0.4,
-                        borderWidth: 2,
-                        pointRadius: 0
-                    }
-                ]
+      let volumeDebounce = null;
+      function spotifyVolume(level) {
+        clearTimeout(volumeDebounce);
+        volumeDebounce = setTimeout(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: "tool",
+                action: { tool: "spotify", command: "volume", level: parseInt(level) },
+              }),
+            );
+          }
+        }, 300); // aspetta 300ms dopo l'ultimo movimento
+      }
+
+      function switchView(viewId) {
+        document.querySelectorAll(".view-section").forEach((v) => v.classList.remove("active"));
+        document.getElementById("view-" + viewId).classList.add("active");
+        document
+          .querySelectorAll(".nav-btn")
+          .forEach((b) => b.classList.remove("active-tab", "text-white/30"));
+        document.querySelectorAll(".nav-btn").forEach((b) => b.classList.add("text-white/30"));
+        const activeBtn = document.querySelector(`[data-view="${viewId}"]`);
+        if (activeBtn) {
+          activeBtn.classList.add("active-tab");
+          activeBtn.classList.remove("text-white/30");
+        }
+        gsap.from("#view-" + viewId, { opacity: 0, x: 15, duration: 0.4 });
+      }
+
+      // Chart Initialization
+      const ctx = document.getElementById("mainChart").getContext("2d");
+      const mainChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: Array(60).fill(""),
+          datasets: [
+            {
+              label: "Neural Load",
+              data: Array(60).fill(0),
+              borderColor: "#FF4B4B",
+              backgroundColor: "rgba(255, 75, 75, 0.05)",
+              fill: true,
+              tension: 0.4,
+              borderWidth: 2,
+              pointRadius: 0,
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: { 
-                        display: false,
-                        min: 0,
-                        max: 100
-                    }
-                },
-                animation: {
-                    duration: 100,
-                    easing: 'linear'
-                },
-                elements: { line: { capBezierPoints: false } }
-            }
-        });
+            {
+              label: "Memory",
+              data: Array(60).fill(0),
+              borderColor: "#3B82F6",
+              backgroundColor: "rgba(59, 130, 246, 0.05)",
+              fill: true,
+              tension: 0.4,
+              borderWidth: 2,
+              pointRadius: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: {
+              display: false,
+              min: 0,
+              max: 100,
+            },
+          },
+          animation: {
+            duration: 100,
+            easing: "linear",
+          },
+          elements: { line: { capBezierPoints: false } },
+        },
+      });
 
-        function updateChart(load, mem) {
-            mainChart.data.datasets[0].data.push(load);
-            mainChart.data.datasets[0].data.shift();
-            mainChart.data.datasets[1].data.push(mem);
-            mainChart.data.datasets[1].data.shift();
-            mainChart.update('none'); // Aggiorna i dati istantaneamente
-            mainChart.update();      // Anima a 10Hz (fluido a 60fps)
+      function updateChart(load, mem) {
+        mainChart.data.datasets[0].data.push(load);
+        mainChart.data.datasets[0].data.shift();
+        mainChart.data.datasets[1].data.push(mem);
+        mainChart.data.datasets[1].data.shift();
+        mainChart.update("none"); // Aggiorna i dati istantaneamente
+        mainChart.update(); // Anima a 10Hz (fluido a 60fps)
+      }
+
+      function addLog(msg, type = "ok") {
+        const container = document.getElementById("log-container");
+        if (!container) return;
+        const e = document.createElement("div");
+
+        let borderColor = "border-white/10";
+        let icon = "info";
+        let textColor = "text-white/80";
+        let bgGlow = "";
+
+        if (type === "ok") {
+          borderColor = "border-maya-red";
+          icon = "check-circle";
+          bgGlow = "shadow-[0_0_15px_rgba(255,75,75,0.1)]";
+        } else if (type === "info") {
+          borderColor = "border-blue-500";
+          icon = "terminal";
+        } else if (type === "warn") {
+          borderColor = "border-yellow-500";
+          icon = "alert-triangle";
         }
 
-        function addLog(msg, type='ok') {
-            const container = document.getElementById('log-container');
-            if(!container) return;
-            const e = document.createElement('div');
-            
-            let borderColor = 'border-white/10';
-            let icon = 'info';
-            let textColor = 'text-white/80';
-            let bgGlow = '';
-
-            if(type === 'ok') {
-                borderColor = 'border-maya-red';
-                icon = 'check-circle';
-                bgGlow = 'shadow-[0_0_15px_rgba(255,75,75,0.1)]';
-            } else if(type === 'info') {
-                borderColor = 'border-blue-500';
-                icon = 'terminal';
-            } else if(type === 'warn') {
-                borderColor = 'border-yellow-500';
-                icon = 'alert-triangle';
-            }
-
-            e.className = `p-4 bg-white/5 rounded-2xl border-l-4 ${borderColor} ${bgGlow} mb-3 transition-all animate-in fade-in slide-in-from-right-4 duration-300`;
-            e.innerHTML = `
+        e.className = `p-4 bg-white/5 rounded-2xl border-l-4 ${borderColor} ${bgGlow} mb-3 transition-all animate-in fade-in slide-in-from-right-4 duration-300`;
+        e.innerHTML = `
                 <div class="flex gap-4 items-start">
                     <div class="mt-1 opacity-40"><i data-lucide="${icon}" class="w-3 h-3"></i></div>
                     <div class="flex-1">
@@ -507,28 +793,30 @@
                     </div>
                 </div>
             `;
-            container.prepend(e);
-            lucide.createIcons();
-            if(container.children.length > 30) container.lastChild.remove();
+        container.prepend(e);
+        lucide.createIcons();
+        if (container.children.length > 30) container.lastChild.remove();
+      }
+
+      function submitCmd() {
+        const i = document.getElementById("cmd-input");
+        if (!i.value.trim()) return;
+        sendPrompt(i.value);
+        i.value = "";
+      }
+
+      function sendPrompt(text) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "command", text: text }));
         }
+      }
 
-        function submitCmd() {
-            const i = document.getElementById('cmd-input');
-            if(!i.value.trim()) return;
-            sendPrompt(i.value);
-            i.value = '';
-        }
+      function fireTool(t) {
+        sendPrompt(t);
+      }
 
-        function sendPrompt(text) {
-            if(ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({type: 'command', text: text}));
-            }
-        }
-
-        function fireTool(t) { sendPrompt(t); }
-
-        // TOGGLE SIDEBAR DISABILITATO
-        /*
+      // TOGGLE SIDEBAR DISABILITATO
+      /*
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             sidebar.classList.toggle('collapsed');
@@ -538,94 +826,151 @@
             }
         }
         */
-        
-        function showNotifications() {
-            addLog('📬 Nessuna nuova notifica al momento', 'info');
-        }
 
-        let ws;
-        function initWS() {
-            ws = new WebSocket("ws://127.0.0.1:8000/ws");
-            ws.onopen = () => { addLog('⚙️ Sincronizzazione e accensione sistema...', 'ok'); updateGreeting(); };
-            let lastTextUpdate = 0;
-            ws.onmessage = (e) => {
-                const d = JSON.parse(e.data);
-                if(d.type === 'log') {
-                    // Filtra messaggi specifici
-                    if(d.text === 'Nucleo Maya Connesso' || d.text.includes('Nucleo Maya')) return;
-                    addLog(d.text, d.level);
-                }
-                if(d.type === 'state') {
-                    if(d.system) {
-                        document.getElementById('settings-name').innerText = d.system.name;
-                        document.getElementById('settings-version').innerText = d.system.version;
-                    }
-                    // Gestione Modelli Dinamici
-                    if(d.models) {
-                        const container = document.getElementById('model-list-container');
-                        if(container) {
-                            container.innerHTML = ''; // Pulisci caricamento
-                            Object.entries(d.models).forEach(([key, info]) => {
-                                const isOnline = info.online === true;
-                                const statusColor = isOnline ? 'bg-green-500' : 'bg-red-500';
-                                const statusText = isOnline ? 'ONLINE' : 'OFFLINE';
-                                const statusTextColor = isOnline ? 'text-green-500' : 'text-red-500';
-                                const shadowGlow = isOnline ? 'shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'shadow-[0_0_15px_rgba(239,68,68,0.2)]';
-                                const borderColor = isOnline ? 'border-green-500/30' : 'border-red-500/20';
-                                
-                                const item = document.createElement('div');
-                                item.className = `p-5 bg-white/5 rounded-2xl flex items-center justify-between border ${borderColor} transition-all hover:bg-white/8`;
-                                item.innerHTML = `
+      function showNotifications() {
+        addLog("📬 Nessuna nuova notifica al momento", "info");
+      }
+
+      let ws;
+      function initWS() {
+        ws = new WebSocket("ws://127.0.0.1:8000/ws");
+        ws.onopen = () => {
+          addLog("⚙️ Sincronizzazione e accensione sistema...", "ok");
+          updateGreeting();
+        };
+        let lastTextUpdate = 0;
+        ws.onmessage = (e) => {
+          const d = JSON.parse(e.data);
+          if (d.type === "log") {
+            // Filtra messaggi specifici
+            if (d.text === "Nucleo Maya Connesso" || d.text.includes("Nucleo Maya")) return;
+            addLog(d.text, d.level);
+          }
+          if (d.type === "state") {
+            if (d.system) {
+              document.getElementById("settings-name").innerText = d.system.name;
+              document.getElementById("settings-version").innerText = d.system.version;
+            }
+            // Gestione Modelli Dinamici
+            if (d.models) {
+              const container = document.getElementById("model-list-container");
+              if (container) {
+                container.innerHTML = ""; // Pulisci caricamento
+                Object.entries(d.models).forEach(([key, info]) => {
+                  const isOnline = info.online === true;
+                  const statusColor = isOnline ? "bg-green-500" : "bg-red-500";
+                  const statusText = isOnline ? "ONLINE" : "OFFLINE";
+                  const statusTextColor = isOnline ? "text-green-500" : "text-red-500";
+                  const shadowGlow = isOnline
+                    ? "shadow-[0_0_15px_rgba(34,197,94,0.4)]"
+                    : "shadow-[0_0_15px_rgba(239,68,68,0.2)]";
+                  const borderColor = isOnline ? "border-green-500/30" : "border-red-500/20";
+
+                  const item = document.createElement("div");
+                  item.className = `p-5 bg-white/5 rounded-2xl flex items-center justify-between border ${borderColor} transition-all hover:bg-white/8`;
+                  item.innerHTML = `
                                     <div class="flex flex-col gap-1">
                                         <span class="text-[9px] font-black uppercase opacity-30 tracking-tighter">${key}</span>
                                         <span class="font-bold text-sm">${info.name}</span>
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <span class="text-[8px] font-black uppercase tracking-tight ${statusTextColor}">${statusText}</span>
-                                        <div class="w-3 h-3 rounded-full ${statusColor} ${shadowGlow} ${isOnline ? 'animate-pulse' : ''}"></div>
+                                        <div class="w-3 h-3 rounded-full ${statusColor} ${shadowGlow} ${isOnline ? "animate-pulse" : ""}"></div>
                                     </div>
                                 `;
-                                container.appendChild(item);
-                            });
-                            lucide.createIcons();
-                        }
-                    }
-                    if(d.ollama) {
-                        const s = document.getElementById('ollama-status');
-                        const dot = s.querySelector('div');
-                        const txt = s.querySelector('span');
-                        if(d.ollama === 'ONLINE') {
-                            s.className = "flex items-center gap-2 glass-card px-4 h-12 border-green-500/20";
-                            dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]";
-                            txt.className = "text-[10px] font-bold uppercase text-green-500";
-                            txt.innerText = "LLM Online";
-                        } else {
-                            s.className = "flex items-center gap-2 glass-card px-4 h-12 border-red-500/20";
-                            dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]";
-                            txt.className = "text-[10px] font-bold uppercase text-red-500";
-                            txt.innerText = "LLM Offline";
-                        }
-                    }
-                }
-                if(d.type === 'stats') {
-                    // Il grafico si aggiorna sempre alla massima frequenza (0.33s)
-                    updateChart(d.neural_load, d.memory);
-                    
-                    // Il testo si aggiorna solo ogni secondo (1000ms)
-                    const now = Date.now();
-                    if(now - lastTextUpdate > 1000) {
-                        document.getElementById('neural-load').innerText = Math.round(d.neural_load) + '%';
-                        lastTextUpdate = now;
-                    }
-                }
-            };
-            ws.onclose = () => setTimeout(initWS, 3000);
-        }
-        initWS();
-        setInterval(() => { 
-            const clockEl = document.getElementById('clock');
-            if(clockEl) clockEl.innerText = new Date().toLocaleTimeString(); 
-        }, 1000);
+                  container.appendChild(item);
+                });
+                lucide.createIcons();
+              }
+            }
+            if (d.ollama) {
+              const s = document.getElementById("ollama-status");
+              const dot = s.querySelector("div");
+              const txt = s.querySelector("span");
+              if (d.ollama === "ONLINE") {
+                s.className = "flex items-center gap-2 glass-card px-4 h-12 border-green-500/20";
+                dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]";
+                txt.className = "text-[10px] font-bold uppercase text-green-500";
+                txt.innerText = "LLM Online";
+              } else {
+                s.className = "flex items-center gap-2 glass-card px-4 h-12 border-red-500/20";
+                dot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]";
+                txt.className = "text-[10px] font-bold uppercase text-red-500";
+                txt.innerText = "LLM Offline";
+              }
+            }
+          }
+          if (d.type === "stats") {
+            // Il grafico si aggiorna sempre alla massima frequenza (0.33s)
+            updateChart(d.neural_load, d.memory);
+
+            // Il testo si aggiorna solo ogni secondo (1000ms)
+            const now = Date.now();
+            if (now - lastTextUpdate > 1000) {
+              document.getElementById("neural-load").innerText = Math.round(d.neural_load) + "%";
+              lastTextUpdate = now;
+            }
+          }
+          if (d.type === "spotify") {
+            document.getElementById("spotify-track").innerText = d.track || "—";
+            document.getElementById("spotify-artist").innerText =
+              d.artist || "Nessun brano selezionato";
+
+            // Album art
+            const img = document.getElementById("spotify-art");
+            const placeholder = document.getElementById("spotify-art-placeholder");
+            if (d.album_art) {
+              img.src = d.album_art;
+              img.classList.remove("hidden");
+              placeholder.classList.add("hidden");
+            } else {
+              img.classList.add("hidden");
+              placeholder.classList.remove("hidden");
+            }
+
+            // Dot verde
+            document
+              .getElementById("spotify-playing-dot")
+              .classList.toggle("hidden", !d.is_playing);
+
+            // Icona play/pause
+            const btn = document.getElementById("spotify-playbtn");
+            btn.innerHTML = d.is_playing
+              ? '<i data-lucide="pause" class="w-6 h-6 fill-white"></i>'
+              : '<i data-lucide="play" class="w-6 h-6 fill-white"></i>';
+            lucide.createIcons();
+
+            // Aggiorna anche widget home
+            document.getElementById('home-spotify-track').innerText = d.track || '—';
+            document.getElementById('home-spotify-artist').innerText = d.artist || 'Spotify';
+
+            const homeArt = document.getElementById('home-spotify-art');
+            const homeIcon = document.getElementById('home-spotify-icon');
+            if(d.album_art) {
+              homeArt.src = d.album_art;
+              homeArt.classList.remove('hidden');
+              homeIcon.classList.add('hidden');
+            } else {
+              homeArt.classList.add('hidden');
+              homeIcon.classList.remove('hidden');
+            }
+
+            document.getElementById('home-spotify-dot').classList.toggle('hidden', !d.is_playing);
+
+            const homeBtn = document.getElementById('home-spotify-playbtn');
+            homeBtn.innerHTML = d.is_playing
+              ? '<i data-lucide="pause" class="w-3 h-3 fill-white"></i>'
+              : '<i data-lucide="play" class="w-3 h-3 fill-white"></i>';
+            lucide.createIcons();
+          }
+        };
+        ws.onclose = () => setTimeout(initWS, 3000);
+      }
+      initWS();
+      setInterval(() => {
+        const clockEl = document.getElementById("clock");
+        if (clockEl) clockEl.innerText = new Date().toLocaleTimeString();
+      }, 1000);
     </script>
-</body>
+  </body>
 </html>
