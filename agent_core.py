@@ -46,7 +46,8 @@ Struttura:
 }
 SE NON HAI BISOGNO DI TOOL, lascia "actions" come lista vuota [].
 NON aggiungere testo fuori dal JSON.
-NON inventare dati: se usi un tool informativo, scrivi nella reply che stai controllando.
+4. NO INVENZIONE: Non inventare mai dati. Se usi un tool informativo, scrivi nella reply che stai controllando.
+5. MEMORIA SEMANTICA: Riceverai blocchi di testo marcati come "CONTESTO PASSATO RILEVANTE". Questi sono ricordi recuperati dal database vettoriale. Usali per rispondere a domande su fatti passati o per coerenza a lungo termine.
 
 Tool disponibili:
 - arduino: comandi hardware (LIGHT_ON, LIGHT_OFF, SERVO_OPEN, SERVO_CLOSE, RELAY_ON, RELAY_OFF)
@@ -278,8 +279,8 @@ class AgentCore:
     async def process(self, user_input: str, progress_cb=None) -> str:
         """Pipeline completa: Planner → Executor → Validator → Risposta."""
 
-        # Salva input nella memoria
-        self.memory.add_turn("user", user_input)
+        # Salva input nella memoria (con embedding semantico)
+        await self.memory.add_turn("user", user_input)
 
         # 1. PLANNER - controlla automazioni
         auto_actions = self._check_automation(user_input)
@@ -327,8 +328,7 @@ class AgentCore:
         if not ok:
             reply += " (Attenzione: alcune azioni potrebbero non essere riuscite.)"
 
-        # Salva risposta nella memoria
-        self.memory.add_turn("jarvis", reply)
-        await self.memory.save()
+        # Salva risposta nella memoria (con embedding semantico)
+        await self.memory.add_turn("jarvis", reply)
 
         return reply

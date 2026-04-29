@@ -4,7 +4,12 @@ Test del DashboardLogFilter per verificare il corretto filtraggio dei log.
 """
 
 import sys
+import os
 import asyncio
+
+# Aggiungi la root del progetto al path per importare i moduli
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from log_utils import DashboardLogFilter
 
 class MockWebSocketManager:
@@ -71,11 +76,11 @@ async def test_log_filter():
     
     print("\n" + "=" * 60)
     print("RIEPILOGO ATTESO:")
-    print("  - Test 1: ✓ Richiesta inviata")
-    print("  - Test 2: ✓ Risposta MAYA inviata")
-    print("  - Test 3: ✗ Log tecnici NON inviati (0 messaggi)")
-    print("  - Test 4: ✓ Errore critico inviato")
-    print("  - Test 5: ✓ Messaggio di connessione inviato")
+    print("  - Test 1: [V] Richiesta inviata")
+    print("  - Test 2: [V] Risposta MAYA inviata")
+    print("  - Test 3: [X] Log tecnici NON inviati (0 messaggi)")
+    print("  - Test 4: [V] Errore critico inviato")
+    print("  - Test 5: [V] Messaggio di connessione inviato")
     print("=" * 60)
 
 if __name__ == "__main__":
