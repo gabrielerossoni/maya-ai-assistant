@@ -32,49 +32,53 @@ class MemoryManager:
         """Inizializza ChromaDB con persistenza su disco."""
         os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
         
-        # Settings con persistenza
-        settings = Settings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=CHROMA_PERSIST_DIR,
-            anonymized_telemetry=False,
-        )
-        
-        self.chroma_client = chromadb.Client(settings)
-        
-        # Crea o recupera collection
         try:
-            self.collection = self.chroma_client.get_collection(
+            # Nuovo client persistente (ChromaDB 0.4+)
+            self.chroma_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+            
+            # Crea o recupera collection
+            self.collection = self.chroma_client.get_or_create_collection(
                 name="jarvis_memory",
                 metadata={"hnsw:space": "cosine"}
             )
-        except:
-            self.collection = self.chroma_client.create_collection(
-                name="jarvis_memory",
-                metadata={"hnsw:space": "cosine"}
-            )
+            print(f"[MEMORY] ChromaDB inizializzato in: {CHROMA_PERSIST_DIR}")
+        except Exception as e:
+            print(f"[MEMORY] Errore inizializzazione ChromaDB: {e}")
+            # Fallback o gestione errore silenziosa per non bloccare l'agente
+            self.collection = None
 
     def load(self):
         """Carica memoria da file JSON (metadata + ChromaDB)."""
         os.makedirs(MEMORY_DIR, exist_ok=True)
         
         if os.path.exists(METADATA_FILE):
-            with open(METADATA_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                self.turns = data.get("turns", [])
-                print(f"[MEMORY] {len(self.turns)} turni caricati dalla memoria semantica.")
+            try:
+                with open(METADATA_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.turns = data.get("turns", [])
+                    print(f"[MEMORY] {len(self.turns)} turni caricati dai metadati.")
+            except Exception as e:
+                print(f"[MEMORY] Errore caricamento metadati: {e}")
+                self.turns = []
         else:
             self.turns = []
             print("[MEMORY] Nuova memoria inizializzata.")
 
     async def save(self):
-        """Salva metadata su JSON (embeddings già in ChromaDB)."""
+        """Salva metadata su JSON."""
         async with self.save_lock:
             os.makedirs(MEMORY_DIR, exist_ok=True)
-            with open(METADATA_FILE, "w", encoding="utf-8") as f:
-                json.dump({"turns": self.turns}, f, ensure_ascii=False, indent=2)
+            try:
+                with open(METADATA_FILE, "w", encoding="utf-8") as f:
+                    json.dump({"turns": self.turns}, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                print(f"[MEMORY] Errore salvataggio metadati: {e}")
 
     async def _get_embedding(self, text: str) -> Optional[list]:
         """Ottieni embedding da Ollama (nomic-embed-text)."""
+        if not text.strip():
+            return None
+            
         try:
             import ollama
             client = ollama.AsyncClient()
@@ -82,30 +86,44 @@ class MemoryManager:
                 model=EMBEDDING_MODEL,
                 input=text
             )
-            return response.get("embeddings", [None])[0]
+            # Ollama 0.3+ torna una lista di embeddings
+            embeddings = response.get("embeddings", [])
+            if embeddings:
+                return embeddings[0]
+            return None
         except Exception as e:
-            print(f"[MEMORY] Errore embedding: {e}")
+            print(f"[MEMORY] Errore embedding Ollama ({EMBEDDING_MODEL}): {e}")
             return None
 
     async def add_turn(self, role: str, text: str):
         """Aggiunge un turno alla memoria con embedding semantico."""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         turn = {
             "role": role,
             "text": text,
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "time": timestamp,
         }
         self.turns.append(turn)
         
+        # Mantieni cache in-memory ragionevole (opzionale)
+        if len(self.turns) > 1000:
+            self.turns = self.turns[-1000:]
+        
         # Calcola embedding e aggiungilo a ChromaDB
-        embedding = await self._get_embedding(text)
-        if embedding:
-            turn_id = f"{role}_{len(self.turns)}_{int(datetime.now().timestamp() * 1000)}"
-            self.collection.add(
-                ids=[turn_id],
-                documents=[text],
-                metadatas=[{"role": role, "time": turn.get("time")}],
-                embeddings=[embedding]
-            )
+        if self.collection:
+            embedding = await self._get_embedding(text)
+            if embedding:
+                # ID univoco basato su timestamp e ruolo
+                turn_id = f"{role}_{int(datetime.now().timestamp() * 1000)}"
+                try:
+                    self.collection.add(
+                        ids=[turn_id],
+                        documents=[text],
+                        metadatas=[{"role": role, "time": timestamp}],
+                        embeddings=[embedding]
+                    )
+                except Exception as e:
+                    print(f"[MEMORY] Errore aggiunta a ChromaDB: {e}")
         
         await self.save()
 
@@ -115,44 +133,53 @@ class MemoryManager:
         Se query è fornita, usa retrieval semantico.
         Altrimenti torna gli ultimi messaggi (fallback).
         """
-        if not query or not self.collection.count() > 0:
-            # Fallback: ultimi 5 turni
-            recent = self.turns[-5:] if self.turns else []
-            context = "\n".join(
-                f"[{t['time']}] {t['role'].upper()}: {t['text'][:100]}..."
-                for t in recent
-            )
-            return f"Contesto recente:\n{context}" if context else "Memoria vuota."
+        # Sempre includere gli ultimi 3 messaggi per la coerenza immediata
+        recent_turns = self.turns[-3:] if self.turns else []
+        recent_context = ""
+        if recent_turns:
+            recent_context = "--- CONVERSAZIONE RECENTE ---\n"
+            for t in recent_turns:
+                recent_context += f"[{t['time']}] {t['role'].upper()}: {t['text']}\n"
         
-        # Retrieval semantico
+        # Se non c'è query o database, torniamo solo il recente
+        if not query or not self.collection or self.collection.count() == 0:
+            return recent_context if recent_context else "Memoria vuota."
+        
+        # Retrieval semantico per il passato remoto
         try:
             embedding = await self._get_embedding(query)
             if not embedding:
-                return "Impossibile recuperare contesto (embedding fallito)."
+                return recent_context
             
             results = self.collection.query(
                 query_embeddings=[embedding],
                 n_results=top_k
             )
             
-            # Formatta risultati
-            if results and results.get("documents"):
-                context = "\n".join(
-                    f"- {doc[:80]}..." for doc in results["documents"][0]
-                )
-                return f"Contesto rilevante:\n{context}"
-            else:
-                return "Nessun contesto rilevante trovato."
+            semantic_context = ""
+            if results and results.get("documents") and results["documents"][0]:
+                semantic_context = "--- CONTESTO PASSATO RILEVANTE ---\n"
+                for i, doc in enumerate(results["documents"][0]):
+                    metadata = results["metadatas"][0][i]
+                    role = metadata.get("role", "unknown").upper()
+                    time = metadata.get("time", "unknown")
+                    semantic_context += f"[{time}] {role}: {doc}\n"
+            
+            return f"{semantic_context}\n{recent_context}".strip()
+            
         except Exception as e:
-            print(f"[MEMORY] Errore retrieval: {e}")
-            return f"Errore nel recupero del contesto: {e}"
+            print(f"[MEMORY] Errore retrieval semantico: {e}")
+            return recent_context
 
     async def get_all(self) -> list:
-        """Ritorna tutti i turni (per export/debug)."""
+        """Ritorna tutti i turni caricati."""
         return self.turns
 
     async def search(self, query: str, top_k: int = 10) -> list:
         """Cerca messaggi rilevanti per una query."""
+        if not self.collection:
+            return []
+            
         try:
             embedding = await self._get_embedding(query)
             if not embedding:
