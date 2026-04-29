@@ -278,8 +278,8 @@ class AgentCore:
     async def process(self, user_input: str, progress_cb=None) -> str:
         """Pipeline completa: Planner → Executor → Validator → Risposta."""
 
-        # Salva input nella memoria
-        self.memory.add_turn("user", user_input)
+        # Salva input nella memoria (con embedding semantico)
+        await self.memory.add_turn("user", user_input)
 
         # 1. PLANNER - controlla automazioni
         auto_actions = self._check_automation(user_input)
@@ -327,8 +327,7 @@ class AgentCore:
         if not ok:
             reply += " (Attenzione: alcune azioni potrebbero non essere riuscite.)"
 
-        # Salva risposta nella memoria
-        self.memory.add_turn("jarvis", reply)
-        await self.memory.save()
+        # Salva risposta nella memoria (con embedding semantico)
+        await self.memory.add_turn("jarvis", reply)
 
         return reply
