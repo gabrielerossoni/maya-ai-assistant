@@ -59,8 +59,7 @@ class ToolManager:
 
     async def execute(self, action: dict) -> dict:
         """
-        Esegue un'azione sul tool corretto.
-        action: dict con almeno {"tool": "<nome>", ...}
+        Esegue un'azione sul tool corretto con unwrapping automatico dei parametri.
         """
         tool_name = action.get("tool", "none")
         tool = self.tools.get(tool_name)
@@ -68,12 +67,18 @@ class ToolManager:
         if tool is None:
             return {"status": "error", "message": f"Tool '{tool_name}' non trovato"}
 
+        # UNWRAPPING: Se i parametri sono dentro 'parametro', portiamoli al primo livello
+        # Questo garantisce compatibilità con i nuovi modelli che impacchettano i dati.
+        full_action = action.copy()
+        if "parametro" in action and isinstance(action["parametro"], dict):
+            full_action.update(action["parametro"])
+
         try:
             # Ogni tool ha un metodo execute(action) asincrono
             if asyncio.iscoroutinefunction(tool.execute):
-                result = await tool.execute(action)
+                result = await tool.execute(full_action)
             else:
-                result = tool.execute(action)
+                result = tool.execute(full_action)
             return result
         except Exception as e:
             return {"status": "error", "message": str(e)}

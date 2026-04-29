@@ -12,6 +12,7 @@ from agent_core import AgentCore, MODELS
 from tools.display_tool import DisplayTool
 from log_utils import setup_dashboard_log_filter
 
+
 def print_banner():
     PEACH = "\033[38;5;203m"
     GRAY = "\033[90m"
@@ -25,7 +26,9 @@ def print_banner():
             pass
 
     print(f"\n{PEACH}╭───────────────────────────────────────────────────╮")
-    print(f"│ {RESET}✷ Welcome to the {BOLD}MAYA{RESET} research preview!            {PEACH}│")
+    print(
+        f"│ {RESET}✷ Welcome to the {BOLD}MAYA{RESET} research preview!            {PEACH}│"
+    )
     print(f"╰───────────────────────────────────────────────────╯\n")
 
     print(f"{PEACH}{BOLD}")
@@ -46,6 +49,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 from websocket_manager import manager
 from contextlib import asynccontextmanager
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -68,6 +72,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     display.stop()
 
+
 app = FastAPI(lifespan=lifespan)
 agent = AgentCore()
 display = DisplayTool()
@@ -76,25 +81,28 @@ display = DisplayTool()
 # Questo permette ai log di sistema di passare al terminale durante l'avvio
 _log_filter_applied = False
 
+
 @app.get("/")
 async def get_dashboard():
     return FileResponse("static/jarvis_dashboard.html")
 
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global _log_filter_applied
     try:
         await manager.connect(websocket)
-        
+
         # Applica il filtro log al primo collegamento del client (una sola volta)
         if not _log_filter_applied:
             setup_dashboard_log_filter(manager)
             _log_filter_applied = True
-        
+
         await broadcast_state()
-        
+
         while True:
             try:
                 data = await websocket.receive_json()
@@ -109,7 +117,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     action = data.get("action", {})
                     if action:
                         result = await agent.tool_manager.execute(action)
-                        await manager.broadcast({"type": "log", "text": result.get("message", ""), "level": "ok"})
+                        await manager.broadcast(
+                            {
+                                "type": "log",
+                                "text": result.get("message", ""),
+                                "level": "ok",
+                            }
+                        )
                         await broadcast_state()
             except WebSocketDisconnect:
                 break
@@ -121,22 +135,27 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         manager.disconnect(websocket)
 
+
 async def execute_and_broadcast(cmd: str):
     """
     Esegue il comando tramite agent.process() e trasmette la risposta.
     La risposta passa attraverso il filtro log che la invia alla dashboard.
     """
+
     # Callback per inviare il filler message al frontend quando elabora
     async def send_progress(msg: str):
-        await manager.broadcast({"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"})
-    
+        await manager.broadcast(
+            {"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"}
+        )
+
     response = await agent.process(cmd, progress_cb=send_progress)
-    
+
     # Stampa nel terminale con il prefisso "MAYA >" che viene catturato dal filtro
     print(f"MAYA > {response}")
-    
+
     # Aggiorna lo stato del sistema (modelli, stats, ecc)
     await broadcast_state()
+
 
 async def get_models_status():
     """
@@ -146,22 +165,19 @@ async def get_models_status():
     try:
         client = ollama.AsyncClient()
         local_models = await client.list()
-        downloaded = [m.get('name', '') for m in local_models.get('models', [])]
-        
+        downloaded = [m.get("name", "") for m in local_models.get("models", [])]
+
         status = {}
         for key, name in MODELS.items():
             # Controlla se il modello esatto o una variante è disponibile
             is_ok = any(name in d or d in name for d in downloaded)
-            status[key] = {
-                "name": name,
-                "online": is_ok,
-                "id": key
-            }
+            status[key] = {"name": name, "online": is_ok, "id": key}
         return status
     except Exception as e:
         print(f"[MONITOR] Errore nel controllo modelli: {e}")
         # Ritorna tutti i modelli come offline se c'è un errore
         return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
+
 
 async def broadcast_state():
     """
@@ -176,27 +192,41 @@ async def broadcast_state():
 
     state_payload = {
         "type": "state",
-        "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, 'memory') else 0,
-        "memTurns": len(agent.memory.turns) if hasattr(agent, 'memory') else 0,
+        "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, "memory") else 0,
+        "memTurns": len(agent.memory.turns) if hasattr(agent, "memory") else 0,
         "ollama": "ONLINE" if ollama_online else "OFFLINE",
         "models": models_status,
-        "led": arduino_tool.sim_state.get("light", "OFF").lower() if arduino_tool else "off",
-        "relay": arduino_tool.sim_state.get("relay", "OFF").lower() if arduino_tool else "off",
-        "servo": arduino_tool.sim_state.get("servo", "CLOSED").lower() if arduino_tool else "closed",
+        "led": (
+            arduino_tool.sim_state.get("light", "OFF").lower()
+            if arduino_tool
+            else "off"
+        ),
+        "relay": (
+            arduino_tool.sim_state.get("relay", "OFF").lower()
+            if arduino_tool
+            else "off"
+        ),
+        "servo": (
+            arduino_tool.sim_state.get("servo", "CLOSED").lower()
+            if arduino_tool
+            else "closed"
+        ),
         "system": {
             "model": MODELS.get("ultra-fast", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),
-            "version": "1.2.0"
-        }
+            "version": "1.2.0",
+        },
     }
     await manager.broadcast(state_payload)
 
+
 async def stats_broadcaster():
     import psutil
+
     # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
     psutil.cpu_percent(interval=None)
     await asyncio.sleep(0.1)
-    
+
     while True:
         try:
             cpu_load = psutil.cpu_percent(interval=None)
@@ -213,7 +243,8 @@ async def stats_broadcaster():
         except:
             pass
         await asyncio.sleep(0.33)
-        
+
+
 async def spotify_broadcaster():
     while True:
         try:
@@ -221,17 +252,20 @@ async def spotify_broadcaster():
             if spotify_tool and spotify_tool.sp:
                 result = spotify_tool._current_track()
                 if result["status"] == "ok":
-                    await manager.broadcast({
-                        "type": "spotify",
-                        "message": result.get("message", ""),
-                        "track": result.get("track", ""),
-                        "artist": result.get("artist", ""),
-                        "is_playing": result.get("is_playing", False),
-                        "album_art": result.get("album_art", ""),
-                    })
+                    await manager.broadcast(
+                        {
+                            "type": "spotify",
+                            "message": result.get("message", ""),
+                            "track": result.get("track", ""),
+                            "artist": result.get("artist", ""),
+                            "is_playing": result.get("is_playing", False),
+                            "album_art": result.get("album_art", ""),
+                        }
+                    )
         except Exception:
             pass
-        await asyncio.sleep(3)      
+        await asyncio.sleep(3)
+
 
 async def interactive_console():
     """Legge i comandi dal terminale e li processa."""
@@ -245,7 +279,7 @@ async def interactive_console():
             user_input = user_input.strip()
             if not user_input:
                 continue
-            
+
             if user_input.lower() in ["exit", "quit", "esci"]:
                 print("[MAYA] Spegnimento in corso...")
                 os._exit(0)
@@ -259,6 +293,7 @@ async def interactive_console():
             break
         except Exception as e:
             print(f"[ERRORE] {e}")
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="warning")

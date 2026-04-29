@@ -23,12 +23,13 @@ os.environ["OLLAMA_HOST"] = os.getenv("OLLAMA_HOST", "127.0.0.1")
 # CONFIGURAZIONE
 # ──────────────────────────────────────────────
 MODELS = {
-    "ultra-fast": os.getenv("MODEL_ULTRA_FAST", "llama3.2"),
-    "fast": os.getenv("MODEL_FAST", "phi4"),
-    "balanced": os.getenv("MODEL_BALANCED", "mistral-small"),
+    "router": os.getenv("MODEL_ROUTER", "llama3.2:1b"),
+    "domotic": os.getenv("MODEL_DOMOTIC", "phi4"),
+    "reasoning": os.getenv("MODEL_REASONING", "mistral-small"),
+    "chitchat": os.getenv("MODEL_CHITCHAT", "llama3.2"),
 }
 
-ACTIVE_MODEL = MODELS["ultra-fast"]
+ACTIVE_MODEL = MODELS["router"]
 
 # Carica il prompt dal .env se disponibile, altrimenti usa il default
 DEFAULT_PROMPT = """Sei MAYA (Multitask Advanced Yielding Assistant), un assistente AI agentico evoluto.
@@ -74,6 +75,29 @@ REGOLE CRITICHE:
 """
 
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
+
+# ──────────────────────────────────────────────
+# PROMPT SPECIALISTICI
+# ──────────────────────────────────────────────
+
+ROUTER_PROMPT = """Classifica l'intent dell'utente in UNA parola.
+- DOMOTIC: se chiede PREZZI, BITCOIN, CRIPTO, S&P500, BORSA, AZIONI, METEO, NOTIZIE, WIKIPEDIA, LUCI, NOTE o CALENDARIO.
+- REASONING: se chiede CODICE, spiegazioni lunghe, analisi o riassunti.
+- CHITCHAT: se saluta, fa chiacchiere o domande personali.
+
+Esempi:
+"Quanto vale S&P500?" -> DOMOTIC
+"Che tempo fa?" -> DOMOTIC
+"Scrivi un loop" -> REASONING
+"Ciao come stai" -> CHITCHAT
+
+Rispondi SOLO con la categoria: DOMOTIC, REASONING o CHITCHAT."""
+
+SPECIALIST_PROMPTS = {
+    "DOMOTIC": DEFAULT_PROMPT + "\nFOCUS: Sii estremamente concisa e usa i tool appropriati. Rispondi SEMPRE in JSON.",
+    "REASONING": DEFAULT_PROMPT + "\nFOCUS: Fornisci risposte approfondite e strutturate. Se l'utente chiede CODICE, scrivi codice pulito e commentato.",
+    "CHITCHAT": DEFAULT_PROMPT + "\nFOCUS: Sii amichevole ma professionale (personalità 'tough'). Mantieni le risposte brevi.",
+}
 
 # Messaggi di filler per il feedback durante l'elaborazione (zero latenza aggiuntiva)
 FILLER_MESSAGES = [
@@ -136,32 +160,47 @@ class AgentCore:
                 return actions
         return None
 
-    def _select_model(self, user_input: str) -> str:
-        """
-        Seleziona il modello in base alla complessità della query.
-        - balanced (mistral-small): compiti cognitivi pesanti (analisi, riassunti, Wikipedia)
-        - fast (phi4): tool informativi veloci (prezzo, meteo, notizie)
-        - ultra-fast (llama3.2): comandi rapidi e conversazione
-        """
+    async def _route_intent(self, user_input: str) -> str:
+        """Determina l'intent dell'utente con logica ibrida: Hard Routing + LLM."""
         lower = user_input.lower()
         
-        # Compiti cognitivi pesanti → mistral-small (balanced)
-        heavy_keywords = [
-            "spiega", "riassumi", "analizza", "significato", 
-            "wikipedia", "traduci", "background", "storia", "origine"
+        # 1. HARD ROUTING: Se ci sono parole chiave critiche, usa direttamente i tool
+        tool_keywords = [
+            "bitcoin", "btc", "eth", "cripto", "s&p", "sp500", "nasdaq", 
+            "meteo", "news", "notizie", "borsa", "azioni", "prezzo", "valore",
+            "luce", "chiudi", "apri", "wikipedia", "cerca", "search"
         ]
-        
-        # Tool informativi veloci → phi4 (fast)
-        fast_keywords = [
-            "prezzo", "meteo", "bitcoin", "btc", "eth", "notizie", 
-            "vale", "crypto", "trading", "azioni", "cerca", "news"
-        ]
-        
-        if any(k in lower for k in heavy_keywords):
-            return "balanced"  # mistral-small per compiti cognitivi
-        if any(k in lower for k in fast_keywords) or len(user_input.split()) > 8:
-            return "fast"  # phi4 per tool informativi
-        return "ultra-fast"  # llama3.2 per comandi rapidi
+        if any(k in lower for k in tool_keywords):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC")
+            return "DOMOTIC"
+
+        # 2. FAST PATH: se l'input è brevissimo e non è un tool, usa CHITCHAT
+        if len(user_input.split()) <= 2:
+            return "CHITCHAT"
+            
+        try:
+            client = ollama.AsyncClient()
+            response = await client.generate(
+                model=MODELS["router"],
+                system=ROUTER_PROMPT,
+                prompt=user_input,
+                stream=False,
+                options={
+                    "temperature": 0.0,
+                    "num_predict": 10,  # Risposta brevissima
+                },
+                keep_alive="10m"  # Mantieni in VRAM per 10 minuti
+            )
+            intent = response.get("response", "CHITCHAT").strip().upper()
+            # Pulizia output: cerca parole chiave nelle risposte discorsive
+            for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
+                if category in intent:
+                    print(f"[ROUTER] Intent rilevato: {category}")
+                    return category
+            return "CHITCHAT"
+        except Exception as e:
+            print(f"[ROUTER] Errore routing: {e}")
+            return "CHITCHAT"
 
     def _clean_json(self, text: str) -> dict:
         """
@@ -180,41 +219,52 @@ class AgentCore:
             return self._fallback_parse(text)
 
     async def _call_llm(self, user_input: str, progress_cb=None) -> dict:
-        """Chiama Ollama e ottieni JSON strutturato."""
-        # Aggiungi contesto dalla memoria (retrieval semantico)
-        context = await self.memory.get_context(query=user_input, top_k=5)
-        prompt = f"{context}\nUtente: {user_input}"
+        """Pipeline specialistica ottimizzata: Router e Retrieval in parallelo."""
+        # 1. Avvia Routing e Retrieval semantico in parallelo per risparmiare tempo
+        routing_task = asyncio.create_task(self._route_intent(user_input))
+        context_task = asyncio.create_task(self.memory.get_context(query=user_input, top_k=5))
+        
+        # Aspetta il risultato del router
+        intent = await routing_task
+        
+        # 2. Selezione Specialista
+        model_key = intent.lower()
+        model_name = MODELS.get(model_key, MODELS["chitchat"])
+        system_prompt = SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)
+        
+        print(f"[PIPELINE] Specialist: {model_key.upper()} | Model: {model_name}")
 
-        model_type = self._select_model(user_input)
-        model_name = MODELS[model_type]
-        print(f"[ROUTER] Modello selezionato: {model_name} ({model_type})")
-
-        if model_type in ("fast", "balanced") and progress_cb:
+        # Feedback all'utente se il modello è pesante
+        if intent == "REASONING" and progress_cb:
             await progress_cb(random.choice(FILLER_MESSAGES))
 
+        # 3. Chiamata allo Specialista
         try:
+            # Aspetta che il contesto sia pronto (potrebbe essere già finito)
+            context = await context_task
+            prompt = f"{context}\nUtente: {user_input}"
+
             client = ollama.AsyncClient()
             response = await client.generate(
                 model=model_name,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
                 prompt=prompt,
                 format="json",
                 stream=False,
-                options={"temperature": 0.4} # Rende l'output più prevedibile
+                options={"temperature": 0.3 if intent == "CHITCHAT" else 0.1},
+                keep_alive="10m"
             )
 
             text = response.get("response", "{}")
             result = self._clean_json(text)
             
-            # Se l'LLM ha risposto ma manca la chiave reply, proviamo a recuperare
             if "reply" not in result and "response" in result:
                 result["reply"] = result["response"]
             
             return result
 
         except Exception as e:
-            print(f"[LLM] Errore di comunicazione con Ollama: {e}")
-            print("[LLM] Assicurati che Ollama sia in esecuzione ('ollama serve').")
+            print(f"[LLM] Errore specialista {intent}: {e}")
             return self._fallback_parse(user_input)
 
     def _fallback_parse(self, user_input: str) -> dict:
@@ -308,6 +358,13 @@ class AgentCore:
 
         print(f"[PLANNER] Intent: {intent} | Azioni: {len(actions)}")
 
+        # FEEDBACK IMMEDIATO: Invia la risposta testuale dell'LLM prima di eseguire i tool
+        if reply and actions and progress_cb:
+            await progress_cb(reply)
+            # Puliamo il reply per non ripeterlo nel return finale se ci sono tool
+            # Ma lo teniamo se vogliamo che compaia anche nel log finale. 
+            # Per ora lo inviamo come progress.
+
         # 2. EXECUTOR
         results = await self._execute_actions(actions)
 
@@ -320,8 +377,9 @@ class AgentCore:
                     info_messages.append(msg)
 
         if info_messages:
-            # Mantieni la personalità del chatbot aggiungendo i dati in coda alla sua risposta
-            reply = f"{reply}\n\n{ ' | '.join(info_messages) }"
+            # Se abbiamo inviato il feedback prima, qui restituiamo solo i dati dei tool
+            # per evitare l'effetto "muro di testo" ripetuto.
+            reply = " | ".join(info_messages)
 
         # 3. VALIDATOR
         ok = self._validate_results(results)
