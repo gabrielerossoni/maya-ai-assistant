@@ -10,9 +10,20 @@ class TradingTool:
         pass
 
     def execute(self, action: dict) -> dict:
-        operation = action.get("operation", "price") # price, chart
-        symbol = action.get("symbol", "bitcoin")
-        asset_type = action.get("asset_type", "crypto") # crypto, stock
+        # Estrai i parametri dalla chiave 'parametro' se presente (formato Planner)
+        params = action.get("parametro", action)
+        operation = params.get("operation", "price") # price, chart
+        symbol = params.get("symbol", "bitcoin").lower()
+        asset_type = params.get("asset_type") # Può essere None
+
+        # Auto-detection dell'asset type se mancante
+        if not asset_type:
+            stock_indicators = ["spy", "aapl", "goog", "tsla", "msft", "amzn", "meta", "nvda", "sp500", "nasdaq"]
+            if any(ind in symbol for ind in stock_indicators) or len(symbol) <= 5:
+                # La maggior parte dei ticker stock sono brevi o in questa lista
+                asset_type = "stock"
+            else:
+                asset_type = "crypto"
 
         try:
             if operation == "chart":
