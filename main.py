@@ -11,6 +11,7 @@ import ollama
 from agent_core import AgentCore, MODELS
 from tools.display_tool import DisplayTool
 from log_utils import setup_dashboard_log_filter
+from voice_manager import VoiceManager
 
 
 def print_banner():
@@ -56,6 +57,12 @@ async def lifespan(app: FastAPI):
     # Startup
     print_banner()
     print("\n[SYSTEM] Avvio dei sistemi MAYA...\n")
+    # Imposta il loop prima di ogni altra cosa
+    try:
+        agent.loop = asyncio.get_running_loop()
+    except RuntimeError:
+        agent.loop = asyncio.get_event_loop()
+        
     await agent.initialize()
     print("\n[SYSTEM] Sistemi operativi. Avvio interfaccia visiva...\n")
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
@@ -68,6 +75,11 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(interactive_console())
     asyncio.create_task(stats_broadcaster())
     asyncio.create_task(spotify_broadcaster())
+    
+    # Avvia il sistema vocale dopo un piccolo delay per assicurarsi che tutto sia pronto
+    await asyncio.sleep(1)
+    voice_manager.start()
+    
     yield
     # Shutdown
     display.stop()
@@ -76,6 +88,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 agent = AgentCore()
 display = DisplayTool()
+voice_manager = VoiceManager(agent, manager)
 
 # Applica il filtro dei log della dashboard SUBITO dopo l'inizializzazione FastAPI
 # Questo permette ai log di sistema di passare al terminale durante l'avvio
