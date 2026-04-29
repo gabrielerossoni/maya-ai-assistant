@@ -59,7 +59,7 @@ Tool disponibili:
 - timer: sveglie (minutes, seconds, message)
 - translate: traduci testo (text, target: es 'en', 'es')
 - search: ricerca web (query)
-- spotify: controlli media (command: play_pause, next, prev, open)
+- spotify: controllo Spotify reale (command: play_pause/play/pause/next/prev/current/volume_up/volume_down/volume/search, "query" per cercare brano, "level" 0-100 per volume)
 - sys_monitor: statistiche cpu/ram
 - none: risposta solo testuale
 

@@ -71,6 +71,7 @@ async def lifespan(app: FastAPI):
     # Avvia la console e i broadcaster in background
     asyncio.create_task(interactive_console())
     asyncio.create_task(stats_broadcaster())
+    asyncio.create_task(spotify_broadcaster())
     yield
     # Shutdown
     display.stop()
@@ -86,24 +87,40 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global _log_filter_applied
-    await manager.connect(websocket)
-    
-    # Applica il filtro log al primo collegamento del client (una sola volta)
-    if not _log_filter_applied:
-        setup_dashboard_log_filter(manager)
-        _log_filter_applied = True
-    
-    await broadcast_state()
     try:
+        await manager.connect(websocket)
+        
+        # Applica il filtro log al primo collegamento del client (una sola volta)
+        if not _log_filter_applied:
+            setup_dashboard_log_filter(manager)
+            _log_filter_applied = True
+        
+        await broadcast_state()
+        
         while True:
-            data = await websocket.receive_json()
-            if data.get("type") == "command":
-                cmd = data.get("text", "")
-                if cmd:
-                    # Invia la richiesta dell'utente alla dashboard tramite print (che passa dal filtro)
-                    print(f"Richiesta: {cmd}")
-                    asyncio.create_task(execute_and_broadcast(cmd))
-    except WebSocketDisconnect:
+            try:
+                data = await websocket.receive_json()
+                if data.get("type") == "command":
+                    cmd = data.get("text", "")
+                    if cmd:
+                        # Invia la richiesta dell'utente alla dashboard tramite print (che passa dal filtro)
+                        print(f"Richiesta: {cmd}")
+                        asyncio.create_task(execute_and_broadcast(cmd))
+                elif data.get("type") == "tool":
+                    # Esecuzione diretta tool, bypassa LLM
+                    action = data.get("action", {})
+                    if action:
+                        result = await agent.tool_manager.execute(action)
+                        await manager.broadcast({"type": "log", "text": result.get("message", ""), "level": "ok"})
+                        await broadcast_state()
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                print(f"[WebSocket] Errore durante receive: {e}")
+                break
+    except Exception as e:
+        print(f"[WebSocket] Errore connessione: {e}")
+    finally:
         manager.disconnect(websocket)
 
 async def execute_and_broadcast(cmd: str):
@@ -194,6 +211,25 @@ async def stats_broadcaster():
         except:
             pass
         await asyncio.sleep(0.33)
+        
+async def spotify_broadcaster():
+    while True:
+        try:
+            spotify_tool = agent.tool_manager.tools.get("spotify")
+            if spotify_tool and spotify_tool.sp:
+                result = spotify_tool._current_track()
+                if result["status"] == "ok":
+                    await manager.broadcast({
+                        "type": "spotify",
+                        "message": result.get("message", ""),
+                        "track": result.get("track", ""),
+                        "artist": result.get("artist", ""),
+                        "is_playing": result.get("is_playing", False),
+                        "album_art": result.get("album_art", ""),
+                    })
+        except Exception:
+            pass
+        await asyncio.sleep(3)      
 
 async def interactive_console():
     """Legge i comandi dal terminale e li processa."""
