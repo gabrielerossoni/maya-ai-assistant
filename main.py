@@ -7,6 +7,9 @@ import asyncio
 import sys
 import os
 import time
+import socket
+import shutil
+import subprocess
 import threading
 import webbrowser
 import ollama
@@ -14,6 +17,136 @@ from agent_core import AgentCore, MODELS
 from tools.display_tool import DisplayTool
 from log_utils import setup_dashboard_log_filter
 from voice_manager import VoiceManager
+
+
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "127.0.0.1")
+OLLAMA_PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
+
+
+def _ollama_addr() -> tuple[str, int]:
+    host = OLLAMA_HOST
+    if host.startswith("http://"):
+        host = host[7:]
+    elif host.startswith("https://"):
+        host = host[8:]
+    host = host.split("/")[0]
+    if ":" in host:
+        h, _, p = host.partition(":")
+        try:
+            return h, int(p)
+        except ValueError:
+            return h, OLLAMA_PORT
+    return host, OLLAMA_PORT
+
+
+def _ollama_api_reachable(timeout: float = 0.75) -> bool:
+    host, port = _ollama_addr()
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _resolve_ollama_executable() -> str | None:
+    exe = shutil.which("ollama")
+    if exe:
+        return exe
+    if sys.platform == "win32":
+        local = os.path.join(
+            os.environ.get("LOCALAPPDATA", ""),
+            "Programs",
+            "Ollama",
+            "ollama.exe",
+        )
+        if os.path.isfile(local):
+            return local
+    return None
+
+
+def ensure_ollama_running(max_wait_sec: int = 45) -> None:
+    """
+    Se l'API Ollama non risponde, prova ad avviare `ollama serve` in background.
+    Disabilita con MAYA_SKIP_OLLAMA_AUTOSTART=1 oppure se OLLAMA_HOST punta a un host remoto.
+    """
+    if os.environ.get("MAYA_SKIP_OLLAMA_AUTOSTART", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return
+
+    host, _ = _ollama_addr()
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        return
+
+    if _ollama_api_reachable():
+        return
+
+    ollama_exe = _resolve_ollama_executable()
+    if not ollama_exe:
+        print(
+            "[OLLAMA] Eseguibile non trovato. Installa Ollama da https://ollama.com "
+            "oppure avvialo manualmente."
+        )
+        return
+
+    print("[OLLAMA] Avvio del server locale in background...")
+    popen_kw: dict = {
+        "args": [ollama_exe, "serve"],
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if sys.platform == "win32":
+        popen_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+    try:
+        subprocess.Popen(**popen_kw)
+    except OSError as e:
+        print(f"[OLLAMA] Impossibile avviare ollama serve: {e}")
+        return
+
+    for i in range(max_wait_sec):
+        if _ollama_api_reachable():
+            print("[OLLAMA] Server pronto.")
+            return
+        time.sleep(1)
+        if i in (4, 14) and i > 0:
+            print("[OLLAMA] Ancora in attesa del servizio...")
+
+    print(
+        "[OLLAMA] Timeout: il servizio non risponde. Avvia l'app Ollama o "
+        "`ollama serve` da terminale, poi rilancia MAYA."
+    )
+
+
+def _pick_http_port(
+    host: str = "127.0.0.1",
+    *,
+    max_attempts: int = 24,
+) -> int:
+    """
+    Sceglie una porta TCP libera. Parte da MAYA_PORT (default 8000).
+    Con MAYA_PORT_STRICT=1 usa solo quella e non prova altre (uvicorn fallirà se occupata).
+    """
+    first = int(os.environ.get("MAYA_PORT", "8000"))
+    strict = os.environ.get("MAYA_PORT_STRICT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if strict:
+        return first
+    for port in range(first, first + max_attempts):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind((host, port))
+            return port
+        except OSError:
+            continue
+    return first
 
 
 def print_banner():
@@ -64,7 +197,8 @@ async def lifespan(app: FastAPI):
         agent.loop = asyncio.get_running_loop()
     except RuntimeError:
         agent.loop = asyncio.get_event_loop()
-        
+    manager.loop = agent.loop
+
     await agent.initialize()
     print("\n[SYSTEM] Sistemi operativi. Avvio interfaccia visiva...\n")
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
@@ -78,9 +212,12 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(spotify_broadcaster())
     
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
+    http_port = int(os.environ.get("MAYA_HTTP_PORT", "8000"))
+
     def _open_browser():
         time.sleep(1.5)
-        webbrowser.open("http://127.0.0.1:8000")
+        webbrowser.open(f"http://127.0.0.1:{http_port}")
+
     threading.Thread(target=_open_browser, daemon=True).start()
 
     # Avvia il sistema vocale
@@ -151,6 +288,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         await broadcast_state()
             except WebSocketDisconnect:
                 break
+            except RuntimeError as e:
+                err = str(e).lower()
+                if "accept" in err or "not connected" in err or "disconnect" in err:
+                    break
+                raise
             except Exception as e:
                 print(f"[WebSocket] Errore durante receive: {e}")
                 break
@@ -320,4 +462,30 @@ async def interactive_console():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="warning")
+    _http_host = "127.0.0.1"
+    _http_port = _pick_http_port(_http_host)
+    if _http_port != int(os.environ.get("MAYA_PORT", "8000")):
+        print(
+            f"[MAYA] Porta {os.environ.get('MAYA_PORT', '8000')} occupata: "
+            f"avvio su http://{_http_host}:{_http_port} (chiudi le altre istanze se non serve)."
+        )
+    os.environ["MAYA_HTTP_PORT"] = str(_http_port)
+
+    threading.Thread(target=ensure_ollama_running, daemon=True).start()
+    try:
+        uvicorn.run(
+            "main:app",
+            host=_http_host,
+            port=_http_port,
+            log_level="warning",
+        )
+    except OSError as e:
+        if getattr(e, "winerror", None) == 10048 or getattr(e, "errno", None) in (
+            10048,
+            98,
+        ):
+            print(
+                "\n[MAYA] Porta ancora occupata: chiudi l'altra istanza, "
+                "oppure imposta MAYA_PORT=8010 (o MAYA_PORT_STRICT=1 per forzare una sola porta).\n"
+            )
+        raise

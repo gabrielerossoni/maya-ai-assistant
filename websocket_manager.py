@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+import asyncio
+from typing import Optional
+
 from fastapi import WebSocket
-import json
 
 
 class WebSocketManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        # Loop uvicorn (lifespan): necessario per run_coroutine_threadsafe da altri thread
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()

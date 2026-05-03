@@ -878,7 +878,8 @@
 
       let ws;
       function initWS() {
-        ws = new WebSocket("ws://127.0.0.1:8000/ws");
+        const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(`${_wsProto}//${location.host}/ws`);
         ws.onopen = () => {
           addLog("⚙️ Sincronizzazione e accensione sistema...", "ok");
           updateGreeting();
@@ -1013,6 +1014,7 @@
             const wave = document.getElementById("voice-wave");
             const text = document.getElementById("voice-status-text");
             const indicator = document.getElementById("voice-indicator");
+            if (!wave || !text || !indicator) return;
             wave.classList.remove("wave-listening", "wave-speaking");
             
             if (d.status === "LISTENING") {
