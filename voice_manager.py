@@ -35,14 +35,17 @@ class VoiceManager:
         self.piper_exe = os.path.join("voice", "piper.exe")
         self.piper_model = os.path.join("voice", "it_IT-paola-medium.onnx")
 
-        # VAD RMS: default più bassi per timbri vocali gravi / voci morbide (meno energia su 16 kHz mono).
-        # Rialza MAYA_SPEECH_RMS se hai troppi avvii da rumore; abbassa ancora se non parte.
-        self.speech_rms_threshold = float(os.environ.get("MAYA_SPEECH_RMS", "285"))
-        self.silence_rms_threshold = float(os.environ.get("MAYA_SILENCE_RMS", "210"))
-        # Più chunk consecutivi in “silenzio” prima di chiudere l’utterance → meno tagli su pause brevi tra sillabe
-        self.silence_chunks_for_end = int(os.environ.get("MAYA_SILENCE_CHUNKS", "16"))
-        self.max_utterance_sec = float(os.environ.get("MAYA_MAX_UTTERANCE_SEC", "12"))
-        self.min_utterance_chunks = int(os.environ.get("MAYA_MIN_UTTERANCE_CHUNKS", "8"))
+        # Fallback statico se MAYA_DISABLE_ADAPTIVE_VAD=1 (o calibrazione saltata).
+        # speech deve stare sopra silence di un margine chiaro (~60+).
+        self.speech_rms_threshold = float(os.environ.get("MAYA_SPEECH_RMS", "235"))
+        self.silence_rms_threshold = float(os.environ.get("MAYA_SILENCE_RMS", "160"))
+        self.silence_chunks_for_end = int(os.environ.get("MAYA_SILENCE_CHUNKS", "18"))
+        self.max_utterance_sec = float(os.environ.get("MAYA_MAX_UTTERANCE_SEC", "14"))
+        # Wake breve: default basso così «Ehy Maya» non viene scartata per durata (voci gravi più corte sul mic)
+        self.min_utterance_chunks = int(os.environ.get("MAYA_MIN_UTTERANCE_CHUNKS", "6"))
+        self._vad_speech: float | None = None
+        self._vad_silence: float | None = None
+        self._noise_floor: float | None = None
         self.whisper_language = os.environ.get("MAYA_WHISPER_LANGUAGE", "it")
         self.followup_wait_sec = float(os.environ.get("MAYA_FOLLOWUP_WAIT_SEC", "22"))
         self.followup_min_chunks = int(
@@ -51,18 +54,86 @@ class VoiceManager:
                 str(max(5, self.min_utterance_chunks - 3)),
             )
         )
-        
+        # Ultimo stato inviato / da mostrare in dashboard (sincrono su reconnect e stats).
+        self._dashboard_voice_status: str = "IDLE"
+
     def _initialize_models(self):
         print("[VOICE] Caricamento modelli vocali...")
         # STT: faster-whisper (tiny per velocità estrema)
         self.stt_model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        print("[VOICE] Attivazione con frase tipo «Ehi Maya» (Whisper + VAD RMS).")
+        print("[VOICE] Attivazione con frase tipo «Ehi Maya» (Whisper + VAD RMS adattivo).")
         print(
-            f"[VOICE] Soglie: voce RMS≥{self.speech_rms_threshold:.0f}, "
-            f"silenzio RMS<{self.silence_rms_threshold:.0f}, "
-            f"min chunk={self.min_utterance_chunks} (variabili d'ambiente MAYA_*)"
+            f"[VOICE] Fallback statico: RMS voce≥{self.speech_rms_threshold:.0f}, "
+            f"silenzio<{self.silence_rms_threshold:.0f}, min chunk={self.min_utterance_chunks} "
+            "(sovrascrivi con MAYA_*; MAYA_DISABLE_ADAPTIVE_VAD=1 usa solo queste)."
         )
         print("[VOICE] Modelli caricati con successo.")
+
+    def get_dashboard_voice_status(self) -> str:
+        """Stato voce da propagare sulla dashboard (WebSocket reconnect / piggyback)."""
+        return self._dashboard_voice_status
+
+    def voice_status_message(self) -> dict:
+        return {"type": "voice_status", "status": self._dashboard_voice_status}
+
+    def _rms_thresholds(self) -> tuple[float, float]:
+        """Soglie effettive: calibrate se presenti, altrimenti da env/default."""
+        if self._vad_speech is not None and self._vad_silence is not None:
+            return self._vad_speech, self._vad_silence
+        return self.speech_rms_threshold, self.silence_rms_threshold
+
+    def _calibrate_vad_from_stream(self, stream) -> None:
+        """Stima rumore ambiente e imposta soglie relativistiche (migliora voci gravi / mic deboli)."""
+        disabled = os.environ.get("MAYA_DISABLE_ADAPTIVE_VAD", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if disabled:
+            self._vad_speech = self.speech_rms_threshold
+            self._vad_silence = self.silence_rms_threshold
+            print("[VOICE] VAD adattivo disabilitato (solo soglie MAYA_SPEECH_RMS / MAYA_SILENCE_RMS).")
+            return
+
+        self._broadcast("CALIBRATING")
+        n = int(os.environ.get("MAYA_CALIB_CHUNKS", "36"))
+        print("[VOICE] Calibrazione rumore (~3 s): meglio ambiente tranquillo davanti al microfono.")
+        chunks: list[float] = []
+        for _ in range(max(12, n)):
+            if not self.is_running:
+                return
+            data = stream.read(self.CHUNK, exception_on_overflow=False)
+            chunks.append(self._pcm_rms(np.frombuffer(data, dtype=np.int16)))
+
+        arr = np.array(chunks, dtype=np.float64)
+        # Percentili robusti se l'utente tossisce una volta nella finestra
+        noise = float(min(np.percentile(arr, 12), np.percentile(arr, 38)))
+
+        above_s = float(os.environ.get("MAYA_ADAPTIVE_SPEECH_DELTA", "78"))
+        above_i = float(os.environ.get("MAYA_ADAPTIVE_SILENCE_DELTA", "32"))
+        gap = float(os.environ.get("MAYA_ADAPTIVE_MIN_GAP", "52"))
+
+        speech = noise + above_s
+        silence = noise + above_i
+        if speech - silence < gap:
+            silence = speech - gap
+        silence = max(silence, noise + 12.0)
+
+        smin = float(os.environ.get("MAYA_SPEECH_RMS_MIN", "88"))
+        smax = float(os.environ.get("MAYA_SPEECH_RMS_MAX", "540"))
+        imin = float(os.environ.get("MAYA_SILENCE_RMS_MIN", "42"))
+
+        speech = max(smin, min(speech, smax))
+        silence = max(imin, min(silence, speech - 36.0))
+
+        self._noise_floor = noise
+        self._vad_speech = speech
+        self._vad_silence = silence
+        print(
+            f"[VOICE] VAD effettivo: fondo rumore≈{noise:.0f} "
+            f"→ soglia parlato≥{speech:.0f}, fine frase quando RMS<{silence:.0f} "
+            f"per ~{self.silence_chunks_for_end * (self.CHUNK / self.RATE):.1f}s"
+        )
 
     @staticmethod
     def _pcm_rms(audio_int16: np.ndarray) -> float:
@@ -85,6 +156,22 @@ class VoiceManager:
         if m:
             return t[m.end() :].strip()
 
+        # Whisper spesso abbrevia «Ehi» → «E» prima di Maya
+        pat_e_maya = re.compile(rf"(?is)^e\s*,?\s*{maya}\b\s*[,:\-]?\s*")
+        m_e = pat_e_maya.match(t)
+        if m_e:
+            return t[m_e.end() :].strip()
+
+        pat_eh_maya = re.compile(rf"(?is)^eh\s*,?\s*{maya}\b\s*[,:\-]?\s*")
+        m_eh = pat_eh_maya.match(t)
+        if m_eh:
+            return t[m_eh.end() :].strip()
+
+        pat_ok_maya = re.compile(rf"(?is)^(ok|okay|oké)\s*,?\s*{maya}\b\s*[,:\-]?\s*")
+        m_ok = pat_ok_maya.match(t)
+        if m_ok:
+            return t[m_ok.end() :].strip()
+
         pat_maya = re.compile(rf"(?is)^{maya}\b\s*[,:\-]?\s*")
         m2 = pat_maya.match(t)
         if m2:
@@ -102,17 +189,22 @@ class VoiceManager:
 
         Se max_leading_silence_sec è impostato, dopo così tanti secondi senza parlato
         ritorna None (timeout). Default None = attende indefinitamente (loop principale).
+
+        LISTENING solo dopo che il RMS supera la soglia parlato: così tra un turno e l'altro
+        non restiamo sempre «in ascolto» in dashboard mentre il mic è in attesa silenziosa.
         """
         frames: list[bytes] = []
         max_leading_chunks: int | None = None
         if max_leading_silence_sec is not None:
             max_leading_chunks = max(1, int(max_leading_silence_sec * self.RATE / self.CHUNK))
 
+        th_speech, th_silence = self._rms_thresholds()
         leading_quiet = 0
         while self.is_running:
             data = stream.read(self.CHUNK, exception_on_overflow=False)
             a = np.frombuffer(data, dtype=np.int16)
-            if self._pcm_rms(a) >= self.speech_rms_threshold:
+            if self._pcm_rms(a) >= th_speech:
+                self._broadcast("LISTENING")
                 frames.append(data)
                 break
             if max_leading_chunks is not None:
@@ -129,7 +221,7 @@ class VoiceManager:
             data = stream.read(self.CHUNK, exception_on_overflow=False)
             frames.append(data)
             a = np.frombuffer(data, dtype=np.int16)
-            if self._pcm_rms(a) < self.silence_rms_threshold:
+            if self._pcm_rms(a) < th_silence:
                 silent_chunks += 1
                 if silent_chunks >= self.silence_chunks_for_end:
                     break
@@ -148,10 +240,12 @@ class VoiceManager:
         audio_f32 = (audio_i16.astype(np.float32) / 32768.0).clip(-1.0, 1.0)
 
         lang = self.whisper_language.strip() or None
+        # vad_filter=False: non tagliare l’inizio/fine piani (fundamentali per voci gravi)
         segments, _ = self.stt_model.transcribe(
             audio_f32,
             beam_size=5,
             language=lang,
+            vad_filter=False,
         )
         return " ".join(segment.text for segment in segments).strip()
 
@@ -168,21 +262,25 @@ class VoiceManager:
             return self.socket_manager.loop
         return getattr(self.agent, "loop", None)
 
-    def _broadcast(self, status):
+    def _broadcast(self, status: str):
         """Accoda lo stato voce sul loop principale (thread-safe)."""
+        self._dashboard_voice_status = (
+            status.strip().upper() if isinstance(status, str) else "IDLE"
+        )
         loop = self._voice_event_loop()
         if not loop:
             return
         try:
             fut = asyncio.run_coroutine_threadsafe(
-                self.broadcast_status(status), loop
+                self.broadcast_status(self._dashboard_voice_status), loop
             )
 
             def _log_err(f):
                 try:
                     f.result()
                 except Exception as e:
-                    print(f"[VOICE] Invio stato '{status}' alla dashboard fallito: {e}")
+                    sv = getattr(self, "_dashboard_voice_status", status)
+                    print(f"[VOICE] Invio stato '{sv}' alla dashboard fallito: {e}")
 
             fut.add_done_callback(_log_err)
         except Exception as e:
@@ -209,17 +307,22 @@ class VoiceManager:
             stream = audio.open(format=self.FORMAT, channels=self.CHANNELS,
                                 rate=self.RATE, input=True,
                                 frames_per_buffer=self.CHUNK)
-            
-            print("[VOICE] Microfono attivo. Di' «Ehi Maya» e poi il comando.")
-            
+
+            self._calibrate_vad_from_stream(stream)
+
+            print("[VOICE] Microfono pronto: di' «Ehi Maya» e poi il comando.")
+            self._broadcast("IDLE")
+
             while self.is_running:
                 pcm = self._record_utterance_pcm(stream)
                 if not pcm or not self.is_running:
+                    self._broadcast("IDLE")
                     continue
                 if len(pcm) < self.CHUNK * self.min_utterance_chunks:
+                    self._broadcast("IDLE")
                     continue
 
-                # Resta IDLE finché non abbiamo verificato la wake (no LISTENING durante STT della wake)
+                self._broadcast("TRANSCRIBING")
                 try:
                     text = self._transcribe_pcm(pcm)
                 except Exception as e:
@@ -235,13 +338,17 @@ class VoiceManager:
                 if cmd is None:
                     if os.environ.get("MAYA_VOICE_DEBUG"):
                         print(f"[VOICE] (debug) Ignorato, nessuna wake phrase in: {text!r}")
+                    else:
+                        print(
+                            "[VOICE] Trascrizione senza wake (serve «Ehi Maya»… o «Maya» in testa): "
+                            f"{text!r}"
+                        )
                     self._broadcast("IDLE")
                     continue
 
                 print(f"[VOICE] Attivazione riconosciuta. Trascrizione: {text!r}")
 
-                # Sempre LISTENING dopo wake (la dashboard si aggiorna anche se il comando è nella stessa frase)
-                self._broadcast("LISTENING")
+                # LISTENING è già emesso dentro _record_utterance_*; dopo wake + comando inline va in PROCESSING
                 if cmd:
                     self._process_voice_text(cmd)
                 else:
@@ -271,20 +378,25 @@ class VoiceManager:
 
         if not pcm:
             print("[VOICE] Timeout: non ho sentito il comando.")
+            self._broadcast("IDLE")
             return
 
         if len(pcm) < self.CHUNK * self.followup_min_chunks:
             print("[VOICE] Audio troppo breve dopo l'attivazione, ignoro.")
+            self._broadcast("IDLE")
             return
 
         print("[VOICE] Elaborazione comando...")
+        self._broadcast("TRANSCRIBING")
         try:
             text = self._transcribe_pcm(pcm)
         except Exception as e:
             print(f"[VOICE] Errore trascrizione comando: {e}")
+            self._broadcast("IDLE")
             return
         if not text:
             print("[VOICE] Nessun comando rilevato.")
+            self._broadcast("IDLE")
             return
 
         stripped = self._strip_wake_phrase(text)
@@ -295,25 +407,36 @@ class VoiceManager:
 
         if not cmd_text.strip():
             print("[VOICE] Nessun comando dopo l'attivazione (solo wake phrase?).")
+            self._broadcast("IDLE")
             return
 
         print(f"[VOICE] Trascrizione: {cmd_text}")
         self._process_voice_text(cmd_text.strip())
 
     def _process_voice_text(self, text: str):
+        loop = self._voice_event_loop()
+        if loop is None:
+            print("[VOICE] Nessun asyncio loop (agent/manager.loop): comando vocale ignorato.")
+            self._broadcast("IDLE")
+            return
         self._broadcast("PROCESSING")
         try:
             response = asyncio.run_coroutine_threadsafe(
-                self.agent.process(text), self.agent.loop
-            ).result(timeout=30)
-            if response:
+                self.agent.process(text),
+                loop,
+            ).result(timeout=180)
+            if response and str(response).strip():
                 self.speak(response)
+            else:
+                print("[VOICE] Risposta agente vuota, niente TTS.")
         except Exception as e:
             print(f"[VOICE] Errore durante l'elaborazione: {e}")
+            self._broadcast("IDLE")
 
     def speak(self, text):
         if not os.path.exists(self.piper_exe):
             print(f"[VOICE] ERRORE: Piper non trovato in {self.piper_exe}")
+            self._broadcast("IDLE")
             return
             
         print(f"[VOICE] Sintesi vocale: {text[:80]}...")
@@ -332,7 +455,7 @@ class VoiceManager:
             
         except Exception as e:
             print(f"[VOICE] Errore TTS: {e}")
-            
+
         self.is_speaking = False
 
     def _play_wav(self, file_path):

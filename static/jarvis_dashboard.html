@@ -877,6 +877,52 @@
       }
 
       let ws;
+      /** Aggiorna card voce header in base allo stato Maya (messaggio stats o voice_status). */
+      function applyVoiceIndicator(statusRaw) {
+        const status =
+          typeof statusRaw === "string" ? statusRaw.trim().toUpperCase() : "IDLE";
+        const wave = document.getElementById("voice-wave");
+        const text = document.getElementById("voice-status-text");
+        const indicator = document.getElementById("voice-indicator");
+        if (!wave || !text || !indicator) return;
+        const voiceCardBase =
+          "glass-card flex items-center gap-3 px-4 h-12";
+        wave.classList.remove("wave-listening", "wave-speaking");
+
+        if (status === "LISTENING") {
+          wave.classList.add("wave-listening");
+          text.innerText = "In ascolto…";
+          text.className = "text-[9px] font-bold uppercase text-maya-red";
+          indicator.className = `${voiceCardBase} border-maya-red/30`;
+        } else if (status === "CALIBRATING") {
+          wave.classList.add("wave-speaking");
+          text.innerText = "Calibrazione…";
+          text.className = "text-[9px] font-bold uppercase text-yellow-400";
+          indicator.className =
+            `${voiceCardBase} border-yellow-400/35`;
+        } else if (
+          status === "TRANSCRIBING" ||
+          status === "SPEAKING" ||
+          status === "PROCESSING"
+        ) {
+          wave.classList.add("wave-speaking");
+          let label =
+            status === "SPEAKING"
+              ? "Parlo…"
+              : status === "TRANSCRIBING"
+                ? "Trascrizione…"
+                : "Elaborazione…";
+          text.innerText = label;
+          text.className = "text-[9px] font-bold uppercase text-blue-500";
+          indicator.className =
+            `${voiceCardBase} border-blue-500/30`;
+        } else {
+          text.innerText = "Voce idle";
+          text.className = "text-[9px] font-bold uppercase text-white/20";
+          indicator.className = `${voiceCardBase} border-white/5`;
+        }
+      }
+
       function initWS() {
         const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
         ws = new WebSocket(`${_wsProto}//${location.host}/ws`);
@@ -956,6 +1002,8 @@
               document.getElementById("neural-load").innerText = Math.round(d.neural_load) + "%";
               lastTextUpdate = now;
             }
+
+            if (d.voice_status) applyVoiceIndicator(d.voice_status);
           }
           if (d.type === "spotify") {
             document.getElementById("spotify-track").innerText = d.track || "—";
@@ -1010,28 +1058,8 @@
             lucide.createIcons();
           }
 
-          if (d.type === "voice_status") {
-            const wave = document.getElementById("voice-wave");
-            const text = document.getElementById("voice-status-text");
-            const indicator = document.getElementById("voice-indicator");
-            if (!wave || !text || !indicator) return;
-            wave.classList.remove("wave-listening", "wave-speaking");
-            
-            if (d.status === "LISTENING") {
-              wave.classList.add("wave-listening");
-              text.innerText = "Listening...";
-              text.className = "text-[9px] font-bold uppercase text-maya-red";
-              indicator.classList.add("border-maya-red/30");
-            } else if (d.status === "SPEAKING" || d.status === "PROCESSING") {
-              wave.classList.add("wave-speaking");
-              text.innerText = d.status === "SPEAKING" ? "Speaking..." : "Processing...";
-              text.className = "text-[9px] font-bold uppercase text-blue-500";
-              indicator.classList.add("border-blue-500/30");
-            } else {
-              text.innerText = "Voice Idle";
-              text.className = "text-[9px] font-bold uppercase text-white/20";
-              indicator.classList.remove("border-maya-red/30", "border-blue-500/30");
-            }
+          if (d.type === "voice_status" && d.status) {
+            applyVoiceIndicator(d.status);
           }
         };
         ws.onclose = () => setTimeout(initWS, 3000);

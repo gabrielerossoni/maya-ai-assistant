@@ -263,6 +263,10 @@ async def websocket_endpoint(websocket: WebSocket):
             _log_filter_applied = True
 
         await broadcast_state()
+        try:
+            await websocket.send_json(voice_manager.voice_status_message())
+        except Exception:
+            pass
 
         while True:
             try:
@@ -404,6 +408,8 @@ async def stats_broadcaster():
                 "ram_used_gb": round(memory.used / (1024**3), 1),
                 "ram_total_gb": 24,
                 "uptime": "Online",
+                # Allinea widget voce anche se alcuni broadcast si perdono
+                "voice_status": voice_manager.get_dashboard_voice_status(),
             }
             await manager.broadcast(stats)
         except:
@@ -462,6 +468,29 @@ async def interactive_console():
 
 
 if __name__ == "__main__":
+    from instance_guard import (
+        LOCK_PORT,
+        InstanceGuard,
+        install_signal_handlers,
+        kill_existing,
+        skip_guard,
+    )
+
+    if len(sys.argv) > 1 and sys.argv[1].lower() == "kill":
+        sys.exit(0 if kill_existing() else 1)
+
+    if not skip_guard():
+        _instance_guard = InstanceGuard()
+        if not _instance_guard.acquire():
+            print(
+                "[MAYA] È già attiva un'istanza (lock su 127.0.0.1:"
+                f"{LOCK_PORT}).\n"
+                "       Per chiuderla:  python main.py kill\n"
+                "       Bypass (solo debug):  MAYA_SKIP_INSTANCE_GUARD=1\n"
+            )
+            sys.exit(1)
+        install_signal_handlers(_instance_guard)
+
     _http_host = "127.0.0.1"
     _http_port = _pick_http_port(_http_host)
     if _http_port != int(os.environ.get("MAYA_PORT", "8000")):
