@@ -356,8 +356,8 @@ Progetto sviluppato da studenti dell'**ITIS di Crema**.
  
 | | |
 |---|---|
-| **Gabriele Rossoni** | Architettura sistema, backend Python, integrazione LLM, hardware Arduino |
-| **Marcello Patrini** | Co-sviluppatore, testing, integrazione tool |
+| **Gabriele Rossoni** — *Project Manager & Lead Developer* | Ideazione, architettura e sviluppo principale del sistema. |
+| **Marcello Patrini** — *Co-Developer* | Contributi allo sviluppo e testing. |
  
 [![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-gabrielerossoni-181717?style=flat-square&logo=github)](https://github.com/gabrielerossoni)
  
