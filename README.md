@@ -4,11 +4,11 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-black?style=for-the-badge&logo=ollama&logoColor=white)
 ![Arduino](https://img.shields.io/badge/Arduino-Hardware-00979D?style=for-the-badge&logo=arduino&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![License](https://img.shields.io/badge/License-No%20License-red?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)
-![Stars](https://img.shields.io/github/stars/gabrielerossoni/maya-agent?style=for-the-badge&logo=github)
-![Issues](https://img.shields.io/github/issues/gabrielerossoni/maya-agent?style=for-the-badge)
-![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-agent?style=for-the-badge)
+![Stars](https://img.shields.io/github/stars/gabrielerossoni/maya-ai-assistant?style=for-the-badge&logo=github)
+![Issues](https://img.shields.io/github/issues/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
+![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
  
 Sistema AI agentico locale, offline-first, costruito su **Ollama** + **FastAPI** con architettura **Planner → Executor → Validator** e dashboard WebSocket in tempo reale.
  
@@ -16,40 +16,31 @@ Sistema AI agentico locale, offline-first, costruito su **Ollama** + **FastAPI**
  
 ## Architettura
  
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        main.py (FastAPI)                    │
-│   ┌──────────────┐   ┌────────────────┐   ┌─────────────┐  │
-│   │  HTTP /      │   │  WS /ws        │   │  CLI stdin  │  │
-│   └──────┬───────┘   └───────┬────────┘   └──────┬──────┘  │
-│          └──────────────┬────┘                   │          │
-│                         ▼                        │          │
-│               ┌─────────────────┐                │          │
-│               │   AgentCore     │◄───────────────┘          │
-│               │  ┌───────────┐  │                           │
-│               │  │  Planner  │  │  → automazioni keyword    │
-│               │  │   (LLM)   │  │  → routing modello        │
-│               │  └─────┬─────┘  │                           │
-│               │  ┌─────▼─────┐  │                           │
-│               │  │ Executor  │  │  → ToolManager            │
-│               │  └─────┬─────┘  │                           │
-│               │  ┌─────▼─────┐  │                           │
-│               │  │ Validator │  │  → error check            │
-│               │  └───────────┘  │                           │
-│               └────────┬────────┘                           │
-│                        │                                     │
-│         ┌──────────────▼──────────────┐                     │
-│         │         ToolManager         │                      │
-│         │  arduino │ calendar │ weather│                     │
-│         │  network │ trading  │ search │                     │
-│         │  notes   │ timer    │ news   │                     │
-│         │  spotify │ system   │ more.. │                     │
-│         └─────────────────────────────┘                     │
-│                                                              │
-│   WebSocketManager ──► jarvis_dashboard.html (Chart.js)     │
-│   MemoryManager    ──► data/memory.json                      │
-│   DisplayTool      ──► ASCII terminal panel                  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph IN["Input"]
+        HTTP["HTTP /"]
+        WS["WS /ws"]
+        CLI["CLI"]
+    end
+ 
+    subgraph CORE["AgentCore"]
+        P["Planner"] --> E["Executor"] --> V["Validator"]
+    end
+ 
+    subgraph TOOLS["ToolManager"]
+        T["arduino · calendar · weather\nnetwork · trading · search\nnotes · timer · news · spotify"]
+    end
+ 
+    subgraph SUP["Support"]
+        M["MemoryManager"]
+        W["WebSocketManager"]
+        D["DisplayTool"]
+    end
+ 
+    IN --> CORE
+    V --> TOOLS
+    CORE --> SUP
 ```
  
 ---
