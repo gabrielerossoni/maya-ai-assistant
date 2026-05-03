@@ -49,14 +49,21 @@ class DashboardLogFilter:
         
         if should_broadcast:
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.create_task(self.manager.broadcast({
-                        "type": "log", 
-                        "text": display_text, 
-                        "level": log_level
-                    }))
-            except:
+                loop = getattr(self.manager, "loop", None)
+                # Non usare loop.is_running() da altri thread: può essere False in modo spurio.
+                if loop is None:
+                    return
+                asyncio.run_coroutine_threadsafe(
+                    self.manager.broadcast(
+                        {
+                            "type": "log",
+                            "text": display_text,
+                            "level": log_level,
+                        }
+                    ),
+                    loop,
+                )
+            except Exception:
                 pass
 
     def flush(self):
