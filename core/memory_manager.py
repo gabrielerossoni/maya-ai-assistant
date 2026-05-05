@@ -24,6 +24,7 @@ class MemoryManager:
     def __init__(self):
         self.turns = []  # Cache in-memory di tutti i turni
         self.save_lock = asyncio.Lock()
+        self.turn_lock = asyncio.Lock()
         self.chroma_client = None
         self.collection = None
         self._init_chroma()
@@ -103,11 +104,13 @@ class MemoryManager:
             "text": text,
             "time": timestamp,
         }
-        self.turns.append(turn)
         
-        # Mantieni cache in-memory ragionevole (opzionale)
-        if len(self.turns) > 1000:
-            self.turns = self.turns[-1000:]
+        async with self.turn_lock:
+            self.turns.append(turn)
+            
+            # Mantieni cache in-memory ragionevole (opzionale)
+            if len(self.turns) > 1000:
+                self.turns = self.turns[-1000:]
         
         # Calcola embedding e aggiungilo a ChromaDB
         if self.collection:
