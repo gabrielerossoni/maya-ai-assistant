@@ -390,13 +390,19 @@ async def websocket_endpoint(websocket: WebSocket):
                     action = data.get("action", {})
                     if action:
                         result = await agent.tool_manager.execute(action)
-                        await manager.broadcast(
-                            {
-                                "type": "log",
-                                "text": result.get("message", ""),
-                                "level": "ok",
-                            }
-                        )
+                        if action.get("tool") == "calendar" and "events" in result:
+                            await manager.broadcast({
+                                "type": "calendar_data",
+                                "events": result.get("events", [])
+                            })
+                        else:
+                            await manager.broadcast(
+                                {
+                                    "type": "log",
+                                    "text": result.get("message", ""),
+                                    "level": "ok",
+                                }
+                            )
                         await broadcast_state()
             except WebSocketDisconnect:
                 break

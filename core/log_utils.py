@@ -31,12 +31,6 @@ class DashboardLogFilter:
             log_level = "info"
             display_text = msg_clean.replace("[USER]", "").strip()
         
-        # Richieste dell'utente
-        elif msg_clean.startswith("Richiesta:"):
-            should_broadcast = True
-            log_level = "info"
-            display_text = msg_clean.replace("Richiesta: ", "👤 ")
-        
         # Risposte di MAYA
         elif msg_clean.startswith("MAYA >"):
             should_broadcast = True

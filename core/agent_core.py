@@ -388,8 +388,17 @@ class AgentCore:
                     print(f"[ReAct] Pensiero: {thought}")
 
                 # Se c'è una reply finale e nessuna azione, usciamo
-                if not actions and reply:
-                    final_reply = reply
+                if not actions:
+                    if reply:
+                        final_reply = reply
+                    else:
+                        # LLM non ha fornito una reply valida → chiama lo specialista direttamente
+                        print(f"[ReAct] Reply vuota — richiamo specialista per risposta finale.")
+                        try:
+                            fallback = await self._call_llm(user_input, progress_cb)
+                            final_reply = fallback.get("reply") or "Come posso aiutarti?"
+                        except Exception:
+                            final_reply = "Come posso aiutarti?"
                     break
 
                 # 2b. Eseguire azioni
@@ -413,10 +422,6 @@ class AgentCore:
                     # Aggiungi azione e osservazione alla storia
                     history.append({"role": "assistant", "content": text})
                     history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale."})
-                else:
-                    # Nessuna azione e nessuna reply valida?
-                    final_reply = reply or "Ho completato l'analisi."
-                    break
 
             except Exception as e:
                 print(f"[ReAct] Errore step {current_step}: {e}")
