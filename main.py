@@ -14,6 +14,8 @@ import threading
 import webbrowser
 import ollama
 from agent_core import AgentCore, MODELS
+from plugin_loader import PluginLoader
+from proactive_manager import ProactiveManager
 from tools.display_tool import DisplayTool
 from log_utils import setup_dashboard_log_filter
 from voice_manager import VoiceManager
@@ -187,6 +189,50 @@ from websocket_manager import manager
 from contextlib import asynccontextmanager
 
 
+async def weather_broadcaster():
+    """Trasmette il meteo alla dashboard ogni 30 minuti."""
+    while True:
+        try:
+            weather_tool = agent.tool_manager.tools.get("weather")
+            if weather_tool:
+                result = weather_tool.execute({})
+                if result.get("status") == "ok":
+                    print(f"[BROADCASTER] Invio meteo di {result['data']['location']} alla dashboard.")
+                    await manager.broadcast({
+                        "type": "weather",
+                        "data": result.get("data")
+                    })
+                else:
+                    await manager.broadcast({
+                        "type": "weather",
+                        "error": True
+                    })
+        except Exception as e:
+            print(f"[BROADCASTER] Errore meteo: {e}")
+            await manager.broadcast({
+                "type": "weather",
+                "error": True
+            })
+        await asyncio.sleep(1800)
+
+async def news_broadcaster():
+    """Trasmette le ultime notizie alla dashboard ogni 10 minuti."""
+    while True:
+        try:
+            # Recupera il news_tool ogni volta dal tool_manager dell'agente globale
+            news_tool = agent.tool_manager.tools.get("news")
+            if news_tool:
+                result = news_tool.execute({"limit": 5})
+                if result.get("status") == "ok":
+                    print(f"[BROADCASTER] Invio {len(result.get('news', []))} notizie alla dashboard.")
+                    await manager.broadcast({
+                        "type": "news",
+                        "articles": result.get("news", [])
+                    })
+        except Exception as e:
+            print(f"[BROADCASTER] Errore news: {e}")
+        await asyncio.sleep(600)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -200,6 +246,17 @@ async def lifespan(app: FastAPI):
     manager.loop = agent.loop
 
     await agent.initialize()
+    
+    # Inizializza PluginLoader e ProactiveManager
+    plugins_dir = os.path.join(os.getcwd(), "plugins")
+    os.makedirs(plugins_dir, exist_ok=True)
+    
+    plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
+    plugin_loader.start()
+    
+    proactive_manager = ProactiveManager(agent.tool_manager)
+    asyncio.create_task(proactive_manager.start_loop())
+    
     print("\n[SYSTEM] Sistemi operativi. Avvio interfaccia visiva...\n")
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
 
@@ -207,9 +264,13 @@ async def lifespan(app: FastAPI):
     print(f"[MAYA] Apertura dashboard: {dashboard_path}")
 
     # Avvia la console e i broadcaster in background
-    asyncio.create_task(interactive_console())
-    asyncio.create_task(stats_broadcaster())
-    asyncio.create_task(spotify_broadcaster())
+    bg_tasks = [
+        asyncio.create_task(interactive_console()),
+        asyncio.create_task(stats_broadcaster()),
+        asyncio.create_task(spotify_broadcaster()),
+        asyncio.create_task(news_broadcaster()),
+        asyncio.create_task(weather_broadcaster())
+    ]
     
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
     http_port = int(os.environ.get("MAYA_HTTP_PORT", "8000"))
@@ -227,10 +288,31 @@ async def lifespan(app: FastAPI):
         print(f"[VOICE] Impossibile avviare il sistema vocale: {e}")
         import traceback
         traceback.print_exc()
+
+    # Registra hook Arduino per eventi push
+    arduino_tool = agent.tool_manager.tools.get("arduino")
+    if arduino_tool:
+        def arduino_event_handler(event: dict):
+            asyncio.run_coroutine_threadsafe(
+                manager.broadcast({"type": "arduino_event", **event}),
+                asyncio.get_event_loop()
+            )
+        arduino_tool.register_event_hook(arduino_event_handler)
     
     yield
     # Shutdown
+    print("\n[SYSTEM] Spegnimento in corso...")
     display.stop()
+    for task in bg_tasks:
+        task.cancel()
+    
+    # Tool Cleanup
+    for name, tool in agent.tool_manager.tools.items():
+        if hasattr(tool, "close"):
+            try:
+                tool.close()
+            except Exception as e:
+                print(f"[SHUTDOWN] Errore in chiusura tool {name}: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -367,20 +449,20 @@ async def broadcast_state():
         "ollama": "ONLINE" if ollama_online else "OFFLINE",
         "models": models_status,
         "led": (
-            arduino_tool.sim_state.get("light", "OFF").lower()
-            if arduino_tool
-            else "off"
-        ),
+            arduino_tool.sim_state.get("light", "OFF")
+            if isinstance(arduino_tool.sim_state.get("light"), str)
+            else ("ON" if arduino_tool.sim_state.get("light") else "OFF")
+        ).lower(),
         "relay": (
-            arduino_tool.sim_state.get("relay", "OFF").lower()
-            if arduino_tool
-            else "off"
-        ),
+            arduino_tool.sim_state.get("relay", "OFF")
+            if isinstance(arduino_tool.sim_state.get("relay"), str)
+            else ("ON" if arduino_tool.sim_state.get("relay") else "OFF")
+        ).lower(),
         "servo": (
-            arduino_tool.sim_state.get("servo", "CLOSED").lower()
-            if arduino_tool
-            else "closed"
-        ),
+            arduino_tool.sim_state.get("servo", "CLOSED")
+            if isinstance(arduino_tool.sim_state.get("servo"), str)
+            else str(arduino_tool.sim_state.get("servo"))
+        ).lower(),
         "system": {
             "model": MODELS.get("ultra-fast", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),

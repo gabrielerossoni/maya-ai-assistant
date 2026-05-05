@@ -49,6 +49,8 @@ SE NON HAI BISOGNO DI TOOL, lascia "actions" come lista vuota [].
 NON aggiungere testo fuori dal JSON.
 4. NO INVENZIONE: Non inventare mai dati. Se usi un tool informativo, scrivi nella reply che stai controllando.
 5. MEMORIA SEMANTICA: Riceverai blocchi di testo marcati come "CONTESTO PASSATO RILEVANTE". Questi sono ricordi recuperati dal database vettoriale. Usali per rispondere a domande su fatti passati o per coerenza a lungo termine.
+6. ReAct LOOP: Puoi eseguire azioni multiple in sequenza. Se il risultato di un tool non è sufficiente, chiedi un altro tool nel prossimo step. Quando hai l'informazione finale, fornisci la "reply" senza "actions".
+7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
 - arduino: comandi hardware (LIGHT_ON, LIGHT_OFF, SERVO_OPEN, SERVO_CLOSE, RELAY_ON, RELAY_OFF)
@@ -65,6 +67,7 @@ Tool disponibili:
 - search: ricerca web (query)
 - spotify: controllo Spotify reale (command: play_pause/play/pause/next/prev/current/volume_up/volume_down/volume/search, "query" per cercare brano, "level" 0-100 per volume)
 - sys_monitor: statistiche cpu/ram
+- code_generator: genera nuovi tool (filename, code)
 - none: risposta solo testuale
 
 REGOLE CRITICHE:
@@ -325,68 +328,104 @@ class AgentCore:
                 return False
         return True
 
-    # ── PROCESSO PRINCIPALE ──────────────────────────────
+    # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
     async def process(self, user_input: str, progress_cb=None) -> str:
-        """Pipeline completa: Planner → Executor → Validator → Risposta."""
+        """Pipeline completa ReAct: Ragiona → Agisci → Osserva."""
 
-        # Salva input nella memoria (con embedding semantico)
+        # Salva input nella memoria
         await self.memory.add_turn("user", user_input)
 
-        # 1. PLANNER - controlla automazioni
+        # 1. Controlla automazioni (fast path)
         auto_actions = self._check_automation(user_input)
         if auto_actions:
-            plan = {
-                "intent": "automazione",
-                "actions": auto_actions,
-                "reply": f"Automazione '{user_input}' attivata!",
-            }
-        else:
-            # 1b. PLANNER - chiedi all'LLM
-            print("[PLANNER] Consultando LLM...")
-            plan = await self._call_llm(user_input, progress_cb)
+            await self._execute_actions(auto_actions)
+            reply = f"Automazione '{user_input}' eseguita."
+            await self.memory.add_turn("jarvis", reply)
+            return reply
 
-        intent = plan.get("intent", "conversazione")
-        actions = plan.get("actions", [])
-        reply = plan.get("reply")
+        # 2. ReAct Loop
+        max_steps = 5
+        current_step = 0
+        context = await self.memory.get_context(query=user_input, top_k=5)
+        
+        # Inizializziamo la memoria di lavoro per il loop
+        history = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"CONTESTO PASSATO RILEVANTE:\n{context}\n\nRichiesta utente: {user_input}"}
+        ]
 
-        # Se l'LLM non ha fornito una risposta testuale, generiamone una di emergenza
-        if not reply:
-            if actions:
-                reply = "Ho eseguito le azioni richieste."
-            else:
-                reply = "Mi dispiace, non sono riuscita a generare una risposta valida. Puoi ripetere?"
+        final_reply = ""
+        
+        print(f"[ReAct] Avvio loop per: '{user_input}'")
 
-        print(f"[PLANNER] Intent: {intent} | Azioni: {len(actions)}")
+        while current_step < max_steps:
+            current_step += 1
+            print(f"[ReAct] Step {current_step}...")
 
-        # FEEDBACK IMMEDIATO: Invia la risposta testuale dell'LLM prima di eseguire i tool
-        if reply and actions and progress_cb:
-            await progress_cb(reply)
-            # Puliamo il reply per non ripeterlo nel return finale se ci sono tool
-            # Ma lo teniamo se vogliamo che compaia anche nel log finale. 
-            # Per ora lo inviamo come progress.
+            # 2a. Chiedi all'LLM cosa fare
+            try:
+                client = ollama.AsyncClient()
+                # Usiamo il modello reasoning o domotic per il loop ReAct
+                intent = await self._route_intent(user_input)
+                model_name = MODELS.get(intent.lower(), MODELS["domotic"])
+                
+                response = await client.chat(
+                    model=model_name,
+                    messages=history,
+                    format="json",
+                    options={"temperature": 0.1},
+                    keep_alive="10m"
+                )
 
-        # 2. EXECUTOR
-        results = await self._execute_actions(actions)
+                text = response["message"]["content"]
+                plan = self._clean_json(text)
+                
+                actions = plan.get("actions", [])
+                thought = plan.get("thought", "") # L'LLM può spiegare cosa sta facendo
+                reply = plan.get("reply", "")
 
-        # Integra i risultati dei tool informativi nel reply finale
-        info_messages = []
-        for res in results:
-            if res["tool"] not in ["none", "arduino", "system"]:
-                msg = res.get("result", {}).get("message")
-                if msg and res.get("result", {}).get("status") == "ok":
-                    info_messages.append(msg)
+                if thought:
+                    print(f"[ReAct] Pensiero: {thought}")
 
-        if info_messages:
-            # Se abbiamo inviato il feedback prima, qui restituiamo solo i dati dei tool
-            # per evitare l'effetto "muro di testo" ripetuto.
-            reply = " | ".join(info_messages)
+                # Se c'è una reply finale e nessuna azione, usciamo
+                if not actions and reply:
+                    final_reply = reply
+                    break
 
-        # 3. VALIDATOR
-        ok = self._validate_results(results)
-        if not ok:
-            reply += " (Attenzione: alcune azioni potrebbero non essere riuscite.)"
+                # 2b. Eseguire azioni
+                if actions:
+                    if progress_cb and reply:
+                        await progress_cb(reply)
+                    
+                    results = await self._execute_actions(actions)
+                    
+                    # 2c. Crea osservazione per il prossimo step
+                    observation = ""
+                    for res in results:
+                        tool = res["tool"]
+                        data = res["result"]
+                        status = data.get("status", "error")
+                        msg = data.get("message", "")
+                        observation += f"Risultato tool '{tool}' ({status}): {msg}\n"
 
-        # Salva risposta nella memoria (con embedding semantico)
-        await self.memory.add_turn("jarvis", reply)
+                    print(f"[ReAct] Osservazione: {observation.strip()}")
+                    
+                    # Aggiungi azione e osservazione alla storia
+                    history.append({"role": "assistant", "content": text})
+                    history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale."})
+                else:
+                    # Nessuna azione e nessuna reply valida?
+                    final_reply = reply or "Ho completato l'analisi."
+                    break
 
-        return reply
+            except Exception as e:
+                print(f"[ReAct] Errore step {current_step}: {e}")
+                final_reply = f"Errore durante l'elaborazione: {e}"
+                break
+
+        if not final_reply:
+            final_reply = "Mi dispiace, il ragionamento ha richiesto troppi passaggi."
+
+        # Salva risposta nella memoria
+        await self.memory.add_turn("jarvis", final_reply)
+        return final_reply

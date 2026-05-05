@@ -18,6 +18,7 @@ from tools.translate_tool import TranslateTool
 from tools.search_tool import SearchTool
 from tools.spotify_tool import SpotifyTool
 from tools.sys_monitor_tool import SysMonitorTool
+from tools.code_generator_tool import CodeGeneratorTool
 
 
 class ToolManager:
@@ -28,6 +29,26 @@ class ToolManager:
 
     def __init__(self):
         self.tools = {}
+
+    def register_tool(self, name: str, tool_instance: any):
+        """Registra e inizializza un tool a runtime."""
+        try:
+            if hasattr(tool_instance, "initialize"):
+                tool_instance.initialize()
+            self.tools[name] = tool_instance
+            print(f"  [✓] Tool '{name}' registrato/aggiornato")
+            return True
+        except Exception as e:
+            print(f"  [✗] Errore registrazione tool '{name}': {e}")
+            return False
+
+    def unregister_tool(self, name: str):
+        """Rimuove un tool dal registro."""
+        if name in self.tools:
+            del self.tools[name]
+            print(f"  [-] Tool '{name}' rimosso")
+            return True
+        return False
 
     def initialize(self):
         """Istanzia e registra tutti i tool."""
@@ -46,6 +67,7 @@ class ToolManager:
             "search": SearchTool(),
             "spotify": SpotifyTool(),
             "sys_monitor": SysMonitorTool(),
+            "code_generator": CodeGeneratorTool(),
             "none": _NoOpTool(),
         }
 
