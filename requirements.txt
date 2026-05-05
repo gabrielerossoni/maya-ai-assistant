@@ -8,8 +8,9 @@ uvicorn>=0.23.0     # Server asincrono per FastAPI
 websockets>=11.0    # WebSocket
 # pyautogui>=0.9     # screenshot
 # tkinter             # GUI (incluso in Python standard)
-# google-auth-oauthlib  # Google Calendar
-# google-api-python-client  # Google Calendar
+# Google Calendar
+google-auth-oauthlib
+google-api-python-client
 
 # Nuove integrazioni Jarvis
 requests

@@ -263,6 +263,8 @@ async def lifespan(app: FastAPI):
     except RuntimeError:
         agent.loop = asyncio.get_event_loop()
     manager.loop = agent.loop
+    # Segnala che il loop è pronto per VoiceManager
+    voice_manager.set_loop_ready()
 
     await agent.initialize()
     
@@ -273,7 +275,7 @@ async def lifespan(app: FastAPI):
     plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
     plugin_loader.start()
     
-    proactive_manager = ProactiveManager(agent.tool_manager)
+    proactive_manager = ProactiveManager(agent.tool_manager, manager)
     asyncio.create_task(proactive_manager.start_loop())
     
     print("\n[SYSTEM] Sistemi operativi. Avvio interfaccia visiva...\n")
@@ -422,8 +424,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def execute_and_broadcast(cmd: str):
     """
-    Esegue il comando tramite agent.process() e trasmette la risposta.
-    La risposta passa attraverso il filtro log che la invia alla dashboard.
+    Esegue il comando tramite agent.process() e trasmette la risposta in streaming.
     """
 
     # Callback per inviare il filler message al frontend quando elabora
@@ -432,10 +433,20 @@ async def execute_and_broadcast(cmd: str):
             {"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"}
         )
 
-    response = await agent.process(cmd, progress_cb=send_progress)
+    # Streaming dei token
+    full_reply = ""
+    async for token in agent.process(cmd, progress_cb=send_progress):
+        full_reply += token
+        await manager.broadcast({
+            "type": "stream",
+            "token": token,
+            "full_text": full_reply
+        })
 
-    # Stampa nel terminale con il prefisso "MAYA >" che viene catturato dal filtro
-    print(f"MAYA > {response}")
+    # Stampa finale nel terminale per i log della dashboard (filtro esistente)
+    # Rimuoviamo il prefisso MAYA > se vogliamo gestire lo streaming separatamente lato UI
+    # ma lo lasciamo per compatibilità con il filtro log attuale se necessario.
+    print(f"MAYA > {full_reply}")
 
     # Aggiorna lo stato del sistema (modelli, stats, ecc)
     await broadcast_state()
@@ -530,7 +541,7 @@ async def stats_broadcaster():
                 "neural_load": cpu_load,
                 "memory": memory.percent,
                 "ram_used_gb": round(memory.used / (1024**3), 1),
-                "ram_total_gb": 24,
+                "ram_total_gb": round(memory.total / (1024**3), 1),
                 "uptime": "Online",
                 # Allinea widget voce anche se alcuni broadcast si perdono
                 "voice_status": voice_manager.get_dashboard_voice_status(),

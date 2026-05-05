@@ -48,8 +48,9 @@ class CalendarChecker(BaseChecker):
         return None
 
 class ProactiveManager:
-    def __init__(self, tool_manager, interval=60):
+    def __init__(self, tool_manager, websocket_manager=None, interval=60):
         self.tool_manager = tool_manager
+        self.websocket_manager = websocket_manager
         self.interval = interval
         self.checkers = []
         self._initialize_checkers()
@@ -71,11 +72,12 @@ class ProactiveManager:
                     alert = await checker.check()
                     if alert:
                         print(f"[PROACTIVE] Trigger attivato ({checker.name}): {alert}")
-                        await manager.broadcast({
-                            "type": "log",
-                            "text": f"🔔 {alert}",
-                            "level": "warning"
-                        })
+                        if self.websocket_manager:
+                            await self.websocket_manager.broadcast({
+                                "type": "log",
+                                "text": f"🔔 {alert}",
+                                "level": "warning"
+                            })
                 await asyncio.sleep(self.interval)
             except Exception as e:
                 print(f"[PROACTIVE] Errore nel loop: {e}")

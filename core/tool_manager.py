@@ -19,6 +19,7 @@ from tools.search_tool import SearchTool
 from tools.spotify_tool import SpotifyTool
 from tools.sys_monitor_tool import SysMonitorTool
 from tools.code_generator_tool import CodeGeneratorTool
+from tools.mqtt_tool import MqttTool
 
 
 class ToolManager:
@@ -68,6 +69,7 @@ class ToolManager:
             "spotify": SpotifyTool(),
             "sys_monitor": SysMonitorTool(),
             "code_generator": CodeGeneratorTool(),
+            "mqtt": MqttTool(),
             "none": _NoOpTool(),
         }
 

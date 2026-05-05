@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M.A.Y.A. | Home Intelligence</title>
+    <link rel="manifest" href="/static/manifest.json" />
+    <meta name="theme-color" content="#FF4B4B" />
+    <link rel="apple-touch-icon" href="/static/maya_logo.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -294,38 +297,40 @@
       <!-- Sidebar -->
       <aside class="flex flex-col items-start py-10 glass-card-depth-2 border-r border-white/5 z-50" id="sidebar">
         <nav class="flex-1 flex flex-col gap-6 px-4 w-full" id="sidebar-nav">
-          <button onclick="switchView('dashboard')" class="nav-btn flex items-center w-full p-3 active-tab group" data-view="dashboard">
+          <button onclick="switchView('dashboard')" class="nav-btn flex items-center w-full p-3 active-tab group" data-view="dashboard" id="nav-dashboard">
             <i data-lucide="layout-grid" class="w-6 h-6 flex-shrink-0"></i>
             <span class="nav-label">Dashboard</span>
           </button>
-          <button onclick="switchView('domotica')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="domotica">
-            <i data-lucide="home" class="w-6 h-6 flex-shrink-0"></i>
-            <span class="nav-label">Automazione</span>
-          </button>
-          <button onclick="switchView('musica')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="musica">
-            <i data-lucide="music" class="w-6 h-6 flex-shrink-0"></i>
-            <span class="nav-label">Intrattenimento</span>
-          </button>
-          <button onclick="switchView('weather')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="weather">
-            <i data-lucide="cloud-sun" class="w-6 h-6 flex-shrink-0"></i>
-            <span class="nav-label">Meteo</span>
-          </button>
-          <button onclick="switchView('news')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="news">
-            <i data-lucide="newspaper" class="w-6 h-6 flex-shrink-0"></i>
-            <span class="nav-label">Informazione</span>
-          </button>
-          <button onclick="switchView('trading')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="trading">
-            <i data-lucide="trending-up" class="w-6 h-6 flex-shrink-0"></i>
-            <span class="nav-label">Mercati</span>
-          </button>
-          <button onclick="switchView('calendar')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="calendar">
-            <i data-lucide="calendar" class="w-6 h-6 flex-shrink-0"></i>
-            <span class="nav-label">Calendario</span>
-          </button>
+          <div id="reorderable-nav" class="flex flex-col gap-6 w-full">
+            <button onclick="switchView('domotica')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="domotica" id="nav-domotica" draggable="true">
+              <i data-lucide="home" class="w-6 h-6 flex-shrink-0"></i>
+              <span class="nav-label">Automazione</span>
+            </button>
+            <button onclick="switchView('musica')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="musica" id="nav-musica" draggable="true">
+              <i data-lucide="music" class="w-6 h-6 flex-shrink-0"></i>
+              <span class="nav-label">Intrattenimento</span>
+            </button>
+            <button onclick="switchView('weather')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="weather" id="nav-weather" draggable="true">
+              <i data-lucide="cloud-sun" class="w-6 h-6 flex-shrink-0"></i>
+              <span class="nav-label">Meteo</span>
+            </button>
+            <button onclick="switchView('news')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="news" id="nav-news" draggable="true">
+              <i data-lucide="newspaper" class="w-6 h-6 flex-shrink-0"></i>
+              <span class="nav-label">Informazione</span>
+            </button>
+            <button onclick="switchView('trading')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="trading" id="nav-trading" draggable="true">
+              <i data-lucide="trending-up" class="w-6 h-6 flex-shrink-0"></i>
+              <span class="nav-label">Mercati</span>
+            </button>
+            <button onclick="switchView('calendar')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="calendar" id="nav-calendar" draggable="true">
+              <i data-lucide="calendar" class="w-6 h-6 flex-shrink-0"></i>
+              <span class="nav-label">Calendario</span>
+            </button>
+          </div>
         </nav>
 
         <div class="px-4 w-full mt-auto">
-          <button onclick="switchView('settings')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="settings">
+          <button onclick="switchView('settings')" class="nav-btn flex items-center w-full p-3 text-white/30 hover:bg-white/5 transition-all group" data-view="settings" id="nav-settings">
             <i data-lucide="settings" class="w-6 h-6 flex-shrink-0"></i>
             <span class="nav-label">Sistema</span>
           </button>
@@ -1163,6 +1168,44 @@
         mainChart.update("none");
       }
 
+      let currentStreamElement = null;
+
+      function handleStreamingResponse(token, fullText) {
+        const container = document.getElementById("log-container");
+        const drawer = document.getElementById("log-drawer");
+        
+        // Se non abbiamo un elemento corrente o è passato troppo tempo (nuova risposta), creane uno
+        if (!currentStreamElement || currentStreamElement.dataset.finalized === "true") {
+          currentStreamElement = document.createElement("div");
+          currentStreamElement.className = `p-5 bg-white/5 rounded-[var(--radius-inner)] border border-white/5 border-l-4 border-maya-red/30 mb-4 transition-all`;
+          currentStreamElement.innerHTML = `
+                  <div class="flex gap-4 items-start">
+                      <div class="mt-1 opacity-20"><i data-lucide="check-circle" class="w-4 h-4"></i></div>
+                      <div class="flex-1">
+                          <div class="flex justify-between items-center mb-1">
+                              <span class="text-micro opacity-20">${new Date().toLocaleTimeString()}</span>
+                              <span class="text-micro opacity-10 font-black tracking-tighter">maya</span>
+                          </div>
+                          <p class="text-white text-small leading-relaxed font-medium stream-text-content"></p>
+                      </div>
+                  </div>
+              `;
+          container.prepend(currentStreamElement);
+          lucide.createIcons();
+          
+          // Apri il drawer dei log per mostrare la risposta
+          if (!drawer.classList.contains('open')) {
+            toggleLogs();
+          }
+        }
+
+        const contentEl = currentStreamElement.querySelector(".stream-text-content");
+        contentEl.innerText = fullText;
+        
+        // Se il token contiene un segnale di fine (opzionale, o gestito dal backend)
+        // Per ora usiamo un timeout semplice o aspettiamo che execute_and_broadcast finisca
+      }
+
       function addLog(msg, type = "ok") {
         const container = document.getElementById("log-container");
         const drawer = document.getElementById("log-drawer");
@@ -1213,7 +1256,13 @@
       function submitCmd() {
         const i = document.getElementById("cmd-input");
         if (!i.value.trim()) return;
-        sendPrompt(i.value);
+
+        // Finalizza lo stream precedente se esistente
+        if (currentStreamElement) {
+          currentStreamElement.dataset.finalized = "true";
+        }
+
+        ws.send(JSON.stringify({ type: "command", text: i.value }));
         i.value = "";
       }
 
@@ -1449,30 +1498,45 @@
           if (e.stopPropagation) e.stopPropagation();
           
           if (dragSrcEl != this) {
-              // Swap content or reorder DOM
-              const grid = document.querySelector('.dashboard-grid');
-              const children = Array.from(grid.children);
-              const fromIndex = children.indexOf(dragSrcEl);
-              const toIndex = children.indexOf(this);
-              
-              if (fromIndex < toIndex) {
-                  this.after(dragSrcEl);
-              } else {
-                  this.before(dragSrcEl);
+              const fromParent = dragSrcEl.parentNode;
+              const toParent = this.parentNode;
+
+              // Check if we are reordering sidebar tabs or dashboard widgets
+              if (fromParent.id === 'reorderable-nav' && toParent.id === 'reorderable-nav') {
+                  const children = Array.from(fromParent.children);
+                  const fromIndex = children.indexOf(dragSrcEl);
+                  const toIndex = children.indexOf(this);
+                  
+                  if (fromIndex < toIndex) {
+                      this.after(dragSrcEl);
+                  } else {
+                      this.before(dragSrcEl);
+                  }
+                  saveSidebarOrder();
+              } else if (fromParent.classList.contains('dashboard-grid') && toParent.classList.contains('dashboard-grid')) {
+                  const children = Array.from(fromParent.children);
+                  const fromIndex = children.indexOf(dragSrcEl);
+                  const toIndex = children.indexOf(this);
+                  
+                  if (fromIndex < toIndex) {
+                      this.after(dragSrcEl);
+                  } else {
+                      this.before(dragSrcEl);
+                  }
+                  saveLayout();
               }
-              saveLayout();
           }
           return false;
       }
 
       function handleDragEnd(e) {
-          document.querySelectorAll('.dashboard-grid > div').forEach(el => {
+          document.querySelectorAll('.dragging, .drag-over').forEach(el => {
               el.classList.remove('dragging', 'drag-over');
           });
       }
 
       function initDragAndDrop() {
-          const widgets = document.querySelectorAll('.dashboard-grid > div');
+          const widgets = document.querySelectorAll('.dashboard-grid > div, #reorderable-nav > button');
           widgets.forEach(widget => {
               widget.addEventListener('dragstart', handleDragStart, false);
               widget.addEventListener('dragenter', handleDragEnter, false);
@@ -1489,19 +1553,34 @@
           const savedOrder = localStorage.getItem('maya-layout-order');
           if (savedOrder && grid) {
               const order = JSON.parse(savedOrder);
-              const fragments = document.createDocumentFragment();
               order.forEach(id => {
                   const el = document.getElementById(id);
-                  if (el) fragments.appendChild(el);
+                  if (el && el.parentNode === grid) grid.appendChild(el);
               });
-              grid.appendChild(fragments);
           }
+
+          // Sidebar order
+          const navContainer = document.getElementById('reorderable-nav');
+          const savedSidebarOrder = localStorage.getItem('maya-sidebar-order');
+          if (savedSidebarOrder && navContainer) {
+              const order = JSON.parse(savedSidebarOrder);
+              order.forEach(id => {
+                  const el = document.getElementById(id);
+                  if (el && el.parentNode === navContainer) navContainer.appendChild(el);
+              });
+          }
+
           initDragAndDrop();
       }
 
       function saveLayout() {
           const widgets = Array.from(document.querySelectorAll('.dashboard-grid > div')).map(el => el.id);
           localStorage.setItem('maya-layout-order', JSON.stringify(widgets));
+      }
+
+      function saveSidebarOrder() {
+          const tabs = Array.from(document.querySelectorAll('#reorderable-nav > button')).map(el => el.id);
+          localStorage.setItem('maya-sidebar-order', JSON.stringify(tabs));
       }
 
       // Initialize everything
@@ -1525,14 +1604,20 @@
           const val = input.value.trim();
           
           if (!val) return;
+
+          // Finalizza lo stream precedente se esistente
+          if (typeof currentStreamElement !== 'undefined' && currentStreamElement) {
+            currentStreamElement.dataset.finalized = "true";
+          }
           
           input.disabled = true;
           input.classList.add('opacity-30');
           loader.classList.remove('hidden');
-          icon.classList.add('opacity-0');
           container.classList.add('border-maya-red/50', 'shadow-[0_0_50px_rgba(255,75,75,0.1)]');
           
-          sendPrompt(val);
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "command", text: val }));
+          }
           
           // Reset when response is likely to have started processing
           setTimeout(() => {
@@ -1540,7 +1625,6 @@
               input.disabled = false;
               input.classList.remove('opacity-30');
               loader.classList.add('hidden');
-              icon.classList.remove('opacity-0');
               container.classList.remove('border-maya-red/50', 'shadow-[0_0_50px_rgba(255,75,75,0.1)]');
               input.focus();
           }, 1500);
@@ -1548,37 +1632,33 @@
 
       function initWS() {
         const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
-        // Fallback se aperto come file locale (file://)
         const _wsHost = location.host || "127.0.0.1:8000";
-        const wsUrl = `${_wsProto}//${_wsHost}/ws`;
+        ws = new WebSocket(`${_wsProto}//${_wsHost}/ws`);
         
-        console.log("Connecting to WebSocket:", wsUrl);
-        addLog(`🔌 Tentativo di connessione a ${wsUrl}...`, "info");
-        
-        ws = new WebSocket(wsUrl);
         ws.onopen = () => {
           console.log("WS Connected");
-          addLog("⚙️ Connessione WebSocket stabilita.", "ok");
+          addLog(" Connessione WebSocket stabilita.", "ok");
           updateGreeting();
         };
         ws.onerror = (err) => {
           console.error("WS Error:", err);
-          addLog("❌ Errore WebSocket. Verifica connessione.", "warn");
+          addLog(" Errore WebSocket. Verifica connessione.", "warn");
         };
         let lastTextUpdate = 0;
         ws.onmessage = (e) => {
           try {
             const d = JSON.parse(e.data);
             
-            // Debug: decommenta per vedere i messaggi in arrivo
-            // console.log("WS Recv:", d);
-
             if (d.type === "log") {
               if (d.text === "Nucleo Maya Connesso" || d.text.includes("Nucleo Maya")) return;
               addLog(d.text, d.level);
             }
             if (d.type === "news" && d.articles) {
                 updateNewsUI(d.articles);
+            }
+
+            if (d.type === "stream") {
+              handleStreamingResponse(d.token, d.full_text);
             }
 
             if (d.type === "weather" && d.data) {
@@ -1594,21 +1674,17 @@
                 document.getElementById("settings-name").innerText = d.system.name;
                 document.getElementById("settings-version").innerText = d.system.version;
                 
-                // Gestione reset storage se richiesto dal backend (debug mode)
                 if (d.system.reset_storage === true) {
-                    console.log("⚠️ RESET RICHIESTO: Pulizia LocalStorage e SessionStorage...");
                     localStorage.clear();
                     sessionStorage.clear();
-                    addLog("🧹 Cache client ripulita (Debug Mode)", "info");
+                    addLog(" Cache client ripulita (Debug Mode)", "info");
                 }
 
-                // Rimuovi lo stato di sincronizzazione se riceviamo uno stato valido
                 const greeting = document.getElementById("greeting-text");
                 if (greeting.innerText === "Sincronizzazione...") {
                     updateGreeting();
                 }
               }
-              // Gestione Modelli Dinamici
               if (d.models) {
                 const container = document.getElementById("model-list-container");
                 if (container) {
@@ -1655,7 +1731,6 @@
                 }
               }
 
-              // Aggiorna stato dispositivi fisici
               if (d.led) {
                   const dot = document.getElementById("status-light");
                   if (dot) dot.className = `w-3 h-3 rounded-full ${d.led === 'on' ? 'bg-maya-red shadow-[0_0_10px_#ff4b4b]' : 'bg-white/10'}`;
@@ -1675,7 +1750,6 @@
                 const bar = document.getElementById("load-bar");
                 if (bar) bar.style.width = cpuVal + "%";
                 
-                // Aggiorna anche altri campi stats se presenti
                 const memEl = document.getElementById("memory-usage");
                 if (memEl && d.ram_used_gb) {
                     memEl.innerText = d.ram_used_gb + " GB / " + (d.ram_total_gb || 24) + " GB";
@@ -1695,10 +1769,6 @@
               document.getElementById("spotify-track").innerText = d.track || "—";
               document.getElementById("spotify-artist").innerText = d.artist || "Nessun brano selezionato";
               
-              if (document.getElementById("home-spotify-track")) {
-                  document.getElementById("home-spotify-track").innerText = d.track || "—";
-                  document.getElementById("home-spotify-artist").innerText = d.artist || "Entertainment Unit";
-              }
               const img = document.getElementById("spotify-art");
               const placeholder = document.getElementById("spotify-art-placeholder");
               if (d.album_art) {
@@ -1710,7 +1780,6 @@
                   if (placeholder) placeholder.classList.remove("hidden");
               }
 
-              // Update widget home
               document.getElementById('home-spotify-track').innerText = d.track || '—';
               document.getElementById('home-spotify-artist').innerText = d.artist || 'Spotify';
 

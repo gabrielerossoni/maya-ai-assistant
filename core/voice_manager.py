@@ -56,6 +56,12 @@ class VoiceManager:
         )
         # Ultimo stato inviato / da mostrare in dashboard (sincrono su reconnect e stats).
         self._dashboard_voice_status: str = "IDLE"
+        self._loop_ready = threading.Event()
+
+    def set_loop_ready(self):
+        """Segnala che il loop è pronto per i broadcast."""
+        self._loop_ready.set()
+        print("[VOICE] Loop di sistema pronto per i broadcast.")
 
     def _initialize_models(self):
         print("[VOICE] Caricamento modelli vocali...")
@@ -267,6 +273,12 @@ class VoiceManager:
         self._dashboard_voice_status = (
             status.strip().upper() if isinstance(status, str) else "IDLE"
         )
+        # Attendi che il loop sia pronto (timeout per non bloccare il thread vocale all'infinito)
+        if not self._loop_ready.is_set():
+            if not self._loop_ready.wait(timeout=2.0):
+                print(f"[VOICE] Avviso: Loop non pronto, broadcast '{status}' ignorato.")
+                return
+
         loop = self._voice_event_loop()
         if not loop:
             return
@@ -446,9 +458,19 @@ class VoiceManager:
         try:
             output_wav = "voice/response.wav"
             # Comando per Piper: passa il testo e genera il wav
-            command = f'echo {text} | "{self.piper_exe}" --model "{self.piper_model}" --output_file {output_wav}'
-            subprocess.run(command, shell=True, check=True,
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Fix shell injection: use list of args and pass text via input
+            command = [
+                self.piper_exe,
+                "--model", self.piper_model,
+                "--output_file", output_wav
+            ]
+            subprocess.run(
+                command,
+                input=text.encode('utf-8'),
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
             
             # Riproduzione controllata via PyAudio (niente lettore multimediale)
             self._play_wav(output_wav)

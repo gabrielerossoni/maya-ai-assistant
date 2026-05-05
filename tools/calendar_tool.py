@@ -6,19 +6,61 @@ Supporta: aggiunta, lista, eliminazione eventi.
 
 import json
 import os
+import datetime
+import pickle
 from datetime import datetime, timedelta
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
 CALENDAR_FILE = "data/calendar.json"
-
+GOOGLE_TOKEN_FILE = "data/token.pickle"
+GOOGLE_CREDENTIALS_FILE = "credentials.json"
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 class CalendarTool:
-    """Tool calendario locale basato su file JSON."""
+    """Tool calendario unificato (Locale + Google)."""
+
+    def __init__(self):
+        self.google_service = None
 
     def initialize(self):
         os.makedirs("data", exist_ok=True)
         if not os.path.exists(CALENDAR_FILE):
             self._save([])
-        print(f"[CALENDAR] File: {CALENDAR_FILE}")
+        print(f"[CALENDAR] File locale: {CALENDAR_FILE}")
+        self._init_google_service()
+
+    def _init_google_service(self):
+        """Inizializza il servizio Google Calendar se le credenziali sono presenti."""
+        if not os.path.exists(GOOGLE_CREDENTIALS_FILE):
+            print("[CALENDAR] credentials.json assente. Google Calendar disabilitato.")
+            return
+
+        creds = None
+        if os.path.exists(GOOGLE_TOKEN_FILE):
+            with open(GOOGLE_TOKEN_FILE, 'rb') as token:
+                creds = pickle.load(token)
+        
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                try:
+                    flow = InstalledAppFlow.from_client_secrets_file(GOOGLE_CREDENTIALS_FILE, SCOPES)
+                    creds = flow.run_local_server(port=0)
+                except Exception as e:
+                    print(f"[CALENDAR] Errore autenticazione Google: {e}")
+                    return
+            
+            with open(GOOGLE_TOKEN_FILE, 'wb') as token:
+                pickle.dump(creds, token)
+
+        try:
+            self.google_service = build('calendar', 'v3', credentials=creds)
+            print("[CALENDAR] Google Calendar sincronizzato.")
+        except Exception as e:
+            print(f"[CALENDAR] Errore build service Google: {e}")
 
     def execute(self, action: dict) -> dict:
         """
@@ -50,6 +92,22 @@ class CalendarTool:
         if dt is None:
             return {"status": "error", "message": f"Formato data non valido: '{time_str}'"}
 
+        # 1. Aggiungi a Google se disponibile
+        google_msg = ""
+        if self.google_service:
+            try:
+                event_body = {
+                    'summary': title,
+                    'description': notes,
+                    'start': {'dateTime': dt.isoformat(), 'timeZone': 'Europe/Rome'},
+                    'end': {'dateTime': (dt + timedelta(hours=1)).isoformat(), 'timeZone': 'Europe/Rome'},
+                }
+                self.google_service.events().insert(calendarId='primary', body=event_body).execute()
+                google_msg = " (Sincronizzato con Google)"
+            except Exception as e:
+                google_msg = f" (Errore Google: {e})"
+
+        # 2. Aggiungi locale
         events = self._load()
         event = {
             "id":      len(events) + 1,
@@ -62,40 +120,66 @@ class CalendarTool:
         events.sort(key=lambda e: e["time"])
         self._save(events)
 
-        print(f"[CALENDAR] Evento aggiunto: '{title}' il {dt.strftime('%d/%m/%Y alle %H:%M')}")
+        print(f"[CALENDAR] Evento aggiunto: '{title}' il {dt.strftime('%d/%m/%Y alle %H:%M')}{google_msg}")
         return {
             "status": "ok",
-            "message": f"Evento '{title}' aggiunto per il {dt.strftime('%d/%m/%Y alle %H:%M')}",
+            "message": f"Evento '{title}' aggiunto per il {dt.strftime('%d/%m/%Y alle %H:%M')}{google_msg}",
             "event": event
         }
 
     def _list_events(self, action: dict) -> dict:
-        events = self._load()
-        now    = datetime.now()
+        now = datetime.now()
+        now_iso = now.astimezone().isoformat()
+        
+        all_events = []
+        
+        # 1. Recupera da Google
+        if self.google_service:
+            try:
+                events_result = self.google_service.events().list(
+                    calendarId='primary', timeMin=now_iso,
+                    maxResults=10, singleEvents=True,
+                    orderBy='startTime'
+                ).execute()
+                g_events = events_result.get('items', [])
+                for ge in g_events:
+                    start = ge['start'].get('dateTime', ge['start'].get('date'))
+                    # Normalizza formato per il parser locale
+                    dt_g = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    all_events.append({
+                        "title": f"[G] {ge.get('summary', 'Senza titolo')}",
+                        "time": dt_g.strftime("%Y-%m-%d %H:%M"),
+                        "source": "google"
+                    })
+            except Exception as e:
+                print(f"[CALENDAR] Errore fetch Google: {e}")
 
-        # Filtra: mostra solo eventi futuri
-        future = [e for e in events if self._parse_time(e["time"]) >= now]
+        # 2. Recupera locale
+        local_events = self._load()
+        for le in local_events:
+            if self._parse_time(le["time"]) >= now:
+                all_events.append({**le, "source": "local"})
 
-        if not future:
+        # Ordina per tempo
+        all_events.sort(key=lambda e: e["time"])
+        
+        if not all_events:
             return {"status": "ok", "message": "Nessun evento in programma.", "events": []}
 
         lines = []
-        for e in future[:10]:   # max 10 eventi
+        for e in all_events[:10]:
             dt = self._parse_time(e["time"])
             diff = dt - now
             days = diff.days
-            if days == 0:
-                when = "oggi"
-            elif days == 1:
-                when = "domani"
-            else:
-                when = f"tra {days} giorni"
+            if days == 0: when = "oggi"
+            elif days == 1: when = "domani"
+            else: when = f"tra {days} giorni"
             lines.append(f"• {e['title']} — {dt.strftime('%d/%m alle %H:%M')} ({when})")
 
         return {
             "status": "ok",
             "message": "Prossimi eventi:\n" + "\n".join(lines),
-            "events": future
+            "events": all_events
         }
 
     def _delete_event(self, action: dict) -> dict:

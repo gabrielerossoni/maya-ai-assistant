@@ -66,6 +66,7 @@ Tool disponibili:
 - translate: traduci testo (text, target: es 'en', 'es')
 - search: ricerca web (query)
 - spotify: controllo Spotify reale (command: play_pause/play/pause/next/prev/current/volume_up/volume_down/volume/search, "query" per cercare brano, "level" 0-100 per volume)
+- mqtt: controllo multi-room (room, device, state)
 - sys_monitor: statistiche cpu/ram
 - code_generator: genera nuovi tool (filename, code)
 - none: risposta solo testuale
@@ -289,15 +290,17 @@ class AgentCore:
             actions.append({"tool": "arduino", "command": "SERVO_OPEN"})
             reply = "Servo aperto!"
         elif "aggiungi" in lower or "evento" in lower or "riunione" in lower:
+            from datetime import datetime
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
             actions.append(
                 {
                     "tool": "calendar",
                     "action": "add",
                     "title": user_input,
-                    "time": "2026-04-26 12:00",
+                    "time": now_str,
                 }
             )
-            reply = "Evento aggiunto al calendario."
+            reply = f"Evento aggiunto al calendario ({now_str})."
         elif "calendario" in lower or "eventi" in lower:
             actions.append({"tool": "calendar", "action": "list"})
             reply = "Ecco i tuoi prossimi eventi."
@@ -329,9 +332,8 @@ class AgentCore:
         return True
 
     # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
-    async def process(self, user_input: str, progress_cb=None) -> str:
+    async def process(self, user_input: str, progress_cb=None):
         """Pipeline completa ReAct: Ragiona → Agisci → Osserva."""
-
         # Salva input nella memoria
         await self.memory.add_turn("user", user_input)
 
@@ -341,74 +343,81 @@ class AgentCore:
             await self._execute_actions(auto_actions)
             reply = f"Automazione '{user_input}' eseguita."
             await self.memory.add_turn("jarvis", reply)
-            return reply
+            yield reply
+            return
 
         # 2. ReAct Loop
         max_steps = 5
         current_step = 0
+        
+        # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
+        intent = await self._route_intent(user_input)
         context = await self.memory.get_context(query=user_input, top_k=5)
         
         # Inizializziamo la memoria di lavoro per il loop
         history = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)},
             {"role": "user", "content": f"CONTESTO PASSATO RILEVANTE:\n{context}\n\nRichiesta utente: {user_input}"}
         ]
 
         final_reply = ""
+        model_name = MODELS.get(intent.lower(), MODELS["domotic"])
         
-        print(f"[ReAct] Avvio loop per: '{user_input}'")
+        print(f"[ReAct] Avvio loop ({intent}) per: '{user_input}'")
 
         while current_step < max_steps:
             current_step += 1
             print(f"[ReAct] Step {current_step}...")
 
-            # 2a. Chiedi all'LLM cosa fare
+            # 2b. Chiedi all'LLM cosa fare
             try:
                 client = ollama.AsyncClient()
-                # Usiamo il modello reasoning o domotic per il loop ReAct
-                intent = await self._route_intent(user_input)
-                model_name = MODELS.get(intent.lower(), MODELS["domotic"])
                 
-                response = await client.chat(
+                # Streaming della risposta dell'LLM
+                full_response_text = ""
+                async for chunk in await client.chat(
                     model=model_name,
                     messages=history,
                     format="json",
                     options={"temperature": 0.1},
-                    keep_alive="10m"
-                )
+                    keep_alive="10m",
+                    stream=True
+                ):
+                    token = chunk["message"]["content"]
+                    full_response_text += token
+                    # Se non è una struttura JSON ancora incompleta, o se vogliamo inviare solo il campo "reply"
+                    # Per ora inviamo il token grezzo se siamo nell'ultimo step o se l'LLM sta parlando
+                    # Yielding partial tokens for the UI
+                    yield token
 
-                text = response["message"]["content"]
-                plan = self._clean_json(text)
+                plan = self._clean_json(full_response_text)
                 
                 actions = plan.get("actions", [])
-                thought = plan.get("thought", "") # L'LLM può spiegare cosa sta facendo
+                thought = plan.get("thought", "")
                 reply = plan.get("reply", "")
 
                 if thought:
                     print(f"[ReAct] Pensiero: {thought}")
 
-                # Se c'è una reply finale e nessuna azione, usciamo
+                # Se non ci sono azioni, abbiamo finito
                 if not actions:
                     if reply:
                         final_reply = reply
                     else:
-                        # LLM non ha fornito una reply valida → chiama lo specialista direttamente
-                        print(f"[ReAct] Reply vuota — richiamo specialista per risposta finale.")
-                        try:
-                            fallback = await self._call_llm(user_input, progress_cb)
-                            final_reply = fallback.get("reply") or "Come posso aiutarti?"
-                        except Exception:
-                            final_reply = "Come posso aiutarti?"
+                        print(f"[ReAct] Reply vuota — richiamo pipeline specialistica.")
+                        fallback = await self._call_llm(user_input, progress_cb)
+                        final_reply = fallback.get("reply") or "Come posso aiutarti?"
+                        yield final_reply
                     break
 
-                # 2b. Eseguire azioni
+                # 2c. Eseguire azioni
                 if actions:
                     if progress_cb and reply:
                         await progress_cb(reply)
                     
                     results = await self._execute_actions(actions)
                     
-                    # 2c. Crea osservazione per il prossimo step
+                    # 2d. Crea osservazione per il prossimo step
                     observation = ""
                     for res in results:
                         tool = res["tool"]
@@ -420,17 +429,18 @@ class AgentCore:
                     print(f"[ReAct] Osservazione: {observation.strip()}")
                     
                     # Aggiungi azione e osservazione alla storia
-                    history.append({"role": "assistant", "content": text})
+                    history.append({"role": "assistant", "content": full_response_text})
                     history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale."})
 
             except Exception as e:
                 print(f"[ReAct] Errore step {current_step}: {e}")
                 final_reply = f"Errore durante l'elaborazione: {e}"
+                yield final_reply
                 break
 
-        if not final_reply:
+        if not final_reply and current_step >= max_steps:
             final_reply = "Mi dispiace, il ragionamento ha richiesto troppi passaggi."
+            yield final_reply
 
         # Salva risposta nella memoria
         await self.memory.add_turn("jarvis", final_reply)
-        return final_reply

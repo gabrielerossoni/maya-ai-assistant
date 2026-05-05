@@ -116,8 +116,11 @@ class MemoryManager:
         if self.collection:
             embedding = await self._get_embedding(text)
             if embedding:
-                # ID univoco basato su timestamp e ruolo
-                turn_id = f"{role}_{int(datetime.now().timestamp() * 1000)}"
+                # ID univoco: timestamp ms + random per evitare collisioni
+                import random
+                ts_ms = int(datetime.now().timestamp() * 1000)
+                rnd = random.randint(100, 999)
+                turn_id = f"{role}_{ts_ms}_{rnd}"
                 try:
                     self.collection.add(
                         ids=[turn_id],
