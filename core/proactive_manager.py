@@ -1,7 +1,7 @@
 import asyncio
 import psutil
 from datetime import datetime, timedelta
-from websocket_manager import manager
+from .websocket_manager import manager
 
 class BaseChecker:
     def __init__(self, name):

@@ -13,13 +13,17 @@ import subprocess
 import threading
 import webbrowser
 import ollama
-from agent_core import AgentCore, MODELS
-from plugin_loader import PluginLoader
-from proactive_manager import ProactiveManager
+from core.agent_core import AgentCore, MODELS
+from core.plugin_loader import PluginLoader
+from core.proactive_manager import ProactiveManager
 from tools.display_tool import DisplayTool
-from log_utils import setup_dashboard_log_filter
-from voice_manager import VoiceManager
-
+from core.websocket_manager import WebSocketManager
+from core.log_utils import setup_dashboard_log_filter, user_log
+from core.voice_manager import VoiceManager
+from core.websocket_manager import manager
+# Variabili globali per i task in background
+_bg_tasks = []
+_log_filter_applied = False
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "127.0.0.1")
 OLLAMA_PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
@@ -41,13 +45,16 @@ def _ollama_addr() -> tuple[str, int]:
     return host, OLLAMA_PORT
 
 
-def _ollama_api_reachable(timeout: float = 0.75) -> bool:
-    host, port = _ollama_addr()
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
+async def _ollama_api_reachable(timeout: float = 0.75) -> bool:
+    """Versione non-bloccante del check raggiungibilità Ollama."""
+    def _check():
+        host, port = _ollama_addr()
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            return False
+    return await asyncio.to_thread(_check)
 
 
 def _resolve_ollama_executable() -> str | None:
@@ -82,7 +89,16 @@ def ensure_ollama_running(max_wait_sec: int = 45) -> None:
     if host not in ("127.0.0.1", "localhost", "::1"):
         return
 
-    if _ollama_api_reachable():
+    # Check sync reachable (using socket directly)
+    def _check_sync():
+        host, port = _ollama_addr()
+        try:
+            with socket.create_connection((host, port), timeout=0.75):
+                return True
+        except OSError:
+            return False
+
+    if _check_sync():
         return
 
     ollama_exe = _resolve_ollama_executable()
@@ -110,7 +126,7 @@ def ensure_ollama_running(max_wait_sec: int = 45) -> None:
         return
 
     for i in range(max_wait_sec):
-        if _ollama_api_reachable():
+        if _check_sync():
             print("[OLLAMA] Server pronto.")
             return
         time.sleep(1)
@@ -185,19 +201,20 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-from websocket_manager import manager
 from contextlib import asynccontextmanager
 
 
 async def weather_broadcaster():
     """Trasmette il meteo alla dashboard ogni 30 minuti."""
+    print("[BROADCASTER] Avvio loop meteo.")
     while True:
         try:
             weather_tool = agent.tool_manager.tools.get("weather")
             if weather_tool:
-                result = weather_tool.execute({})
+                # Wrap blocking requests call in a thread
+                result = await asyncio.to_thread(weather_tool.execute, {})
                 if result.get("status") == "ok":
-                    print(f"[BROADCASTER] Invio meteo di {result['data']['location']} alla dashboard.")
+                    user_log(f"Meteo aggiornato per {result['data']['location']}.")
                     await manager.broadcast({
                         "type": "weather",
                         "data": result.get("data")
@@ -217,14 +234,16 @@ async def weather_broadcaster():
 
 async def news_broadcaster():
     """Trasmette le ultime notizie alla dashboard ogni 10 minuti."""
+    print("[BROADCASTER] Avvio loop news.")
     while True:
         try:
             # Recupera il news_tool ogni volta dal tool_manager dell'agente globale
             news_tool = agent.tool_manager.tools.get("news")
             if news_tool:
-                result = news_tool.execute({"limit": 5})
+                # Wrap blocking feedparser call in a thread
+                result = await asyncio.to_thread(news_tool.execute, {"limit": 5})
                 if result.get("status") == "ok":
-                    print(f"[BROADCASTER] Invio {len(result.get('news', []))} notizie alla dashboard.")
+                    user_log("Ultime notizie caricate.")
                     await manager.broadcast({
                         "type": "news",
                         "articles": result.get("news", [])
@@ -264,7 +283,8 @@ async def lifespan(app: FastAPI):
     print(f"[MAYA] Apertura dashboard: {dashboard_path}")
 
     # Avvia la console e i broadcaster in background
-    bg_tasks = [
+    global _bg_tasks
+    _bg_tasks = [
         asyncio.create_task(interactive_console()),
         asyncio.create_task(stats_broadcaster()),
         asyncio.create_task(spotify_broadcaster()),
@@ -277,7 +297,8 @@ async def lifespan(app: FastAPI):
 
     def _open_browser():
         time.sleep(1.5)
-        webbrowser.open(f"http://127.0.0.1:{http_port}")
+        # Cache-buster per forzare il ricaricamento della dashboard
+        webbrowser.open(f"http://127.0.0.1:{http_port}/?v={int(time.time())}")
 
     threading.Thread(target=_open_browser, daemon=True).start()
 
@@ -303,7 +324,8 @@ async def lifespan(app: FastAPI):
     # Shutdown
     print("\n[SYSTEM] Spegnimento in corso...")
     display.stop()
-    for task in bg_tasks:
+    # Cancella i task in background al termine
+    for task in _bg_tasks:
         task.cancel()
     
     # Tool Cleanup
@@ -336,14 +358,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global _log_filter_applied
+    print(f"[WS] Nuova connessione da {websocket.client}")
     try:
         await manager.connect(websocket)
+        print(f"[WS] Connessione accettata. Client attivi: {len(manager.active_connections)}")
 
         # Applica il filtro log al primo collegamento del client (una sola volta)
         if not _log_filter_applied:
+            print("[WS] Applicazione filtro log alla dashboard.")
             setup_dashboard_log_filter(manager)
             _log_filter_applied = True
 
+        print("[WS] Invio stato iniziale...")
         await broadcast_state()
         try:
             await websocket.send_json(voice_manager.voice_status_message())
@@ -415,8 +441,13 @@ async def get_models_status():
     Ritorna un dizionario con il nome del modello e il suo stato (online/offline).
     """
     try:
+        # Check if ollama is reachable first to avoid long library timeouts
+        if not await _ollama_api_reachable(timeout=0.5):
+            return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
+
         client = ollama.AsyncClient()
-        local_models = await client.list()
+        # Timeout di 2 secondi per evitare blocchi infiniti se ollama è appeso
+        local_models = await asyncio.wait_for(client.list(), timeout=2.0)
         downloaded = [m.get("name", "") for m in local_models.get("models", [])]
 
         status = {}
@@ -425,9 +456,10 @@ async def get_models_status():
             is_ok = any(name in d or d in name for d in downloaded)
             status[key] = {"name": name, "online": is_ok, "id": key}
         return status
-    except Exception as e:
-        print(f"[MONITOR] Errore nel controllo modelli: {e}")
-        # Ritorna tutti i modelli come offline se c'è un errore
+    except (asyncio.TimeoutError, Exception) as e:
+        if not isinstance(e, asyncio.TimeoutError):
+            print(f"[MONITOR] Errore nel controllo modelli: {e}")
+        # Ritorna tutti i modelli come offline se c'è un errore o timeout
         return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
 
 
@@ -441,6 +473,8 @@ async def broadcast_state():
     arduino_tool = agent.tool_manager.tools.get("arduino")
     models_status = await get_models_status()
     ollama_online = any(m.get("online", False) for m in models_status.values())
+    
+    _debug_reset_client = os.getenv("MAYA_DEBUG_RESET_CLIENT", "False").lower() == "true"
 
     state_payload = {
         "type": "state",
@@ -464,9 +498,10 @@ async def broadcast_state():
             else str(arduino_tool.sim_state.get("servo"))
         ).lower(),
         "system": {
-            "model": MODELS.get("ultra-fast", "llama3.2").upper(),
+            "model": MODELS.get("router", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),
-            "version": "1.2.0",
+            "version": "2.0.1-dev",
+            "reset_storage": _debug_reset_client,
         },
     }
     await manager.broadcast(state_payload)
@@ -474,6 +509,7 @@ async def broadcast_state():
 
 async def stats_broadcaster():
     import psutil
+    print("[BROADCASTER] Avvio loop statistiche.")
 
     # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
     psutil.cpu_percent(interval=None)
@@ -500,11 +536,13 @@ async def stats_broadcaster():
 
 
 async def spotify_broadcaster():
+    print("[BROADCASTER] Avvio loop spotify.")
     while True:
         try:
             spotify_tool = agent.tool_manager.tools.get("spotify")
             if spotify_tool and spotify_tool.sp:
-                result = spotify_tool._current_track()
+                # Wrap blocking spotipy call in a thread
+                result = await asyncio.to_thread(spotify_tool._current_track)
                 if result["status"] == "ok":
                     await manager.broadcast(
                         {
@@ -546,7 +584,7 @@ async def interactive_console():
             # Terminale chiuso
             break
         except Exception as e:
-            print(f"[ERRORE] {e}")
+            user_log(f"Errore comando: {e}", is_error=True)
 
 
 if __name__ == "__main__":

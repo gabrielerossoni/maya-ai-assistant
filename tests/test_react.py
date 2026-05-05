@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 # Aggiungi la root del progetto al path per gli import
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agent_core import AgentCore
+from core.agent_core import AgentCore
 
 @pytest.fixture
 def agent():

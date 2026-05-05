@@ -25,8 +25,14 @@ class DashboardLogFilter:
         log_level = "info"
         display_text = msg_clean
         
+        # Messaggi espliciti per l'utente (usando user_log o [USER])
+        if msg_clean.startswith("[USER]"):
+            should_broadcast = True
+            log_level = "info"
+            display_text = msg_clean.replace("[USER]", "").strip()
+        
         # Richieste dell'utente
-        if msg_clean.startswith("Richiesta:"):
+        elif msg_clean.startswith("Richiesta:"):
             should_broadcast = True
             log_level = "info"
             display_text = msg_clean.replace("Richiesta: ", "👤 ")
@@ -37,15 +43,11 @@ class DashboardLogFilter:
             log_level = "ok"
             display_text = msg_clean.replace("MAYA > ", "🤖 MAYA: ")
         
-        # Nucleo connesso
-        elif "Nucleo Maya Connesso" in msg_clean:
-            should_broadcast = True
-            log_level = "ok"
-        
-        # Errori critici
-        elif any(err in msg_clean for err in ["[ERRORE]", "Error:", "Exception:"]):
+        # Errori critici (solo se contengono il tag [USER_ERR])
+        elif "[USER_ERR]" in msg_clean:
             should_broadcast = True
             log_level = "warn"
+            display_text = msg_clean.replace("[USER_ERR]", "").strip()
         
         if should_broadcast:
             try:
@@ -80,3 +82,11 @@ class DashboardLogFilter:
 def setup_dashboard_log_filter(manager):
     """Sostituisce sys.stdout con il filtro dashboard."""
     sys.stdout = DashboardLogFilter(sys.stdout, manager)
+
+def user_log(message: str, is_error: bool = False):
+    """
+    Invia un messaggio che verrà mostrato sulla dashboard dell'utente.
+    Viene comunque stampato nel terminale.
+    """
+    prefix = "[USER_ERR]" if is_error else "[USER]"
+    print(f"{prefix} {message}")

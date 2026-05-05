@@ -9,8 +9,8 @@ import re
 import random
 import ollama
 import asyncio
-from tool_manager import ToolManager
-from memory_manager import MemoryManager
+from .tool_manager import ToolManager
+from .memory_manager import MemoryManager
 from dotenv import load_dotenv
 
 # Carica variabili d'ambiente da .env

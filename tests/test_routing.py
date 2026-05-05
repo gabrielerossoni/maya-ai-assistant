@@ -5,7 +5,7 @@ import asyncio
 # Aggiungi la root del progetto al path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agent_core import AgentCore
+from core.agent_core import AgentCore
 
 async def test_routing():
     agent = AgentCore()

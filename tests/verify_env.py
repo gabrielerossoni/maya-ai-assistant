@@ -26,7 +26,7 @@ def test_env_loading():
     
     print("\n--- Verifica AgentCore (import) ---")
     try:
-        from agent_core import MODELS, SYSTEM_PROMPT
+        from core.agent_core import MODELS, SYSTEM_PROMPT
         print(f"MODELS: {MODELS}")
         # print(f"SYSTEM_PROMPT: {SYSTEM_PROMPT[:50]}...")
         print("AgentCore caricato correttamente.")

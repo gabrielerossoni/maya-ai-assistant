@@ -46,14 +46,40 @@ class NewsTool:
             news_list = []
             structured_news = []
             for entry in feed.entries[:limit]:
-                # Estrai sommario pulito
-                summary = self._clean_html(entry.get("summary", ""))
-                title = self._clean_html(entry.get("title", ""))
+                raw_summary = entry.get("summary", "")
+                # Estrai immagine se presente
+                image_url = None
                 
-                news_list.append(f"- {title}")
+                # 1. Prova regex nel summary
+                img_match = re.search(r'<img[^>]+src="([^">]+)"', raw_summary)
+                if img_match:
+                    image_url = img_match.group(1)
+                
+                # 2. Prova media_content
+                if not image_url and 'media_content' in entry and entry.media_content:
+                    image_url = entry.media_content[0]['url']
+                
+                # 3. Prova enclosure
+                if not image_url and 'enclosures' in entry and entry.enclosures:
+                    image_url = entry.enclosures[0]['href']
+
+                summary = self._clean_html(raw_summary)
+                raw_title = self._clean_html(entry.get("title", ""))
+                
+                # Google News usa spesso "Titolo - Fonte"
+                source = "Breaking News"
+                title = raw_title
+                if " - " in raw_title:
+                    parts = raw_title.rsplit(" - ", 1)
+                    title = parts[0]
+                    source = parts[1]
+
+                news_list.append(f"- {title} ({source})")
                 structured_news.append({
                     "title": title,
+                    "source": source,
                     "link": entry.link,
+                    "image": image_url,
                     "summary": summary[:200] + ("..." if len(summary) > 200 else ""),
                     "published": entry.get("published", "")
                 })
