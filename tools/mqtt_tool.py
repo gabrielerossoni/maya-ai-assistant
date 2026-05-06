@@ -33,11 +33,12 @@ class MqttTool:
         payload = json.dumps({"state": state, "sender": "maya_core"})
         
         try:
-            result = self.client.publish(topic, payload)
+            # QoS 1 and Retain enabled to avoid message loss
+            result = self.client.publish(topic, payload, qos=1, retain=True)
             result.wait_for_publish()
             return {
                 "status": "ok",
-                "message": f"Comando '{state}' inviato a {device} in stanza '{room}'",
+                "message": f"Comando '{state}' inviato a {device} in stanza '{room}' (QoS 1, Retain)",
                 "topic": topic
             }
         except Exception as e:

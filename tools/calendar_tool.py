@@ -14,7 +14,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 CALENDAR_FILE = "data/calendar.json"
-GOOGLE_TOKEN_FILE = "data/token.pickle"
+GOOGLE_TOKEN_FILE = "data/token.json"
 GOOGLE_CREDENTIALS_FILE = "credentials.json"
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
@@ -37,10 +37,11 @@ class CalendarTool:
             print("[CALENDAR] credentials.json assente. Google Calendar disabilitato.")
             return
 
+        from google.oauth2.credentials import Credentials
+
         creds = None
         if os.path.exists(GOOGLE_TOKEN_FILE):
-            with open(GOOGLE_TOKEN_FILE, 'rb') as token:
-                creds = pickle.load(token)
+            creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_FILE, SCOPES)
         
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
@@ -48,13 +49,20 @@ class CalendarTool:
             else:
                 try:
                     flow = InstalledAppFlow.from_client_secrets_file(GOOGLE_CREDENTIALS_FILE, SCOPES)
-                    creds = flow.run_local_server(port=0)
+                    # Try local server first, fallback to console if it fails (headless)
+                    try:
+                        creds = flow.run_local_server(port=0)
+                    except Exception:
+                        print("[CALENDAR] Ambiente headless rilevato o browser non disponibile. Fallback console OAuth.")
+                        # flow.run_console() is deprecated in some versions, 
+                        # using urn:ietf:wg:oauth:2.0:oob logic if supported by the flow
+                        creds = flow.run_console()
                 except Exception as e:
                     print(f"[CALENDAR] Errore autenticazione Google: {e}")
                     return
             
-            with open(GOOGLE_TOKEN_FILE, 'wb') as token:
-                pickle.dump(creds, token)
+            with open(GOOGLE_TOKEN_FILE, 'w') as token:
+                token.write(creds.to_json())
 
         try:
             self.google_service = build('calendar', 'v3', credentials=creds)

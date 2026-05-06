@@ -201,7 +201,44 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
+import requests
 from contextlib import asynccontextmanager
+
+
+def start_ngrok(port: int) -> str | None:
+    """Avvia ngrok in background e ritorna l'URL pubblico."""
+    try:
+        # Avvia ngrok
+        popen_kw: dict = {
+            "args": ["ngrok", "http", str(port)],
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if sys.platform == "win32":
+            popen_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+        subprocess.Popen(**popen_kw)
+        
+        # Aspetta che ngrok sia pronto (max 5s)
+        for _ in range(10):
+            time.sleep(0.5)
+            try:
+                res = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=1)
+                tunnels = res.json().get("tunnels", [])
+                for t in tunnels:
+                    if t.get("proto") == "https":
+                        return t["public_url"]
+            except Exception:
+                continue
+        
+        return None
+    except FileNotFoundError:
+        print("[NGROK] ngrok non trovato nel PATH")
+        return None
+    except Exception as e:
+        print(f"[NGROK] Errore: {e}")
+        return None
 
 
 async def weather_broadcaster():
@@ -266,7 +303,19 @@ async def lifespan(app: FastAPI):
     # Segnala che il loop è pronto per VoiceManager
     voice_manager.set_loop_ready()
 
+    # Recupera la porta HTTP configurata
+    http_port = int(os.environ.get("MAYA_HTTP_PORT", "8000"))
+
     await agent.initialize()
+
+    # Avvia ngrok
+    ngrok_url = await asyncio.to_thread(start_ngrok, http_port)
+    if ngrok_url:
+        print(f"\n{'='*50}")
+        print(f"  🌐 MAYA pubblica su: {ngrok_url}")
+        print(f"{'='*50}\n")
+    else:
+        print("[NGROK] Tunnel non avviato, solo accesso locale.")
     
     # Inizializza PluginLoader e ProactiveManager
     plugins_dir = os.path.join(os.getcwd(), "plugins")
@@ -295,8 +344,6 @@ async def lifespan(app: FastAPI):
     ]
     
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
-    http_port = int(os.environ.get("MAYA_HTTP_PORT", "8000"))
-
     def _open_browser():
         time.sleep(1.5)
         # Cache-buster per forzare il ricaricamento della dashboard

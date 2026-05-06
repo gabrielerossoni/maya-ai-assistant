@@ -375,21 +375,20 @@ class AgentCore:
                 
                 # Streaming della risposta dell'LLM
                 full_response_text = ""
-                async for chunk in await client.chat(
+                # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
+                # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
+                # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
+                
+                response = await client.chat(
                     model=model_name,
                     messages=history,
                     format="json",
                     options={"temperature": 0.1},
                     keep_alive="10m",
-                    stream=True
-                ):
-                    token = chunk["message"]["content"]
-                    full_response_text += token
-                    # Se non è una struttura JSON ancora incompleta, o se vogliamo inviare solo il campo "reply"
-                    # Per ora inviamo il token grezzo se siamo nell'ultimo step o se l'LLM sta parlando
-                    # Yielding partial tokens for the UI
-                    yield token
-
+                    stream=False
+                )
+                
+                full_response_text = response["message"]["content"]
                 plan = self._clean_json(full_response_text)
                 
                 actions = plan.get("actions", [])
@@ -399,15 +398,21 @@ class AgentCore:
                 if thought:
                     print(f"[ReAct] Pensiero: {thought}")
 
-                # Se non ci sono azioni, abbiamo finito
+                # Se non ci sono azioni, abbiamo finito: streammiano la reply finale
                 if not actions:
                     if reply:
                         final_reply = reply
+                        # Stream the final reply token by token
+                        for token in re.findall(r'.*?\s|.*$', final_reply):
+                            yield token
+                            await asyncio.sleep(0.02) # Piccola pausa per effetto streaming
                     else:
                         print(f"[ReAct] Reply vuota — richiamo pipeline specialistica.")
                         fallback = await self._call_llm(user_input, progress_cb)
                         final_reply = fallback.get("reply") or "Come posso aiutarti?"
-                        yield final_reply
+                        for token in re.findall(r'.*?\s|.*$', final_reply):
+                            yield token
+                            await asyncio.sleep(0.01)
                     break
 
                 # 2c. Eseguire azioni
