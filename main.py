@@ -482,6 +482,14 @@ async def execute_and_broadcast(cmd: str):
 
     # Streaming dei token
     full_reply = ""
+    # Inizia con l'emoji
+    await manager.broadcast({
+        "type": "stream",
+        "token": "🤖 MAYA: ",
+        "full_text": "🤖 MAYA: "
+    })
+    full_reply = "🤖 MAYA: "
+
     async for token in agent.process(cmd, progress_cb=send_progress):
         full_reply += token
         await manager.broadcast({
@@ -538,7 +546,7 @@ async def broadcast_state():
     models_status = await get_models_status()
     ollama_online = any(m.get("online", False) for m in models_status.values())
     
-    _debug_reset_client = os.getenv("MAYA_DEBUG_RESET_CLIENT", "False").lower() == "true"
+    _debug_reset_client = False
 
     state_payload = {
         "type": "state",

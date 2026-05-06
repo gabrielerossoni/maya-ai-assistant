@@ -1650,8 +1650,10 @@
             const d = JSON.parse(e.data);
             
             if (d.type === "log") {
-              if (d.text === "Nucleo Maya Connesso" || d.text.includes("Nucleo Maya")) return;
-              addLog(d.text, d.level);
+              const text = d.text || "";
+              if (text.includes("Nucleo Maya") || text.includes("Cache client") || text.includes("Debug Mode")) return;
+              if (d.level === "info" && !text.startsWith("🤖")) return;
+              addLog(text, d.level);
             }
             if (d.type === "news" && d.articles) {
                 updateNewsUI(d.articles);

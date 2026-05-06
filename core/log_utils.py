@@ -33,9 +33,9 @@ class DashboardLogFilter:
         
         # Risposte di MAYA
         elif msg_clean.startswith("MAYA >"):
-            should_broadcast = True
-            log_level = "ok"
-            display_text = msg_clean.replace("MAYA > ", "🤖 MAYA: ")
+            # Ignora se è una risposta di MAYA, perché ora usiamo lo streaming WebSocket nativo
+            # che invia i token uno a uno con l'emoji inclusa.
+            return
         
         # Errori critici (solo se contengono il tag [USER_ERR])
         elif "[USER_ERR]" in msg_clean:
