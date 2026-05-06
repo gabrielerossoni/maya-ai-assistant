@@ -514,5 +514,7 @@ class AgentCore:
 
         # Salva risposta nella memoria
         await self.memory.add_turn("jarvis", final_reply)
-
-        return final_reply, getattr(self, '_last_layout', {"type": "orb", "params": {}})
+        
+        # In un async generator non si può usare 'return value' prima di Python 3.10 
+        # o in contesti specifici. Usiamo un attributo per passare il layout finale.
+        self._last_final_data = (final_reply, getattr(self, '_last_layout', {"type": "orb", "params": {}}))

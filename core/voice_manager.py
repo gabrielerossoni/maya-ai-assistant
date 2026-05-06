@@ -433,32 +433,36 @@ class VoiceManager:
             return
         self._broadcast("PROCESSING")
         try:
-            response = asyncio.run_coroutine_threadsafe(
-                self.agent.process(text),
-                loop,
-            ).result(timeout=180)
+            # agent.process(text) è un ASYNC GENERATOR, non una coroutine.
+            # Non può essere passato direttamente a run_coroutine_threadsafe.
             
-            # Gestione tupla (reply, layout_data)
-            layout_data = {"type": "orb", "params": {}}
-            if isinstance(response, tuple):
-                response, layout_data = response
-            
-            if response and str(response).strip():
-                # Invia il layout via WebSocket (se disponibile) prima di parlare
-                if self.socket_manager:
-                    asyncio.run_coroutine_threadsafe(
-                        self.socket_manager.broadcast({
+            async def _consume_gen():
+                full_reply = ""
+                async for token in self.agent.process(text):
+                    full_reply += token
+                
+                # Recupera dati finali (layout) salvati dall'agente
+                layout_data = {"type": "orb", "params": {}}
+                if hasattr(self.agent, '_last_final_data'):
+                    _, layout_data = self.agent._last_final_data
+                
+                if full_reply.strip():
+                    if self.socket_manager:
+                        await self.socket_manager.broadcast({
                             "type": "layout",
                             "layout": layout_data.get("type", "orb"),
                             "params": layout_data.get("params", {})
-                        }),
-                        loop
-                    )
-                self.speak(response)
-            else:
-                print("[VOICE] Risposta agente vuota, niente TTS.")
+                        })
+                    self.speak(full_reply)
+                else:
+                    print("[VOICE] Risposta agente vuota, niente TTS.")
+
+            asyncio.run_coroutine_threadsafe(_consume_gen(), loop).result(timeout=180)
+            
         except Exception as e:
             print(f"[VOICE] Errore durante l'elaborazione: {e}")
+            import traceback
+            traceback.print_exc()
             self._broadcast("IDLE")
 
     def speak(self, text):

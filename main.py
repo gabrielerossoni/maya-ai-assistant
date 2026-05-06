@@ -504,17 +504,14 @@ async def execute_and_broadcast(cmd: str):
                 "token": token,
                 "full_text": full_reply
             })
-    except StopAsyncIteration as e:
-        # Recupera il valore di ritorno del generatore (layout_data)
-        if hasattr(e, "value") and isinstance(e.value, tuple):
-            final_resp, layout_data = e.value
+        
+        # Dopo la fine del generatore, recuperiamo i dati finali dall'attributo dell'agente
+        if hasattr(agent, '_last_final_data'):
+            _, layout_data = agent._last_final_data
+            
     except Exception as e:
-        # Gestione per versioni Python che non mettono il valore in StopAsyncIteration direttamente
-        # o se process() viene interrotto. In Python 3.10+ il return in un async generator
-        # solleva StopAsyncIteration con il valore in .value
-        if isinstance(e, StopAsyncIteration) and hasattr(e, "value"):
-            if isinstance(e.value, tuple):
-                final_resp, layout_data = e.value
+        print(f"[PROCESS] Errore: {e}")
+
 
     # Invia il layout finale alla dashboard
     await manager.broadcast({
@@ -677,9 +674,11 @@ async def interactive_console():
             try:
                 async for token in agent.process(user_input):
                     full_reply += token
-            except StopAsyncIteration as e:
-                if hasattr(e, "value") and isinstance(e.value, tuple):
-                    full_reply, layout_data = e.value
+                
+                if hasattr(agent, '_last_final_data'):
+                    _, layout_data = agent._last_final_data
+            except Exception as e:
+                print(f"[CONSOLE] Errore: {e}")
             
             await manager.broadcast({
                 "type": "layout",

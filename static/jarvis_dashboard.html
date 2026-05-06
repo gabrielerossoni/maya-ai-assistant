@@ -14,29 +14,43 @@
 
     <style>
         :root {
-            --orb-color: 100, 160, 255;
-            --bg-dark: #050505;
-            --accent: #ff4b4b;
+            --orb-color: 255, 30, 30;
+            --bg-dark: #020000;
+            --accent: #ff1a1a;
             --text-main: #ffffff;
             --text-dim: rgba(255, 255, 255, 0.4);
-            --panel-bg: rgba(10, 10, 10, 0.95);
-            --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+            --panel-bg: rgba(10, 0, 0, 0.9);
+            --glass-border: 1px solid rgba(255, 0, 0, 0.3);
             --transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        body.listening { --orb-color: 255, 100, 100; }
-        body.speaking  { --orb-color: 100, 220, 150; }
-        body.processing { --orb-color: 255, 200, 50; }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @font-face {
+            font-family: 'Geometos';
+            src: url('https://fonts.cdnfonts.com/s/14885/Geometos.woff') format('woff');
+        }
 
         body {
-            background: var(--bg-dark);
+            background: radial-gradient(circle at center, #1a0000 0%, #020000 100%);
             color: var(--text-main);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'Inter', sans-serif;
             overflow: hidden;
             height: 100vh;
             width: 100vw;
+        }
+
+        #idle-clock .time { 
+            font-family: 'Geometos', sans-serif;
+            font-size: 100px; 
+            font-weight: 100; 
+            letter-spacing: -2px;
+            text-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+        }
+        #idle-clock .date { 
+            font-size: 14px; 
+            color: var(--text-dim); 
+            text-transform: uppercase; 
+            letter-spacing: 6px; 
+            margin-top: -10px;
         }
 
         #bg-canvas {
@@ -269,7 +283,7 @@
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-            camera.position.z = 3;
+            camera.position.z = 3.5;
 
             renderer = new THREE.WebGLRenderer({ 
                 canvas: canvas,
@@ -280,85 +294,135 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setClearColor(0x000000, 0);
 
-            // Main Orb
-            const geometry = new THREE.SphereGeometry(1, 64, 64);
-            originalPositions = geometry.attributes.position.array.slice();
-            
-            const material = new THREE.MeshBasicMaterial({ 
-                wireframe: true, 
+            // 1. Core Glowing Sphere (L'anima dell'orb)
+            const coreGeom = new THREE.IcosahedronGeometry(0.7, 15);
+            const coreMat = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
                 transparent: true,
-                opacity: 0.8
+                opacity: 0.2,
+                blending: THREE.AdditiveBlending
             });
-
-            mainOrb = new THREE.Mesh(geometry, material);
+            mainOrb = new THREE.Mesh(coreGeom, coreMat);
+            originalPositions = coreGeom.attributes.position.array.slice();
             scene.add(mainOrb);
 
-            // Outer Ring
-            const outerGeom = new THREE.SphereGeometry(1.15, 16, 16);
-            const outerMat = new THREE.MeshBasicMaterial({ 
-                wireframe: true, 
-                transparent: true, 
-                opacity: 0.15 
+            // 2. Neural Wireframe Shell (Esterno reattivo)
+            const shellGeom = new THREE.IcosahedronGeometry(0.85, 10);
+            const shellMat = new THREE.MeshBasicMaterial({
+                color: 0xff2222,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.4,
+                blending: THREE.AdditiveBlending
             });
-            outerRing = new THREE.Mesh(outerGeom, outerMat);
-            scene.add(outerRing);
+            window.orbShell = new THREE.Mesh(shellGeom, shellMat);
+            window.shellOrigPos = shellGeom.attributes.position.array.slice();
+            scene.add(window.orbShell);
+
+            // 3. Floating Data Particles (I puntini che fluttuano intorno)
+            const partGeom = new THREE.BufferGeometry();
+            const partCount = 1200;
+            const posArray = new Float32Array(partCount * 3);
+            for(let i=0; i<partCount*3; i++) {
+                const r = 0.8 + Math.random() * 0.4;
+                const phi = Math.random() * Math.PI * 2;
+                const theta = Math.random() * Math.PI;
+                posArray[i*3] = r * Math.sin(theta) * Math.cos(phi);
+                posArray[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
+                posArray[i*3+2] = r * Math.cos(theta);
+            }
+            partGeom.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const partMat = new THREE.PointsMaterial({ 
+                color: 0xff0000, 
+                size: 0.015, 
+                transparent: true, 
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending 
+            });
+            window.orbParticles = new THREE.Points(partGeom, partMat);
+            scene.add(window.orbParticles);
+
+            // 4. Energy Rings (Sottili e veloci)
+            const ringGeom = new THREE.RingGeometry(0.95, 0.97, 64);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
+            window.ring1 = new THREE.Mesh(ringGeom, ringMat);
+            window.ring2 = new THREE.Mesh(ringGeom, ringMat);
+            window.ring1.rotation.x = Math.PI / 2;
+            scene.add(window.ring1);
+            scene.add(window.ring2);
         }
 
         function animate(time) {
             requestAnimationFrame(animate);
             if (!renderer) return;
 
-            // Update color from CSS var
+            const t = time * 0.001;
             const rgb = getComputedStyle(document.documentElement).getPropertyValue('--orb-color').trim();
             const color = new THREE.Color(`rgb(${rgb})`);
-            mainOrb.material.color = color;
-            outerRing.material.color = color;
 
-            // Audio Analysis
+            // Audio Analysis Ultra-Sensitive
             let audioLevel = 0;
             if (dataArray) {
                 analyser.getByteFrequencyData(dataArray);
                 let sum = 0;
-                for (let i = 0; i < 32; i++) sum += dataArray[i];
-                audioLevel = sum / (32 * 255);
+                // Prendiamo una gamma più ampia per la sensibilità
+                for (let i = 0; i < 64; i++) sum += dataArray[i];
+                audioLevel = (sum / (64 * 255)) * 1.5; // Gain aumentato
             }
 
-            // Vertex Deformation
-            const positions = mainOrb.geometry.attributes.position;
-            const t = time * 0.001;
+            const reactFactor = 1.0 + audioLevel * 2.5;
 
-            for (let i = 0; i < positions.count; i++) {
-                const ix = i * 3;
-                const iy = i * 3 + 1;
-                const iz = i * 3 + 2;
-
-                const ox = originalPositions[ix];
-                const oy = originalPositions[iy];
-                const oz = originalPositions[iz];
-
-                const vec = new THREE.Vector3(ox, oy, oz);
-                const normal = vec.clone().normalize();
+            // 1. Deformazione Core (Fluida)
+            const pos = mainOrb.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
+                const ox = originalPositions[ix], oy = originalPositions[iy], oz = originalPositions[iz];
+                const vec = new THREE.Vector3(ox, oy, oz).normalize();
                 
-                let displacement = Math.sin(t * 2 + ox * 3) * 0.05;
-                if (orbState !== 'idle' && dataArray) {
-                    const fftSample = dataArray[i % 32] / 255;
-                    displacement += audioLevel * 0.4 * fftSample;
-                }
-
-                positions.array[ix] = ox + normal.x * displacement;
-                positions.array[iy] = oy + normal.y * displacement;
-                positions.array[iz] = oz + normal.z * displacement;
+                const noise = Math.sin(t * 4 + ox * 2 + oy * 3) * 0.05;
+                const reaction = audioLevel * (Math.random() * 0.2);
+                const d = 0.7 + noise + reaction;
+                
+                pos.array[ix] = vec.x * d;
+                pos.array[iy] = vec.y * d;
+                pos.array[iz] = vec.z * d;
             }
-            positions.needsUpdate = true;
+            pos.needsUpdate = true;
 
-            // Rotation
-            if (orbState === 'idle') {
-                mainOrb.rotation.y += 0.002;
-            } else {
-                mainOrb.rotation.y += 0.008 + audioLevel * 0.02;
+            // 2. Deformazione Shell (Wireframe che "scoppia")
+            const sPos = window.orbShell.geometry.attributes.position;
+            for (let i = 0; i < sPos.count; i++) {
+                const ix = i * 3;
+                const ox = window.shellOrigPos[ix], oy = window.shellOrigPos[ix+1], oz = window.shellOrigPos[ix+2];
+                const vec = new THREE.Vector3(ox, oy, oz).normalize();
+                
+                const spike = (orbState !== 'idle') ? audioLevel * (i % 5 === 0 ? 0.4 : 0.1) : 0;
+                const d = 0.85 + Math.sin(t * 5 + i) * 0.02 + spike;
+                
+                sPos.array[ix] = vec.x * d;
+                sPos.array[ix+1] = vec.y * d;
+                sPos.array[ix+2] = vec.z * d;
             }
-            outerRing.rotation.y -= 0.001;
-            outerRing.rotation.x += 0.0005;
+            sPos.needsUpdate = true;
+
+            // 3. Particelle Reattive (Esplodono con l'audio)
+            window.orbParticles.rotation.y += 0.002 + audioLevel * 0.05;
+            window.orbParticles.scale.setScalar(1.0 + audioLevel * 0.5);
+            window.orbParticles.material.opacity = 0.3 + audioLevel * 0.7;
+
+            // 4. Rings & Rotation
+            window.ring1.rotation.y += 0.01 + audioLevel * 0.1;
+            window.ring2.rotation.x += 0.005 + audioLevel * 0.1;
+            mainOrb.rotation.y -= 0.002;
+            
+            // Colore e Intensità Glow
+            mainOrb.material.color = color;
+            window.orbShell.material.color = color;
+            window.orbParticles.material.color = color;
+            
+            // Lo scaling globale dell'intero container per un effetto "battito"
+            const scale = 1.0 + Math.sin(t * 10) * 0.01 + audioLevel * 0.2;
+            scene.scale.setScalar(scale);
 
             renderer.render(scene, camera);
         }
