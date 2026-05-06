@@ -401,6 +401,11 @@ async def get_dashboard():
     return FileResponse("static/jarvis_dashboard.html")
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -490,17 +495,34 @@ async def execute_and_broadcast(cmd: str):
     })
     full_reply = "🤖 MAYA: "
 
-    async for token in agent.process(cmd, progress_cb=send_progress):
-        full_reply += token
-        await manager.broadcast({
-            "type": "stream",
-            "token": token,
-            "full_text": full_reply
-        })
+    layout_data = {"type": "orb", "params": {}}
+    try:
+        async for token in agent.process(cmd, progress_cb=send_progress):
+            full_reply += token
+            await manager.broadcast({
+                "type": "stream",
+                "token": token,
+                "full_text": full_reply
+            })
+    except StopAsyncIteration as e:
+        # Recupera il valore di ritorno del generatore (layout_data)
+        if hasattr(e, "value") and isinstance(e.value, tuple):
+            final_resp, layout_data = e.value
+    except Exception as e:
+        # Gestione per versioni Python che non mettono il valore in StopAsyncIteration direttamente
+        # o se process() viene interrotto. In Python 3.10+ il return in un async generator
+        # solleva StopAsyncIteration con il valore in .value
+        if isinstance(e, StopAsyncIteration) and hasattr(e, "value"):
+            if isinstance(e.value, tuple):
+                final_resp, layout_data = e.value
 
-    # Stampa finale nel terminale per i log della dashboard (filtro esistente)
-    # Rimuoviamo il prefisso MAYA > se vogliamo gestire lo streaming separatamente lato UI
-    # ma lo lasciamo per compatibilità con il filtro log attuale se necessario.
+    # Invia il layout finale alla dashboard
+    await manager.broadcast({
+        "type": "layout",
+        "layout": layout_data.get("type", "orb"),
+        "params": layout_data.get("params", {})
+    })
+
     print(f"MAYA > {full_reply}")
 
     # Aggiorna lo stato del sistema (modelli, stats, ecc)
@@ -650,7 +672,21 @@ async def interactive_console():
 
             # Invia il comando dal terminale come se venisse dalla dashboard
             print(f"Richiesta: {user_input}")
-            await execute_and_broadcast(user_input)
+            full_reply = ""
+            layout_data = {"type": "orb", "params": {}}
+            try:
+                async for token in agent.process(user_input):
+                    full_reply += token
+            except StopAsyncIteration as e:
+                if hasattr(e, "value") and isinstance(e.value, tuple):
+                    full_reply, layout_data = e.value
+            
+            await manager.broadcast({
+                "type": "layout",
+                "layout": layout_data.get("type", "orb"),
+                "params": layout_data.get("params", {})
+            })
+            print(f"MAYA > {full_reply}")
 
         except EOFError:
             # Terminale chiuso

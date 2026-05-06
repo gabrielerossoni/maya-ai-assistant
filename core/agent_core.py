@@ -9,6 +9,7 @@ import re
 import random
 import ollama
 import asyncio
+import httpx
 from .tool_manager import ToolManager
 from .memory_manager import MemoryManager
 from dotenv import load_dotenv
@@ -42,9 +43,19 @@ REGOLE DI COMPORTAMENTO:
 Struttura:
 {
   "intent": "cosa vuole l'utente",
+  "layout": "uno tra [orb, weather, map, browser, news, dashboard]",
+  "layout_params": {"chiave": "valore"},
   "actions": [{"tool": "nome_tool", "parametro": "valore"}],
   "reply": "Tua risposta discorsiva e naturale in italiano"
 }
+REGOLE LAYOUT:
+- weather: se l'utente chiede il meteo o previsioni (params: location).
+- map: se l'utente chiede una posizione geografica o indicazioni (params: query, zoom).
+- browser: se devi mostrare un sito web specifico o ricerca (params: url).
+- news: se l'utente chiede ultime notizie (params: category).
+- dashboard: per riepiloghi generali o stato casa.
+- orb: default per chitchat o quando non serve un pannello specifico.
+
 SE NON HAI BISOGNO DI TOOL, lascia "actions" come lista vuota [].
 NON aggiungere testo fuori dal JSON.
 4. NO INVENZIONE: Non inventare mai dati. Se usi un tool informativo, scrivi nella reply che stai controllando.
@@ -145,6 +156,7 @@ class AgentCore:
         self.tool_manager = ToolManager()
         self.memory = MemoryManager()
         self.conversation_history = []
+        self._last_layout = {"type": "orb", "params": {}}
 
     async def initialize(self):
         """Inizializza tutti i componenti."""
@@ -218,9 +230,49 @@ class AgentCore:
         if match:
             text = match.group(0)
         try:
-            return json.loads(text)
+            result = json.loads(text)
+            # Salvataggio layout per propagazione
+            self._last_layout = {
+                "type": result.get("layout", "orb"),
+                "params": result.get("layout_params", {})
+            }
+            return result
         except json.JSONDecodeError:
-            return self._fallback_parse(text)
+            result = self._fallback_parse(text)
+            self._last_layout = {"type": "orb", "params": {}}
+            return result
+
+    async def _call_groq_fallback(self, messages: list) -> dict:
+        """Chiamata di fallback a Groq se Ollama non è disponibile."""
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            print("[LLM] Groq fallback saltato: GROQ_API_KEY non trovata.")
+            return {}
+
+        print("[LLM] Utilizzo fallback Groq (Llama 3.3 70B)...")
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+            "max_tokens": 1000
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                text = data["choices"][0]["message"]["content"]
+                return self._clean_json(text)
+        except Exception as e:
+            print(f"[LLM] Errore critico Groq fallback: {e}")
+            return {}
 
     async def _call_llm(self, user_input: str, progress_cb=None) -> dict:
         """Pipeline specialistica ottimizzata: Router e Retrieval in parallelo."""
@@ -247,28 +299,41 @@ class AgentCore:
             # Aspetta che il contesto sia pronto (potrebbe essere già finito)
             context = await context_task
             prompt = f"{context}\nUtente: {user_input}"
-
-            client = ollama.AsyncClient()
-            response = await client.generate(
-                model=model_name,
-                system=system_prompt,
-                prompt=prompt,
-                format="json",
-                stream=False,
-                options={"temperature": 0.3 if intent == "CHITCHAT" else 0.1},
-                keep_alive="10m"
-            )
-
-            text = response.get("response", "{}")
-            result = self._clean_json(text)
             
-            if "reply" not in result and "response" in result:
-                result["reply"] = result["response"]
-            
-            return result
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
 
+            try:
+                client = ollama.AsyncClient()
+                response = await client.generate(
+                    model=model_name,
+                    system=system_prompt,
+                    prompt=prompt,
+                    format="json",
+                    stream=False,
+                    options={"temperature": 0.3 if intent == "CHITCHAT" else 0.1},
+                    keep_alive="10m"
+                )
+
+                text = response.get("response", "{}")
+                result = self._clean_json(text)
+                
+                if "reply" not in result and "response" in result:
+                    result["reply"] = result["response"]
+                
+                return result
+
+            except (ollama.ResponseError, httpx.ConnectError, ConnectionError) as e:
+                print(f"[LLM] Ollama non raggiungibile ({e}). Provo fallback Groq...")
+                groq_res = await self._call_groq_fallback(messages)
+                if groq_res:
+                    return groq_res
+                raise # Rilancia per il fallback parse se anche Groq fallisce
+        
         except Exception as e:
-            print(f"[LLM] Errore specialista {intent}: {e}")
+            print(f"[LLM] Errore pipeline {intent}: {e}")
             return self._fallback_parse(user_input)
 
     def _fallback_parse(self, user_input: str) -> dict:
@@ -449,3 +514,5 @@ class AgentCore:
 
         # Salva risposta nella memoria
         await self.memory.add_turn("jarvis", final_reply)
+
+        return final_reply, getattr(self, '_last_layout', {"type": "orb", "params": {}})

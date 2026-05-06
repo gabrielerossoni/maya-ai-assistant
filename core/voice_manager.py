@@ -437,7 +437,23 @@ class VoiceManager:
                 self.agent.process(text),
                 loop,
             ).result(timeout=180)
+            
+            # Gestione tupla (reply, layout_data)
+            layout_data = {"type": "orb", "params": {}}
+            if isinstance(response, tuple):
+                response, layout_data = response
+            
             if response and str(response).strip():
+                # Invia il layout via WebSocket (se disponibile) prima di parlare
+                if self.socket_manager:
+                    asyncio.run_coroutine_threadsafe(
+                        self.socket_manager.broadcast({
+                            "type": "layout",
+                            "layout": layout_data.get("type", "orb"),
+                            "params": layout_data.get("params", {})
+                        }),
+                        loop
+                    )
                 self.speak(response)
             else:
                 print("[VOICE] Risposta agente vuota, niente TTS.")
