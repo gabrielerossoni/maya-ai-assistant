@@ -96,9 +96,14 @@ class ArduinoTool:
                 future = self._pending.pop(msg_id, None)
             if future and not future.done():
                 try:
-                    loop = asyncio.get_event_loop()
+                    # Fix deprecated get_event_loop()
+                    try:
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        # Fallback if no loop is running in this thread
+                        return
                     loop.call_soon_threadsafe(future.set_result, data)
-                except RuntimeError:
+                except Exception:
                     pass
 
             if "state" in data:
@@ -160,6 +165,12 @@ class ArduinoTool:
         payload = {"id": msg_id, "cmd": op, "target": target}
         if value is not None:
             payload["value"] = value
+
+        # Cleanup expired futures to prevent memory leaks
+        with self._lock:
+            expired = [mid for mid, fut in self._pending.items() if fut.done()]
+            for mid in expired:
+                self._pending.pop(mid)
 
         try:
             self.connection.write((json.dumps(payload) + "\n").encode())

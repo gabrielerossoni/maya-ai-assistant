@@ -201,7 +201,44 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
+import requests
 from contextlib import asynccontextmanager
+
+
+def start_ngrok(port: int) -> str | None:
+    """Avvia ngrok in background e ritorna l'URL pubblico."""
+    try:
+        # Avvia ngrok
+        popen_kw: dict = {
+            "args": ["ngrok", "http", str(port)],
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if sys.platform == "win32":
+            popen_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+        subprocess.Popen(**popen_kw)
+        
+        # Aspetta che ngrok sia pronto (max 5s)
+        for _ in range(10):
+            time.sleep(0.5)
+            try:
+                res = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=1)
+                tunnels = res.json().get("tunnels", [])
+                for t in tunnels:
+                    if t.get("proto") == "https":
+                        return t["public_url"]
+            except Exception:
+                continue
+        
+        return None
+    except FileNotFoundError:
+        print("[NGROK] ngrok non trovato nel PATH")
+        return None
+    except Exception as e:
+        print(f"[NGROK] Errore: {e}")
+        return None
 
 
 async def weather_broadcaster():
@@ -263,8 +300,22 @@ async def lifespan(app: FastAPI):
     except RuntimeError:
         agent.loop = asyncio.get_event_loop()
     manager.loop = agent.loop
+    # Segnala che il loop è pronto per VoiceManager
+    voice_manager.set_loop_ready()
+
+    # Recupera la porta HTTP configurata
+    http_port = int(os.environ.get("MAYA_HTTP_PORT", "8000"))
 
     await agent.initialize()
+
+    # Avvia ngrok
+    ngrok_url = await asyncio.to_thread(start_ngrok, http_port)
+    if ngrok_url:
+        print(f"\n{'='*50}")
+        print(f"  🌐 MAYA pubblica su: {ngrok_url}")
+        print(f"{'='*50}\n")
+    else:
+        print("[NGROK] Tunnel non avviato, solo accesso locale.")
     
     # Inizializza PluginLoader e ProactiveManager
     plugins_dir = os.path.join(os.getcwd(), "plugins")
@@ -273,7 +324,7 @@ async def lifespan(app: FastAPI):
     plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
     plugin_loader.start()
     
-    proactive_manager = ProactiveManager(agent.tool_manager)
+    proactive_manager = ProactiveManager(agent.tool_manager, manager)
     asyncio.create_task(proactive_manager.start_loop())
     
     print("\n[SYSTEM] Sistemi operativi. Avvio interfaccia visiva...\n")
@@ -293,8 +344,6 @@ async def lifespan(app: FastAPI):
     ]
     
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
-    http_port = int(os.environ.get("MAYA_HTTP_PORT", "8000"))
-
     def _open_browser():
         time.sleep(1.5)
         # Cache-buster per forzare il ricaricamento della dashboard
@@ -390,13 +439,19 @@ async def websocket_endpoint(websocket: WebSocket):
                     action = data.get("action", {})
                     if action:
                         result = await agent.tool_manager.execute(action)
-                        await manager.broadcast(
-                            {
-                                "type": "log",
-                                "text": result.get("message", ""),
-                                "level": "ok",
-                            }
-                        )
+                        if action.get("tool") == "calendar" and "events" in result:
+                            await manager.broadcast({
+                                "type": "calendar_data",
+                                "events": result.get("events", [])
+                            })
+                        else:
+                            await manager.broadcast(
+                                {
+                                    "type": "log",
+                                    "text": result.get("message", ""),
+                                    "level": "ok",
+                                }
+                            )
                         await broadcast_state()
             except WebSocketDisconnect:
                 break
@@ -416,8 +471,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def execute_and_broadcast(cmd: str):
     """
-    Esegue il comando tramite agent.process() e trasmette la risposta.
-    La risposta passa attraverso il filtro log che la invia alla dashboard.
+    Esegue il comando tramite agent.process() e trasmette la risposta in streaming.
     """
 
     # Callback per inviare il filler message al frontend quando elabora
@@ -426,10 +480,28 @@ async def execute_and_broadcast(cmd: str):
             {"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"}
         )
 
-    response = await agent.process(cmd, progress_cb=send_progress)
+    # Streaming dei token
+    full_reply = ""
+    # Inizia con l'emoji
+    await manager.broadcast({
+        "type": "stream",
+        "token": "🤖 MAYA: ",
+        "full_text": "🤖 MAYA: "
+    })
+    full_reply = "🤖 MAYA: "
 
-    # Stampa nel terminale con il prefisso "MAYA >" che viene catturato dal filtro
-    print(f"MAYA > {response}")
+    async for token in agent.process(cmd, progress_cb=send_progress):
+        full_reply += token
+        await manager.broadcast({
+            "type": "stream",
+            "token": token,
+            "full_text": full_reply
+        })
+
+    # Stampa finale nel terminale per i log della dashboard (filtro esistente)
+    # Rimuoviamo il prefisso MAYA > se vogliamo gestire lo streaming separatamente lato UI
+    # ma lo lasciamo per compatibilità con il filtro log attuale se necessario.
+    print(f"MAYA > {full_reply}")
 
     # Aggiorna lo stato del sistema (modelli, stats, ecc)
     await broadcast_state()
@@ -474,7 +546,7 @@ async def broadcast_state():
     models_status = await get_models_status()
     ollama_online = any(m.get("online", False) for m in models_status.values())
     
-    _debug_reset_client = os.getenv("MAYA_DEBUG_RESET_CLIENT", "False").lower() == "true"
+    _debug_reset_client = False
 
     state_payload = {
         "type": "state",
@@ -524,7 +596,7 @@ async def stats_broadcaster():
                 "neural_load": cpu_load,
                 "memory": memory.percent,
                 "ram_used_gb": round(memory.used / (1024**3), 1),
-                "ram_total_gb": 24,
+                "ram_total_gb": round(memory.total / (1024**3), 1),
                 "uptime": "Online",
                 # Allinea widget voce anche se alcuni broadcast si perdono
                 "voice_status": voice_manager.get_dashboard_voice_status(),

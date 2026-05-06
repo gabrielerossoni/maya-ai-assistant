@@ -15,7 +15,7 @@ Sistema AI agentico locale, offline-first, costruito su **Ollama** + **FastAPI**
 ---
  
 ## Architettura
- 
+
 ```mermaid
 flowchart LR
     subgraph IN["Input"]
@@ -23,21 +23,22 @@ flowchart LR
         WS["WS /ws"]
         CLI["CLI"]
     end
- 
+
     subgraph CORE["AgentCore"]
-        P["Planner"] --> E["Executor"] --> V["Validator"]
+        P["Planner (ReAct)"] --> E["Executor"] --> V["Validator"]
     end
- 
+
     subgraph TOOLS["ToolManager"]
         T["arduino · calendar · weather\nnetwork · trading · search\nnotes · timer · news · spotify"]
     end
- 
+
     subgraph SUP["Support"]
-        M["MemoryManager"]
+        M["Memory (ChromaDB)"]
         W["WebSocketManager"]
         D["DisplayTool"]
+        V["VoiceManager"]
     end
- 
+
     IN --> CORE
     V --> TOOLS
     CORE --> SUP
@@ -47,17 +48,14 @@ flowchart LR
  
 ## Caratteristiche
  
-- **100% Offline & Privato** — nessuna API key esterna, LLM locale via Ollama
-- **Agentic Routing** — selezione automatica del modello in base alla complessità del task (ultra-fast / fast / balanced)
-- **Pattern Planner → Executor → Validator** — pipeline strutturata con fallback parser keyword-based
-- **Automazioni predefinite** — trigger su frasi chiave (`buonanotte`, `modalità film`, `modalità lavoro`) che attivano sequenze multi-tool
-- **Tool System modulare** — 14 tool plug-in con interfaccia `initialize()` / `execute(action: dict)` uniforme
-- **Controllo Hardware Arduino** — relay, LED, servo via PySerial con auto-discovery porta COM e fallback simulazione
-- **Rete multi-PC** — invio comandi TCP a un secondo nodo con server incluso (`run_server()`)
-- **Memoria persistente** — sliding window di 10 turni su `data/memory.json`
-- **Dashboard WebSocket real-time** — CPU, RAM, log, controlli hardware; aggiornamento a 3 Hz via FastAPI + WS
-- **Filler intelligente** — genera risposta di attesa con `llama3.2` mentre il modello lento elabora
-- **Display ASCII** — pannello di stato animato su terminale separato (thread daemon)
+- **Agentic ReAct Loop** — ciclo di ragionamento asincrono (Ragiona → Agisci → Osserva) con routing intelligente dell'intent fuori dal loop per massime performance.
+- **Voice I/O Integrato** — STT via `faster-whisper` (tiny) e TTS via `Piper` (modello Paola) con VAD (Voice Activity Detection) adattivo e calibrazione rumore ambientale.
+- **Memoria Semantica Vettoriale** — Memory persistente con database vettoriale **ChromaDB** per il recupero del contesto a lungo termine e sliding window per la coerenza immediata.
+- **Monitoraggio Proattivo** — Sistema di checker in background che notificano all'utente eventi critici (CPU/RAM alta, eventi calendario imminenti) via WebSocket.
+- **Sicurezza & Robustezza** — Protezione da shell injection, gestione automatica dei leak di memoria (Futures timeout) e sincronizzazione thread-safe per i broadcast.
+- **Setup Semplificato** — Avvio automatico di Ollama locale (se configurato) e gestione intelligente della simulazione hardware.
+- **Dashboard WebSocket real-time** — CPU, RAM, log, stato vocale e controlli hardware aggiornati istantaneamente.
+- **Display ASCII** — Pannello di stato animato su terminale separato per un feedback visivo immediato.
 ---
  
 ## Stack Tecnologico
@@ -78,7 +76,8 @@ flowchart LR
 | Monitoring | psutil |
 | Media | keyboard (media keys) + webbrowser |
 | Frontend | Tailwind CDN + Chart.js + GSAP + Lucide |
-| Persistenza | JSON locale (data/) |
+| Persistenza | ChromaDB (vettoriale) + JSON locale |
+| Voice | Faster-Whisper + Piper TTS |
  
 ---
  
@@ -321,11 +320,10 @@ Messaggi client → server:
  
 ## Note Tecniche
  
-- Il routing del modello in `_select_model()` è keyword-based sincrono — nessun overhead LLM per la selezione
-- `_generate_filler()` usa sempre `llama3.2` indipendentemente dal modello selezionato, per garantire latenza bassa sulla risposta intermedia
-- `stats_broadcaster()` gira a 0.33s (3 Hz) ma il grafico frontend aggiorna a frame rate nativo con `Chart.js update('none')`
-- I tool informativi (weather, trading, search, ecc.) vengono eseguiti **dopo** che l'LLM ha già generato la `reply`, e il loro output viene concatenato — questo è intenzionale per separare la personalità della risposta dai dati grezzi
-- `memory_manager.py` mantiene al massimo `MAX_TURNS = 10` turni in RAM e inietta solo gli ultimi 6 nel prompt LLM
+- Il routing del modello in `_route_intent()` utilizza una logica ibrida: Hard Routing per task comuni e LLM Router per quelli complessi, ottimizzando i tempi di risposta.
+- Il **ReAct Loop** è ottimizzato per evitare il "double routing", determinando l'intent una sola volta fuori dal ciclo.
+- `VoiceManager` include una fase di calibrazione automatica per adattarsi al rumore ambientale e migliorare l'accuratezza del trigger.
+- `ChromaDB` garantisce che l'agente possa ricordare fatti avvenuti mesi prima, iniettandoli come contesto nel prompt.
 ---
  
 ## .gitignore — Cosa viene escluso
@@ -343,6 +341,8 @@ __pycache__/
 ## Roadmap
  
 - [X] Voice I/O (Whisper local + TTS)
+- [X] Semantic Memory (ChromaDB)
+- [X] Proactive Monitoring System
 - [ ] Google Calendar sync (oauth2 già predisposto in requirements)
 - [ ] Streaming LLM response via WebSocket (token-by-token)
 - [ ] Plugin system dinamico (hot-reload tool senza restart)

@@ -75,11 +75,15 @@ class SystemTool:
     def _screenshot(self):
         try:
             import pyautogui
-            path = os.path.expanduser("~/Desktop/jarvis_screenshot.png")
+            # Get the correct Desktop path on Windows
+            desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop') if self.os == "Windows" else os.path.expanduser("~/Desktop")
+            path = os.path.join(desktop, "jarvis_screenshot.png")
             pyautogui.screenshot(path)
             return f"screenshot salvato in {path}"
         except ImportError:
-            return "pyautogui non installato"
+            return "Libreria 'pyautogui' non installata. Installa con: pip install pyautogui"
+        except Exception as e:
+            return f"Errore durante lo screenshot: {e}"
 
     def _open_notepad(self):
         if self.os == "Windows":
@@ -89,15 +93,20 @@ class SystemTool:
         return "editor aperto"
 
     def _volume_up(self):
-        if self.os == "Windows":
-            # Usa nircmd se disponibile
-            subprocess.Popen(["nircmd", "changesysvolume", "3000"])
-        return "volume aumentato"
+        try:
+            import keyboard
+            keyboard.press_and_release('volume up')
+            return "volume aumentato"
+        except ImportError:
+            return "keyboard non installato"
 
     def _volume_down(self):
-        if self.os == "Windows":
-            subprocess.Popen(["nircmd", "changesysvolume", "-3000"])
-        return "volume diminuito"
+        try:
+            import keyboard
+            keyboard.press_and_release('volume down')
+            return "volume diminuito"
+        except ImportError:
+            return "keyboard non installato"
 
     def _lock_screen(self):
         if self.os == "Windows":
