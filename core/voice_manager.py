@@ -362,7 +362,10 @@ class VoiceManager:
 
                 # LISTENING è già emesso dentro _record_utterance_*; dopo wake + comando inline va in PROCESSING
                 if cmd:
-                    self._process_voice_text(cmd)
+                    # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
+                    loop = self._voice_event_loop()
+                    if loop:
+                        asyncio.run_coroutine_threadsafe(self._process_voice_text(cmd), loop)
                 else:
                     self._handle_voice_command(stream)
 
@@ -423,46 +426,52 @@ class VoiceManager:
             return
 
         print(f"[VOICE] Trascrizione: {cmd_text}")
-        self._process_voice_text(cmd_text.strip())
-
-    def _process_voice_text(self, text: str):
+        # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
         loop = self._voice_event_loop()
-        if loop is None:
-            print("[VOICE] Nessun asyncio loop (agent/manager.loop): comando vocale ignorato.")
-            self._broadcast("IDLE")
-            return
+        if loop:
+            asyncio.run_coroutine_threadsafe(self._process_voice_text(cmd_text.strip()), loop)
+
+    async def _process_voice_text(self, text: str):
         self._broadcast("PROCESSING")
         try:
-            # agent.process(text) è un ASYNC GENERATOR, non una coroutine.
-            # Non può essere passato direttamente a run_coroutine_threadsafe.
+            # Per le notizie, vogliamo che l'agente legga i titoli con pause
+            is_news_request = any(word in text.lower() for word in ["notizie", "news", "notiziario", "aggiornamenti"])
             
-            async def _consume_gen():
-                full_reply = ""
-                async for token in self.agent.process(text):
-                    full_reply += token
+            full_reply = ""
+            async for token in self.agent.process(text):
+                full_reply += token
+            
+            # Recupera dati finali (layout) salvati dall'agente
+            layout_data = {"type": "orb", "params": {}}
+            if hasattr(self.agent, '_last_final_data'):
+                _, layout_data = self.agent._last_final_data
+            
+            if full_reply.strip():
+                if self.socket_manager:
+                    await self.socket_manager.broadcast({
+                        "type": "layout",
+                        "layout": layout_data.get("type", "orb"),
+                        "params": layout_data.get("params", {})
+                    })
                 
-                # Recupera dati finali (layout) salvati dall'agente
-                layout_data = {"type": "orb", "params": {}}
-                if hasattr(self.agent, '_last_final_data'):
-                    _, layout_data = self.agent._last_final_data
-                
-                if full_reply.strip():
-                    if self.socket_manager:
-                        await self.socket_manager.broadcast({
-                            "type": "layout",
-                            "layout": layout_data.get("type", "orb"),
-                            "params": layout_data.get("params", {})
-                        })
-                    self.speak(full_reply)
+                if is_news_request:
+                    # Se è una richiesta di notizie, dividiamo per punti elenco o articoli
+                    articles = re.split(r'\n-|\n\*', full_reply)
+                    for article in articles:
+                        if article.strip():
+                            clean_text = article.strip().lstrip('-').lstrip('*').strip()
+                            self.speak(clean_text)
+                            time.sleep(1.5)
                 else:
-                    print("[VOICE] Risposta agente vuota, niente TTS.")
+                    self.speak(full_reply)
+            else:
+                print("[VOICE] Risposta agente vuota, niente TTS.")
 
-            asyncio.run_coroutine_threadsafe(_consume_gen(), loop).result(timeout=180)
-            
         except Exception as e:
             print(f"[VOICE] Errore durante l'elaborazione: {e}")
             import traceback
             traceback.print_exc()
+        finally:
             self._broadcast("IDLE")
 
     def speak(self, text):

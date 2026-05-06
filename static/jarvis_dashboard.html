@@ -22,6 +22,7 @@
             --panel-bg: rgba(10, 0, 0, 0.9);
             --glass-border: 1px solid rgba(255, 0, 0, 0.3);
             --transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            --hud-color: rgba(255, 0, 0, 0.15);
         }
 
         @font-face {
@@ -36,54 +37,78 @@
             overflow: hidden;
             height: 100vh;
             width: 100vw;
+            margin: 0;
         }
 
-        #idle-clock .time { 
-            font-family: 'Geometos', sans-serif;
-            font-size: 100px; 
-            font-weight: 100; 
-            letter-spacing: -2px;
-            text-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
-        }
-        #idle-clock .date { 
-            font-size: 14px; 
-            color: var(--text-dim); 
-            text-transform: uppercase; 
-            letter-spacing: 6px; 
-            margin-top: -10px;
-        }
-
-        #bg-canvas {
+        /* --- HUD SCANLINES & VIGNETTE --- */
+        body::before {
+            content: "";
             position: fixed;
-            top: 0; left: 0;
-            z-index: 1;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 200;
+            opacity: 0.3;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 40%, black 150%);
+            pointer-events: none;
+            z-index: 201;
+        }
+
+        /* --- HUD CORNERS --- */
+        .hud-corner {
+            position: fixed;
+            width: 100px; height: 100px;
+            border: 2px solid var(--hud-color);
+            z-index: 150;
             pointer-events: none;
         }
+        .top-left { top: 30px; left: 30px; border-right: none; border-bottom: none; }
+        .top-right { top: 30px; right: 30px; border-left: none; border-bottom: none; }
+        .bottom-left { bottom: 30px; left: 30px; border-right: none; border-top: none; }
+        .bottom-right { bottom: 30px; right: 30px; border-left: none; border-top: none; }
 
         /* --- MAYA ORB --- */
         #maya-orb-container {
             position: fixed;
-            top: 50%; left: 50%;
+            top: 40%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 280px; height: 280px;
+            width: 380px; height: 380px;
             z-index: 100;
             transition: var(--transition);
             cursor: pointer;
         }
 
         #maya-orb-container.corner {
-            top: 24px; left: 24px;
-            transform: translate(0, 0);
-            width: 90px; height: 90px;
+            top: 100px; left: 100px;
+            width: 140px; height: 140px;
         }
 
-        #maya-orb {
-            width: 100%; height: 100%;
-            border-radius: 50%;
-            position: relative;
-            background: radial-gradient(circle, rgba(var(--orb-color), 0.2) 0%, transparent 70%);
-            box-shadow: 0 0 40px rgba(var(--orb-color), 0.3);
-            transition: var(--transition);
+        #orb-branding {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Geometos', sans-serif;
+            font-size: 18px;
+            letter-spacing: 6px;
+            color: rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+            z-index: 102;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+
+        body.content-open #orb-branding {
+            font-size: 10px;
+            letter-spacing: 3px;
         }
 
         #orb-canvas {
@@ -91,21 +116,35 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 101;
+            filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.5));
         }
 
         /* --- CLOCK --- */
         #idle-clock {
             position: fixed;
-            top: 65%; left: 50%;
+            top: 75%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
             z-index: 10;
             transition: var(--transition);
         }
-        #idle-clock .time { font-size: 80px; font-weight: 200; letter-spacing: -2px; }
-        #idle-clock .date { font-size: 18px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 4px; }
+        #idle-clock .time { 
+            font-family: 'Geometos', sans-serif;
+            font-size: 100px; 
+            font-weight: 100; 
+            letter-spacing: 15px; 
+            text-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+            margin-bottom: 10px;
+        }
+        #idle-clock .date { 
+            font-size: 16px; 
+            color: var(--text-dim); 
+            text-transform: uppercase; 
+            letter-spacing: 12px;
+            opacity: 0.5;
+        }
         
-        body.content-open #idle-clock { opacity: 0; visibility: hidden; transform: translate(-50%, -40%); }
+        body.content-open #idle-clock { opacity: 0; visibility: hidden; transform: translate(-50%, -60%); }
 
         /* --- CONTENT AREA --- */
         #content-area {
@@ -200,9 +239,14 @@
 <body>
     <canvas id="bg-canvas"></canvas>
     
+    <div class="hud-corner top-left"></div>
+    <div class="hud-corner top-right"></div>
+    <div class="hud-corner bottom-left"></div>
+    <div class="hud-corner bottom-right"></div>
+
     <div id="maya-orb-container" onclick="handleOrbClick()">
-        <div id="maya-orb"></div>
         <canvas id="orb-canvas"></canvas>
+        <div id="orb-branding">M.A.Y.A</div>
     </div>
 
     <div id="idle-clock">
@@ -264,22 +308,83 @@
         let orbState = 'idle';
         
         // --- THREE.JS GLOBALS ---
-        let scene, camera, renderer, mainOrb, outerRing, originalPositions;
-        
-        // --- INIZIALIZZAZIONE ---
-        window.onload = () => {
-            initBackground();
-            initClock();
-            initThree();
-            animate();
-            initWS();
-        };
+        let scene, camera, renderer, mainOrb, originalPositions;
 
+        // --- CLOCK ---
+        function initClock() {
+            const timeEl = document.getElementById('clock-time');
+            const dateEl = document.getElementById('clock-date');
+            
+            function update() {
+                const now = new Date();
+                if (timeEl) {
+                    timeEl.textContent = now.toLocaleTimeString('it-IT', {
+                        hour: '2-digit', 
+                        minute: '2-digit'
+                    });
+                }
+                if (dateEl) {
+                    dateEl.textContent = now.toLocaleDateString('it-IT', {
+                        weekday: 'long', 
+                        day: 'numeric', 
+                        month: 'long'
+                    }).toUpperCase();
+                }
+            }
+            setInterval(update, 1000);
+            update();
+        }
+
+        // --- BACKGROUND PARTICLES ---
+        function initBackground() {
+            const canvas = document.getElementById('bg-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let pts = [];
+            
+            const resize = () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            };
+            window.addEventListener('resize', resize);
+            resize();
+
+            for(let i=0; i<60; i++) {
+                pts.push({
+                    x: Math.random()*canvas.width,
+                    y: Math.random()*canvas.height,
+                    vx: (Math.random()-0.5)*0.5,
+                    vy: (Math.random()-0.5)*0.5,
+                    r: Math.random()*2
+                });
+            }
+
+            function anim() {
+                ctx.clearRect(0,0,canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                pts.forEach(p => {
+                    p.x += p.vx; p.y += p.vy;
+                    if(p.x<0) p.x=canvas.width; if(p.x>canvas.width) p.x=0;
+                    if(p.y<0) p.y=canvas.height; if(p.y>canvas.height) p.y=0;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+                    ctx.fill();
+                });
+                requestAnimationFrame(anim);
+            }
+            anim();
+        }
+
+        // --- THREE.JS ORB ---
         function initThree() {
             const container = document.getElementById('maya-orb-container');
             const canvas = document.getElementById('orb-canvas');
+            if (!container || !canvas) return;
+
             const w = container.clientWidth;
             const h = container.clientHeight;
+            canvas.width = w;
+            canvas.height = h;
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
@@ -294,7 +399,7 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setClearColor(0x000000, 0);
 
-            // 1. Core Glowing Sphere (L'anima dell'orb)
+            // 1. Core Glowing Sphere
             const coreGeom = new THREE.IcosahedronGeometry(0.7, 15);
             const coreMat = new THREE.MeshBasicMaterial({
                 color: 0xff0000,
@@ -306,7 +411,7 @@
             originalPositions = coreGeom.attributes.position.array.slice();
             scene.add(mainOrb);
 
-            // 2. Neural Wireframe Shell (Esterno reattivo)
+            // 2. Shell
             const shellGeom = new THREE.IcosahedronGeometry(0.85, 10);
             const shellMat = new THREE.MeshBasicMaterial({
                 color: 0xff2222,
@@ -319,7 +424,7 @@
             window.shellOrigPos = shellGeom.attributes.position.array.slice();
             scene.add(window.orbShell);
 
-            // 3. Floating Data Particles (I puntini che fluttuano intorno)
+            // 3. Particles
             const partGeom = new THREE.BufferGeometry();
             const partCount = 1200;
             const posArray = new Float32Array(partCount * 3);
@@ -342,7 +447,7 @@
             window.orbParticles = new THREE.Points(partGeom, partMat);
             scene.add(window.orbParticles);
 
-            // 4. Energy Rings (Sottili e veloci)
+            // 4. Rings
             const ringGeom = new THREE.RingGeometry(0.95, 0.97, 64);
             const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
             window.ring1 = new THREE.Mesh(ringGeom, ringMat);
@@ -354,78 +459,74 @@
 
         function animate(time) {
             requestAnimationFrame(animate);
-            if (!renderer) return;
+            if (!renderer || !mainOrb) return;
 
             const t = time * 0.001;
-            const rgb = getComputedStyle(document.documentElement).getPropertyValue('--orb-color').trim();
+            const rgb = getComputedStyle(document.documentElement).getPropertyValue('--orb-color').trim() || "255, 30, 30";
             const color = new THREE.Color(`rgb(${rgb})`);
 
-            // Audio Analysis Ultra-Sensitive
             let audioLevel = 0;
             if (dataArray) {
                 analyser.getByteFrequencyData(dataArray);
                 let sum = 0;
-                // Prendiamo una gamma più ampia per la sensibilità
                 for (let i = 0; i < 64; i++) sum += dataArray[i];
-                audioLevel = (sum / (64 * 255)) * 1.5; // Gain aumentato
+                audioLevel = (sum / (64 * 255)) * 1.5;
             }
 
-            const reactFactor = 1.0 + audioLevel * 2.5;
-
-            // 1. Deformazione Core (Fluida)
+            // Deformations
             const pos = mainOrb.geometry.attributes.position;
             for (let i = 0; i < pos.count; i++) {
                 const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
                 const ox = originalPositions[ix], oy = originalPositions[iy], oz = originalPositions[iz];
                 const vec = new THREE.Vector3(ox, oy, oz).normalize();
-                
                 const noise = Math.sin(t * 4 + ox * 2 + oy * 3) * 0.05;
-                const reaction = audioLevel * (Math.random() * 0.2);
-                const d = 0.7 + noise + reaction;
-                
+                const d = 0.7 + noise + (audioLevel * (Math.random() * 0.2));
                 pos.array[ix] = vec.x * d;
                 pos.array[iy] = vec.y * d;
                 pos.array[iz] = vec.z * d;
             }
             pos.needsUpdate = true;
 
-            // 2. Deformazione Shell (Wireframe che "scoppia")
             const sPos = window.orbShell.geometry.attributes.position;
             for (let i = 0; i < sPos.count; i++) {
                 const ix = i * 3;
                 const ox = window.shellOrigPos[ix], oy = window.shellOrigPos[ix+1], oz = window.shellOrigPos[ix+2];
                 const vec = new THREE.Vector3(ox, oy, oz).normalize();
-                
                 const spike = (orbState !== 'idle') ? audioLevel * (i % 5 === 0 ? 0.4 : 0.1) : 0;
                 const d = 0.85 + Math.sin(t * 5 + i) * 0.02 + spike;
-                
                 sPos.array[ix] = vec.x * d;
                 sPos.array[ix+1] = vec.y * d;
                 sPos.array[ix+2] = vec.z * d;
             }
             sPos.needsUpdate = true;
 
-            // 3. Particelle Reattive (Esplodono con l'audio)
+            // Rotations
             window.orbParticles.rotation.y += 0.002 + audioLevel * 0.05;
             window.orbParticles.scale.setScalar(1.0 + audioLevel * 0.5);
             window.orbParticles.material.opacity = 0.3 + audioLevel * 0.7;
-
-            // 4. Rings & Rotation
             window.ring1.rotation.y += 0.01 + audioLevel * 0.1;
             window.ring2.rotation.x += 0.005 + audioLevel * 0.1;
             mainOrb.rotation.y -= 0.002;
             
-            // Colore e Intensità Glow
             mainOrb.material.color = color;
             window.orbShell.material.color = color;
             window.orbParticles.material.color = color;
             
-            // Lo scaling globale dell'intero container per un effetto "battito"
             const scale = 1.0 + Math.sin(t * 10) * 0.01 + audioLevel * 0.2;
             scene.scale.setScalar(scale);
 
             renderer.render(scene, camera);
         }
+
+        // --- MAIN ENTRY POINT ---
+        window.addEventListener('load', async () => {
+            initBackground();
+            initClock();
+            initThree();
+            animate();
+            initWS();
+        });
+
 
         function handleResize() {
             const container = document.getElementById('maya-orb-container');
@@ -473,15 +574,13 @@
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
                 
-                if(d.type === 'layout') setLayout(d.layout, d.params);
-                if(d.type === 'voice_status') setOrbState(d.status.toLowerCase());
-                if(d.type === 'stats') {
-                    document.getElementById('dash-cpu').innerText = Math.round(d.neural_load) + '%';
-                    document.getElementById('dash-ram').innerText = Math.round(d.memory) + '%';
-                    if(d.voice_status) setOrbState(d.voice_status.toLowerCase());
-                }
-                if(d.type === 'weather' && d.data) updateWeather(d.data);
-                if(d.type === 'news' && d.articles) updateNews(d.articles);
+        if (d.type === 'layout') setLayout(d.layout, d.params);
+        if (d.type === 'voice_status') setOrbState(d.status.toLowerCase());
+        if (d.type === 'news' && d.articles) {
+            updateNews(d.articles);
+            // Il pannello non si apre più automaticamente qui,
+            // si affida al comando 'layout' inviato dall'agente se necessario.
+        }
                 if(d.type === 'state') updateArduino(d);
                 if(d.type === 'spotify') {
                     if(d.is_playing) document.getElementById('log-strip').innerText = `♫ SPOTIFY: ${d.track} - ${d.artist}`;
