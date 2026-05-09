@@ -15,14 +15,14 @@
     <style>
         :root {
             --orb-color: 255, 30, 30;
-            --bg-dark: #020000;
-            --accent: #ff1a1a;
+            --bg-dark: #000000;
+            --accent: #ff0000;
             --text-main: #ffffff;
             --text-dim: rgba(255, 255, 255, 0.4);
-            --panel-bg: rgba(10, 0, 0, 0.9);
-            --glass-border: 1px solid rgba(255, 0, 0, 0.3);
+            --panel-bg: rgba(0, 0, 0, 0.95);
+            --glass-border: 1px solid rgba(255, 0, 0, 0.5);
             --transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-            --hud-color: rgba(255, 0, 0, 0.15);
+            --hud-color: rgba(255, 0, 0, 0.4);
         }
 
         @font-face {
@@ -30,85 +30,86 @@
             src: url('https://fonts.cdnfonts.com/s/14885/Geometos.woff') format('woff');
         }
 
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap');
+
         body {
-            background: radial-gradient(circle at center, #1a0000 0%, #020000 100%);
+            background: #050508;
+            background-image: radial-gradient(ellipse 60% 50% at 50% 40%, 
+                rgba(255,30,30,0.06) 0%, transparent 70%);
             color: var(--text-main);
-            font-family: 'Inter', sans-serif;
+            font-family: 'Sora', sans-serif;
             overflow: hidden;
             height: 100vh;
             width: 100vw;
             margin: 0;
         }
 
-        /* --- HUD SCANLINES & VIGNETTE --- */
-        body::before {
-            content: "";
+        /* --- TOP LOGO --- */
+        #top-logo {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: 
-                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
-                linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-            background-size: 100% 4px, 3px 100%;
+            top: 15px;
+            left: 15px;
+            width: 80px;
+            height: 80px;
+            z-index: 210;
+            opacity: 0.6;
+            filter: drop-shadow(0 0 5px rgba(255, 30, 30, 0.3));
             pointer-events: none;
-            z-index: 200;
-            opacity: 0.3;
+            transition: var(--transition);
         }
 
+        body.content-open #top-logo {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
         body::after {
             content: "";
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, transparent 40%, black 150%);
+            background: radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.4) 100%);
             pointer-events: none;
             z-index: 201;
         }
 
-        /* --- HUD CORNERS --- */
-        .hud-corner {
-            position: fixed;
-            width: 100px; height: 100px;
-            border: 2px solid var(--hud-color);
-            z-index: 150;
-            pointer-events: none;
-        }
-        .top-left { top: 30px; left: 30px; border-right: none; border-bottom: none; }
-        .top-right { top: 30px; right: 30px; border-left: none; border-bottom: none; }
-        .bottom-left { bottom: 30px; left: 30px; border-right: none; border-top: none; }
-        .bottom-right { bottom: 30px; right: 30px; border-left: none; border-top: none; }
-
         /* --- MAYA ORB --- */
         #maya-orb-container {
             position: fixed;
-            top: 40%; left: 50%;
+            top: 45%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 380px; height: 380px;
+            width: 420px; height: 420px;
             z-index: 100;
             transition: var(--transition);
             cursor: pointer;
         }
 
         #maya-orb-container.corner {
-            top: 100px; left: 100px;
-            width: 140px; height: 140px;
+            top: 40px; left: 40px;
+            transform: translate(0, 0);
+            width: 120px; height: 120px;
         }
 
         #orb-branding {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            font-family: 'Geometos', sans-serif;
-            font-size: 18px;
-            letter-spacing: 6px;
-            color: rgba(255, 255, 255, 0.4);
+            font-family: 'Syncopate', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 12px;
+            color: #ffffff;
             pointer-events: none;
             z-index: 102;
             text-align: center;
-            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+            opacity: 0.8;
+            display: block;
+            text-indent: 12px; /* Bilancia l'ultimo letter-spacing */
         }
 
         body.content-open #orb-branding {
-            font-size: 10px;
-            letter-spacing: 3px;
+            font-size: 9px;
+            letter-spacing: 6px;
+            text-indent: 6px;
+            display: block;
         }
 
         #orb-canvas {
@@ -116,32 +117,35 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 101;
-            filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.5));
         }
 
         /* --- CLOCK --- */
         #idle-clock {
             position: fixed;
-            top: 75%; left: 50%;
+            top: 78%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
             z-index: 10;
             transition: var(--transition);
+            pointer-events: none;
         }
         #idle-clock .time { 
-            font-family: 'Geometos', sans-serif;
-            font-size: 100px; 
+            font-family: 'Sora', sans-serif;
+            font-size: 58px; 
             font-weight: 100; 
-            letter-spacing: 15px; 
-            text-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
-            margin-bottom: 10px;
+            letter-spacing: -1px; 
+            color: rgba(255, 255, 255, 0.35);
+            text-shadow: none;
+            line-height: 1;
         }
         #idle-clock .date { 
-            font-size: 16px; 
-            color: var(--text-dim); 
+            font-family: 'Syncopate', sans-serif;
+            font-size: 9px; 
+            color: rgba(255, 255, 255, 0.35); 
             text-transform: uppercase; 
-            letter-spacing: 12px;
-            opacity: 0.5;
+            letter-spacing: 0.5em;
+            margin-top: 12px;
+            opacity: 1;
         }
         
         body.content-open #idle-clock { opacity: 0; visibility: hidden; transform: translate(-50%, -60%); }
@@ -151,8 +155,8 @@
             position: fixed;
             top: 0; right: -75vw;
             width: 75vw; height: 100vh;
-            background: var(--panel-bg);
-            border-left: var(--glass-border);
+            background: rgba(3, 3, 6, 0.97);
+            border-left: 1px solid rgba(255, 30, 30, 0.15);
             z-index: 50;
             transition: var(--transition);
             padding: 40px;
@@ -188,9 +192,9 @@
         /* --- CMD INPUT --- */
         #cmd-container {
             position: fixed;
-            bottom: 60px; left: 50%;
+            bottom: 40px; left: 50%;
             transform: translateX(-50%);
-            width: 500px;
+            width: 380px;
             z-index: 110;
             transition: var(--transition);
         }
@@ -203,17 +207,19 @@
 
         #cmd-input {
             width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            border: var(--glass-border);
-            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 50px;
             padding: 15px 25px;
             color: white;
-            font-size: 16px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 300;
+            font-size: 14px;
             outline: none;
             backdrop-filter: blur(10px);
             transition: 0.3s;
         }
-        #cmd-input:focus { border-color: var(--orb-color); box-shadow: 0 0 15px rgba(0,242,255,0.2); }
+        #cmd-input:focus { border-color: rgba(255, 255, 255, 0.15); box-shadow: none; }
 
         /* --- LOG STRIP --- */
         #log-strip {
@@ -237,16 +243,12 @@
     </style>
 </head>
 <body>
+    <img src="/static/maya_logo_no_sfondo.png" id="top-logo" alt="MAYA Logo">
     <canvas id="bg-canvas"></canvas>
     
-    <div class="hud-corner top-left"></div>
-    <div class="hud-corner top-right"></div>
-    <div class="hud-corner bottom-left"></div>
-    <div class="hud-corner bottom-right"></div>
-
     <div id="maya-orb-container" onclick="handleOrbClick()">
         <canvas id="orb-canvas"></canvas>
-        <div id="orb-branding">M.A.Y.A</div>
+        <div id="orb-branding">MAYA</div>
     </div>
 
     <div id="idle-clock">
@@ -349,19 +351,19 @@
             window.addEventListener('resize', resize);
             resize();
 
-            for(let i=0; i<60; i++) {
+            for(let i=0; i<150; i++) {
                 pts.push({
                     x: Math.random()*canvas.width,
                     y: Math.random()*canvas.height,
                     vx: (Math.random()-0.5)*0.5,
                     vy: (Math.random()-0.5)*0.5,
-                    r: Math.random()*2
+                    r: Math.random()*0.8
                 });
             }
 
             function anim() {
                 ctx.clearRect(0,0,canvas.width, canvas.height);
-                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fillStyle = 'rgba(255,255,255,0.15)';
                 pts.forEach(p => {
                     p.x += p.vx; p.y += p.vy;
                     if(p.x<0) p.x=canvas.width; if(p.x>canvas.width) p.x=0;
@@ -399,62 +401,82 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setClearColor(0x000000, 0);
 
-            // 1. Core Glowing Sphere
-            const coreGeom = new THREE.IcosahedronGeometry(0.7, 15);
+            // 1. CORE SOLIDO
+            const coreGeom = new THREE.SphereGeometry(0.65, 64, 64);
             const coreMat = new THREE.MeshBasicMaterial({
-                color: 0xff0000,
+                color: 0xff1e1e, // Rosso (255, 30, 30)
                 transparent: true,
-                opacity: 0.2,
+                opacity: 0.08,
                 blending: THREE.AdditiveBlending
             });
             mainOrb = new THREE.Mesh(coreGeom, coreMat);
             originalPositions = coreGeom.attributes.position.array.slice();
             scene.add(mainOrb);
 
-            // 2. Shell
-            const shellGeom = new THREE.IcosahedronGeometry(0.85, 10);
-            const shellMat = new THREE.MeshBasicMaterial({
-                color: 0xff2222,
-                wireframe: true,
-                transparent: true,
-                opacity: 0.4,
-                blending: THREE.AdditiveBlending
+            // 2. TRE SFERE GLOW CONCENTRICHE
+            window.glowSpheres = [];
+            const glowLayers = [
+                { r: 0.68, op: 0.20 },
+                { r: 0.78, op: 0.10 },
+                { r: 0.95, op: 0.04 }
+            ];
+            glowLayers.forEach(layer => {
+                const gGeom = new THREE.SphereGeometry(layer.r, 32, 32);
+                const gMat = new THREE.MeshBasicMaterial({
+                    color: 0xff1e1e,
+                    transparent: true,
+                    opacity: layer.op,
+                    blending: THREE.AdditiveBlending
+                });
+                const gMesh = new THREE.Mesh(gGeom, gMat);
+                scene.add(gMesh);
+                window.glowSpheres.push({ mesh: gMesh, baseOpacity: layer.op, baseRadius: layer.r });
             });
-            window.orbShell = new THREE.Mesh(shellGeom, shellMat);
-            window.shellOrigPos = shellGeom.attributes.position.array.slice();
-            scene.add(window.orbShell);
 
-            // 3. Particles
-            const partGeom = new THREE.BufferGeometry();
-            const partCount = 1200;
-            const posArray = new Float32Array(partCount * 3);
-            for(let i=0; i<partCount*3; i++) {
-                const r = 0.8 + Math.random() * 0.4;
+            // 3. PARTICELLE NEBULA
+            const nebulaGeom = new THREE.BufferGeometry();
+            const nebulaCount = 4000;
+            const nebulaPos = new Float32Array(nebulaCount * 3);
+            for(let i=0; i<nebulaCount; i++) {
+                const r = 0.90 + Math.random() * 0.15; // Banda stretta 0.90-1.05
                 const phi = Math.random() * Math.PI * 2;
                 const theta = Math.random() * Math.PI;
-                posArray[i*3] = r * Math.sin(theta) * Math.cos(phi);
-                posArray[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
-                posArray[i*3+2] = r * Math.cos(theta);
+                nebulaPos[i*3] = r * Math.sin(theta) * Math.cos(phi);
+                nebulaPos[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
+                nebulaPos[i*3+2] = r * Math.cos(theta);
             }
-            partGeom.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-            const partMat = new THREE.PointsMaterial({ 
-                color: 0xff0000, 
-                size: 0.015, 
+            nebulaGeom.setAttribute('position', new THREE.BufferAttribute(nebulaPos, 3));
+            const nebulaMat = new THREE.PointsMaterial({ 
+                color: 0xff1e1e, 
+                size: 0.006, 
                 transparent: true, 
-                opacity: 0.8,
+                opacity: 0.5,
                 blending: THREE.AdditiveBlending 
             });
-            window.orbParticles = new THREE.Points(partGeom, partMat);
-            scene.add(window.orbParticles);
+            window.nebulaParticles = new THREE.Points(nebulaGeom, nebulaMat);
+            scene.add(window.nebulaParticles);
 
-            // 4. Rings
-            const ringGeom = new THREE.RingGeometry(0.95, 0.97, 64);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
-            window.ring1 = new THREE.Mesh(ringGeom, ringMat);
-            window.ring2 = new THREE.Mesh(ringGeom, ringMat);
-            window.ring1.rotation.x = Math.PI / 2;
-            scene.add(window.ring1);
-            scene.add(window.ring2);
+            // 4. OUTER RING PUNTI
+            const ringPointCount = 80;
+            const ringPos = new Float32Array(ringPointCount * 3);
+            for(let i=0; i<ringPointCount; i++) {
+                const angle = (i / ringPointCount) * Math.PI * 2;
+                const r = 1.1;
+                ringPos[i*3] = r * Math.cos(angle);
+                ringPos[i*3+1] = r * Math.sin(angle);
+                ringPos[i*3+2] = 0;
+            }
+            const ringGeom = new THREE.BufferGeometry();
+            ringGeom.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
+            const ringMat = new THREE.PointsMaterial({
+                color: 0xff1e1e,
+                size: 0.015,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+            window.outerRingPoints = new THREE.Points(ringGeom, ringMat);
+            scene.add(window.outerRingPoints);
         }
 
         function animate(time) {
@@ -465,6 +487,7 @@
             const rgb = getComputedStyle(document.documentElement).getPropertyValue('--orb-color').trim() || "255, 30, 30";
             const color = new THREE.Color(`rgb(${rgb})`);
 
+            // Audio Analysis Ultra-Sensitive
             let audioLevel = 0;
             if (dataArray) {
                 analyser.getByteFrequencyData(dataArray);
@@ -473,46 +496,57 @@
                 audioLevel = (sum / (64 * 255)) * 1.5;
             }
 
-            // Deformations
+            // --- ANIMAZIONE REATTIVA ---
+            // Se audioLevel è molto basso, l'orb è quasi immobile (idle cinematico)
+            const isSpeaking = audioLevel > 0.05;
+            const moveFactor = isSpeaking ? audioLevel * 2.0 : 0.02; // Quasi fermo se non si parla
+            const speedFactor = isSpeaking ? 4.0 : 0.5; // Molto lento se non si parla
+            
+            // 1. Deformazione Core (Triple Sin Organico)
             const pos = mainOrb.geometry.attributes.position;
             for (let i = 0; i < pos.count; i++) {
                 const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
                 const ox = originalPositions[ix], oy = originalPositions[iy], oz = originalPositions[iz];
                 const vec = new THREE.Vector3(ox, oy, oz).normalize();
-                const noise = Math.sin(t * 4 + ox * 2 + oy * 3) * 0.05;
-                const d = 0.7 + noise + (audioLevel * (Math.random() * 0.2));
+                
+                // Triple sin deformation
+                const deform = (Math.sin(t * 1.3 + ox * 2.1) + Math.sin(t * 0.7 + oy * 1.8) + Math.sin(t * 1.9 + oz * 2.4)) / 3.0;
+                const d = 0.65 + deform * 0.06;
+                
                 pos.array[ix] = vec.x * d;
                 pos.array[iy] = vec.y * d;
                 pos.array[iz] = vec.z * d;
             }
             pos.needsUpdate = true;
 
-            const sPos = window.orbShell.geometry.attributes.position;
-            for (let i = 0; i < sPos.count; i++) {
-                const ix = i * 3;
-                const ox = window.shellOrigPos[ix], oy = window.shellOrigPos[ix+1], oz = window.shellOrigPos[ix+2];
-                const vec = new THREE.Vector3(ox, oy, oz).normalize();
-                const spike = (orbState !== 'idle') ? audioLevel * (i % 5 === 0 ? 0.4 : 0.1) : 0;
-                const d = 0.85 + Math.sin(t * 5 + i) * 0.02 + spike;
-                sPos.array[ix] = vec.x * d;
-                sPos.array[ix+1] = vec.y * d;
-                sPos.array[ix+2] = vec.z * d;
+            // 2. Glow Spheres (Scaling reattivo, NO deformazione)
+            if (window.glowSpheres) {
+                window.glowSpheres.forEach(layer => {
+                    const scale = 1.0 + audioLevel * 0.15;
+                    layer.mesh.scale.setScalar(scale);
+                    layer.mesh.material.color = color;
+                });
             }
-            sPos.needsUpdate = true;
 
-            // Rotations
-            window.orbParticles.rotation.y += 0.002 + audioLevel * 0.05;
-            window.orbParticles.scale.setScalar(1.0 + audioLevel * 0.5);
-            window.orbParticles.material.opacity = 0.3 + audioLevel * 0.7;
-            window.ring1.rotation.y += 0.01 + audioLevel * 0.1;
-            window.ring2.rotation.x += 0.005 + audioLevel * 0.1;
-            mainOrb.rotation.y -= 0.002;
+            // 3. Nebula Particles
+            if (window.nebulaParticles) {
+                window.nebulaParticles.rotation.y += 0.002 + (isSpeaking ? audioLevel * 0.03 : 0);
+                window.nebulaParticles.rotation.z += 0.001;
+                window.nebulaParticles.material.opacity = isSpeaking ? (0.3 + audioLevel * 0.4) : 0.25;
+                window.nebulaParticles.material.color = color;
+            }
+
+            // 4. Outer Ring Points
+            if (window.outerRingPoints) {
+                window.outerRingPoints.rotation.z -= 0.005;
+                window.outerRingPoints.material.color = color;
+            }
             
             mainOrb.material.color = color;
-            window.orbShell.material.color = color;
-            window.orbParticles.material.color = color;
             
-            const scale = 1.0 + Math.sin(t * 10) * 0.01 + audioLevel * 0.2;
+            // Scaling globale "battito"
+            const pulse = isSpeaking ? (Math.sin(t * 10) * 0.01 + audioLevel * 0.05) : (Math.sin(t * 2) * 0.005);
+            const scale = 1.0 + pulse;
             scene.scale.setScalar(scale);
 
             renderer.render(scene, camera);
