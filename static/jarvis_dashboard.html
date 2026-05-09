@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MAYA | Neural Interface</title>
+    <link rel="icon" type="image/png" href="/static/maya_logo_no_sfondo.png">
     
     <!-- Three.js r128 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -83,14 +84,14 @@
         }
 
         #maya-orb-container.corner {
-            top: 40px; left: 40px;
+            top: 24px; left: 24px;
             transform: translate(0, 0);
-            width: 120px; height: 120px;
+            width: 80px; height: 80px;
         }
 
         #orb-branding {
-            position: absolute;
-            top: 50%; left: 50%;
+            position: fixed;
+            top: 45%; left: 50%;
             transform: translate(-50%, -50%);
             font-family: 'Syncopate', sans-serif;
             font-size: 14px;
@@ -103,12 +104,18 @@
             opacity: 0.8;
             display: block;
             text-indent: 12px; /* Bilancia l'ultimo letter-spacing */
+            transition: var(--transition);
         }
 
         body.content-open #orb-branding {
+            top: 108px;
+            left: 0;
+            width: 128px;
+            transform: translate(0, 0);
             font-size: 9px;
-            letter-spacing: 6px;
-            text-indent: 6px;
+            letter-spacing: 4px;
+            text-indent: 4px;
+            opacity: 0.4;
             display: block;
         }
 
@@ -164,7 +171,10 @@
             backdrop-filter: blur(20px);
         }
 
-        #content-area.open { right: 0; }
+        #content-area.open { 
+            right: 0; 
+            padding: 48px 48px 48px 56px;
+        }
 
         .panel { display: none; height: 100%; flex-direction: column; gap: 30px; }
         .panel.active { display: flex; animation: fadeIn 0.5s ease forwards; }
@@ -181,8 +191,54 @@
         #panel-browser iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: white; }
 
         #panel-news .news-list { display: flex; flex-direction: column; gap: 20px; }
-        .news-item { padding: 20px; border: var(--glass-border); border-radius: 12px; cursor: pointer; transition: 0.3s; }
-        .news-item:hover { background: rgba(255,255,255,0.05); }
+        .news-item { 
+            padding: 24px 28px; 
+            border: 1px solid rgba(255,255,255,0.06); 
+            border-radius: 16px; 
+            background: rgba(255,255,255,0.02);
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+        }
+        .news-item:hover { 
+            background: rgba(255,255,255,0.04); 
+            border-color: rgba(255,30,30,0.2);
+            transform: translateX(4px);
+        }
+        .news-item .news-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+        .news-item .news-source { opacity: 0.3; }
+        .news-item .news-date { opacity: 0.2; }
+        .news-item .news-title {
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 8px;
+            color: rgba(255,255,255,0.9);
+        }
+        .news-item .news-summary {
+            font-size: 12px;
+            opacity: 0.4;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .news-item .news-more {
+            font-size: 10px;
+            margin-top: 12px;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .news-item:hover .news-more {
+            opacity: 0.5;
+        }
 
         #panel-dashboard .dash-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
         .stat-card { padding: 30px; border: var(--glass-border); border-radius: 16px; background: rgba(255,255,255,0.02); }
@@ -192,34 +248,63 @@
         /* --- CMD INPUT --- */
         #cmd-container {
             position: fixed;
-            bottom: 40px; left: 50%;
+            bottom: 50px;
+            left: 50%;
             transform: translateX(-50%);
-            width: 380px;
+            width: 90%;
+            max-width: 600px;
             z-index: 110;
             transition: var(--transition);
+            display: flex;
+            justify-content: center;
         }
 
         #cmd-container.corner {
-            bottom: auto; top: 38px; left: 130px;
+            bottom: auto;
+            top: 120px;
+            left: 12px;
             transform: translateX(0);
-            width: 350px;
+            width: 104px;
+            justify-content: flex-start;
         }
 
         #cmd-input {
             width: 100%;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 50px;
-            padding: 15px 25px;
+            padding: 18px 30px;
             color: white;
             font-family: 'Sora', sans-serif;
             font-weight: 300;
-            font-size: 14px;
+            font-size: 16px;
             outline: none;
-            backdrop-filter: blur(10px);
-            transition: 0.3s;
+            backdrop-filter: blur(15px);
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
         }
-        #cmd-input:focus { border-color: rgba(255, 255, 255, 0.15); box-shadow: none; }
+
+        #cmd-input:focus {
+            border-color: rgba(255, 30, 30, 0.4);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 20px rgba(255, 30, 30, 0.15);
+        }
+
+        #cmd-container.corner #cmd-input {
+            text-align: left;
+            padding: 8px 12px;
+            font-size: 11px;
+            border-radius: 20px;
+            opacity: 0.5;
+        }
+
+        #cmd-input:focus {
+            border-color: rgba(255, 30, 30, 0.4);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 20px rgba(255, 30, 30, 0.15);
+            opacity: 1 !important;
+        }
 
         /* --- LOG STRIP --- */
         #log-strip {
@@ -248,8 +333,8 @@
     
     <div id="maya-orb-container" onclick="handleOrbClick()">
         <canvas id="orb-canvas"></canvas>
-        <div id="orb-branding">MAYA</div>
     </div>
+    <div id="orb-branding">MAYA</div>
 
     <div id="idle-clock">
         <div class="time" id="clock-time">00:00</div>
@@ -261,6 +346,7 @@
     </div>
 
     <div id="content-area">
+        <div style="height:0"></div>
         <div id="panel-weather" class="panel">
             <h2 id="weather-city">Località</h2>
             <div class="temp-main"><span id="weather-temp">--</span>°</div>
@@ -277,6 +363,11 @@
         </div>
 
         <div id="panel-news" class="panel">
+            <div style="font-size:10px; letter-spacing:0.4em; opacity:0.2; 
+            text-transform:uppercase; margin-bottom:32px; 
+            padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.05)">
+              FEED NOTIZIE — AGGIORNAMENTO IN TEMPO REALE
+            </div>
             <h2>Ultime Notizie</h2>
             <div class="news-list" id="news-list"></div>
         </div>
@@ -638,12 +729,14 @@
             const orb = document.getElementById('maya-orb-container');
             const content = document.getElementById('content-area');
             const cmd = document.getElementById('cmd-container');
+            const cmdInput = document.getElementById('cmd-input');
             
             if(layout === 'orb') {
                 orb.classList.remove('corner');
                 content.classList.remove('open');
                 cmd.classList.remove('corner');
                 document.body.classList.remove('content-open');
+                cmdInput.placeholder = "Comando neurale...";
                 // Update Three.js size after CSS transition
                 setTimeout(handleResize, 600);
                 return;
@@ -653,6 +746,7 @@
             content.classList.add('open');
             cmd.classList.add('corner');
             document.body.classList.add('content-open');
+            cmdInput.placeholder = "comando...";
             // Update Three.js size after CSS transition
             setTimeout(handleResize, 600);
 
@@ -698,9 +792,13 @@
             const list = document.getElementById('news-list');
             list.innerHTML = articles.map(a => `
                 <div class="news-item" onclick="setLayout('browser', {url: '${a.link}'})">
-                    <div style="font-size:10px; color:var(--orb-color); margin-bottom:5px;">${a.source || 'MAYA FEED'}</div>
-                    <div style="font-weight:bold;">${a.title}</div>
-                    <div style="font-size:13px; opacity:0.6; margin-top:8px;">${a.summary}</div>
+                    <div class="news-meta">
+                        <span class="news-source">${a.source || 'MAYA FEED'}</span>
+                        <span class="news-date">${new Date().toLocaleDateString('it-IT')}</span>
+                    </div>
+                    <div class="news-title">${a.title}</div>
+                    <div class="news-summary">${a.summary}</div>
+                    <div class="news-more">Leggi →</div>
                 </div>
             `).join('');
         }

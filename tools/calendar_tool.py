@@ -28,7 +28,6 @@ class CalendarTool:
         os.makedirs("data", exist_ok=True)
         if not os.path.exists(CALENDAR_FILE):
             self._save([])
-        print(f"[CALENDAR] File locale: {CALENDAR_FILE}")
         self._init_google_service()
 
     def _init_google_service(self):

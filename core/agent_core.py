@@ -160,9 +160,7 @@ class AgentCore:
 
     async def initialize(self):
         """Inizializza tutti i componenti."""
-        print("[AGENT] Inizializzazione tool manager...")
         self.tool_manager.initialize()
-        print("[AGENT] Caricamento memoria conversazioni...")
         self.memory.load()
         print("[AGENT] AgentCore pronto.\n")
 
@@ -195,6 +193,21 @@ class AgentCore:
             return "CHITCHAT"
             
         try:
+            # PRIORITÀ GROQ PER ROUTING
+            if os.getenv("GROQ_API_KEY"):
+                messages = [
+                    {"role": "system", "content": ROUTER_PROMPT},
+                    {"role": "user", "content": user_input}
+                ]
+                response_text = await self._call_groq(messages, json_mode=False)
+                if response_text:
+                    intent = response_text.strip().upper()
+                    for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
+                        if category in intent:
+                            print(f"[ROUTER] Intent rilevato (Groq): {category}")
+                            return category
+
+            # FALLBACK OLLAMA
             client = ollama.AsyncClient()
             response = await client.generate(
                 model=MODELS["router"],
@@ -241,6 +254,39 @@ class AgentCore:
             result = self._fallback_parse(text)
             self._last_layout = {"type": "orb", "params": {}}
             return result
+
+    async def _call_groq(self, messages, json_mode=True):
+        """Chiamata primaria a Groq."""
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            return None
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        
+        # Scegli il modello in base al contenuto dei messaggi (se router o meno)
+        # Se json_mode è False, probabilmente siamo nel routing
+        model_env = "GROQ_ROUTER_MODEL" if not json_mode else "GROQ_MODEL"
+        default_model = "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
+        model = os.getenv(model_env, default_model)
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            print(f"[GROQ] Errore: {e}")
+            return None
 
     async def _call_groq_fallback(self, messages: list) -> dict:
         """Chiamata di fallback a Groq se Ollama non è disponibile."""
@@ -305,6 +351,13 @@ class AgentCore:
                 {"role": "user", "content": prompt}
             ]
 
+            # PRIORITÀ GROQ
+            if os.getenv("GROQ_API_KEY"):
+                response_text = await self._call_groq(messages, json_mode=True)
+                if response_text:
+                    return self._clean_json(response_text)
+
+            # FALLBACK OLLAMA
             try:
                 client = ollama.AsyncClient()
                 response = await client.generate(
@@ -436,24 +489,31 @@ class AgentCore:
 
             # 2b. Chiedi all'LLM cosa fare
             try:
-                client = ollama.AsyncClient()
-                
-                # Streaming della risposta dell'LLM
                 full_response_text = ""
-                # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
-                # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
-                # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
                 
-                response = await client.chat(
-                    model=model_name,
-                    messages=history,
-                    format="json",
-                    options={"temperature": 0.1},
-                    keep_alive="10m",
-                    stream=False
-                )
+                # PRIORITÀ GROQ
+                if os.getenv("GROQ_API_KEY"):
+                    full_response_text = await self._call_groq(history, json_mode=True)
                 
-                full_response_text = response["message"]["content"]
+                # FALLBACK OLLAMA
+                if not full_response_text:
+                    client = ollama.AsyncClient()
+                    
+                    # Streaming della risposta dell'LLM
+                    # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
+                    # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
+                    # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
+                    
+                    response = await client.chat(
+                        model=model_name,
+                        messages=history,
+                        format="json",
+                        options={"temperature": 0.1},
+                        keep_alive="10m",
+                        stream=False
+                    )
+                    full_response_text = response["message"]["content"]
+                
                 plan = self._clean_json(full_response_text)
                 
                 actions = plan.get("actions", [])
