@@ -177,21 +177,70 @@ class AgentCore:
     async def _route_intent(self, user_input: str) -> str:
         """Determina l'intent dell'utente con logica ibrida: Hard Routing + LLM."""
         lower = user_input.lower()
+        words = lower.split()
+        word_count = len(words)
         
-        # 1. HARD ROUTING: Se ci sono parole chiave critiche, usa direttamente i tool
-        tool_keywords = [
-            "bitcoin", "btc", "eth", "cripto", "s&p", "sp500", "nasdaq", 
-            "meteo", "news", "notizie", "borsa", "azioni", "prezzo", "valore",
-            "luce", "chiudi", "apri", "wikipedia", "cerca", "search"
+        # --- 0. ECCEZIONI (MAI HARD-ROUTE) ---
+        # Se contiene citazioni, domande di spiegazione o è troppo lunga
+        never_hard_route = [
+            "parla di", "spiegami", "cosa pensi", "perché", "come mai", "cosa significa"
         ]
-        if any(k in lower for k in tool_keywords):
-            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC")
+        if (any(x in lower for x in never_hard_route) or 
+            '"' in user_input or 
+            "'" in user_input or
+            word_count > 12):
+            return await self._llm_routing(user_input)
+
+        # --- 1. HARD ROUTING: DOMOTIC ---
+        # Azione hardware esplicita: VERBO + OGGETTO
+        domotic_verbs = ["accendi", "spegni", "apri", "chiudi"]
+        domotic_objects = ["luce", "led", "relè", "servo", "tapparella"]
+        if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Hardware)")
             return "DOMOTIC"
 
-        # 2. FAST PATH: se l'input è brevissimo e non è un tool, usa CHITCHAT
-        if len(user_input.split()) <= 2:
+        # Finanza: PREZZO/QUANTO VALE + ASSET
+        crypto_verbs = ["prezzo", "quanto vale", "quotazione"]
+        crypto_assets = ["bitcoin", "btc", "eth", "ethereum", "crypto", "azioni", "sp500", "nasdaq"]
+        if any(v in lower for v in crypto_verbs) and any(a in lower for a in crypto_assets):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Finance)")
+            return "DOMOTIC"
+
+        # Meteo e News (già filtrati per lunghezza > 12 sopra)
+        if any(x in lower for x in ["meteo", "che tempo fa", "temperatura"]):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Meteo)")
+            return "DOMOTIC"
+        
+        if any(x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (News)")
+            return "DOMOTIC"
+
+        # Spotify: VERBO + OGGETTO
+        spotify_verbs = ["metti", "riproduci", "play", "pausa", "prossimo brano", "volume"]
+        spotify_objects = ["musica", "spotify", "canzone", "brano"]
+        if any(v in lower for v in spotify_verbs) and any(o in lower for o in spotify_objects):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Spotify)")
+            return "DOMOTIC"
+
+        # --- 2. HARD ROUTING: CHITCHAT ---
+        # Saluto puro o messaggio brevissimo senza keyword tool
+        greetings = ["ciao", "hey", "salve", "buon"]
+        is_greeting = any(lower.startswith(g) for g in greetings)
+        
+        # Se è un saluto e non ci sono altre keyword (finanza/meteo/ecc già controllate sopra)
+        if is_greeting and word_count <= 4:
+            print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Saluto)")
             return "CHITCHAT"
-            
+        
+        if word_count <= 2:
+            print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Short)")
+            return "CHITCHAT"
+
+        # --- 3. FALLBACK LLM ---
+        return await self._llm_routing(user_input)
+
+    async def _llm_routing(self, user_input: str) -> str:
+        """Routing tramite LLM (Groq -> Ollama)."""
         try:
             # PRIORITÀ GROQ PER ROUTING
             if os.getenv("GROQ_API_KEY"):
@@ -216,19 +265,18 @@ class AgentCore:
                 stream=False,
                 options={
                     "temperature": 0.0,
-                    "num_predict": 10,  # Risposta brevissima
+                    "num_predict": 10,
                 },
-                keep_alive="10m"  # Mantieni in VRAM per 10 minuti
+                keep_alive="10m"
             )
             intent = response.get("response", "CHITCHAT").strip().upper()
-            # Pulizia output: cerca parole chiave nelle risposte discorsive
             for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
                 if category in intent:
                     print(f"[ROUTER] Intent rilevato: {category}")
                     return category
             return "CHITCHAT"
         except Exception as e:
-            print(f"[ROUTER] Errore routing: {e}")
+            print(f"[ROUTER] Errore routing LLM: {e}")
             return "CHITCHAT"
 
     def _clean_json(self, text: str) -> dict:
@@ -438,6 +486,39 @@ class AgentCore:
             result = await self.tool_manager.execute(action)
             results.append({"tool": tool_name, "result": result})
             print(f"[EXECUTOR] Risultato: {result}")
+
+            # --- BROADCAST AUTOMATICO PER DASHBOARD ---
+            if self.socket_manager:
+                # Mappa i tool ai messaggi websocket
+                ws_map = {
+                    "weather": "weather",
+                    "spotify": "spotify",
+                    "calendar": "calendar",
+                    "trading": "trading",
+                    "sys_monitor": "stats"
+                }
+                
+                if tool_name in ws_map and result.get("status") == "ok":
+                    msg_type = ws_map[tool_name]
+                    # Alcuni tool mettono i dati in 'data', altri no
+                    payload = {"type": msg_type}
+                    
+                    if "data" in result:
+                        if isinstance(result["data"], dict):
+                            payload.update(result["data"])
+                        else:
+                            payload["data"] = result["data"]
+                    else:
+                        # Fallback: metti tutto il risultato nel payload
+                        payload.update(result)
+                    
+                    # Rimuovi campi ridondanti
+                    payload.pop("status", None)
+                    payload.pop("message", None)
+                    
+                    print(f"[EXECUTOR] Broadcasting {msg_type} for dashboard")
+                    await self.socket_manager.broadcast(payload)
+
         return results
 
     # ── FASE 3: VALIDATOR ────────────────────────────────
@@ -470,6 +551,38 @@ class AgentCore:
         
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
         intent = await self._route_intent(user_input)
+
+        # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
+        if intent == "CHITCHAT":
+            print(f"[PIPELINE] Single-shot CHITCHAT per: '{user_input}'")
+            messages = [
+                {"role": "system", "content": SPECIALIST_PROMPTS["CHITCHAT"]},
+                {"role": "user", "content": user_input}
+            ]
+            
+            res_text = None
+            if os.getenv("GROQ_API_KEY"):
+                res_text = await self._call_groq(messages, json_mode=True)
+            
+            if not res_text:
+                client = ollama.AsyncClient()
+                response = await client.chat(
+                    model=MODELS["chitchat"],
+                    messages=messages,
+                    format="json",
+                    options={"temperature": 0.7},
+                    keep_alive="10m"
+                )
+                res_text = response["message"]["content"]
+            
+            result = self._clean_json(res_text)
+            final_reply = result.get("reply", "")
+            if final_reply:
+                for token in re.findall(r'.*?\s|.*$', final_reply):
+                    yield token
+                await self.memory.add_turn("jarvis", final_reply)
+                return
+
         context = await self.memory.get_context(query=user_input, top_k=5)
         
         # Inizializziamo la memoria di lavoro per il loop
@@ -558,6 +671,26 @@ class AgentCore:
 
                     print(f"[ReAct] Osservazione: {observation.strip()}")
                     
+                    # --- EARLY EXIT CHECK ---
+                    # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
+                    # consistente, usciamo senza fare lo Step 2 (riformulazione).
+                    is_error = any(res.get("result", {}).get("status") == "error" for res in results)
+                    is_short_q_reply = "?" in user_input and len(reply) < 30
+                    
+                    critical_tools = ["none", "code_generator"]
+                    has_critical_tool = any(res["tool"] in critical_tools for res in results)
+                    
+                    if (not is_error and 
+                        len(actions) == 1 and 
+                        not has_critical_tool and 
+                        len(reply) > 15 and 
+                        not is_short_q_reply):
+                        print(f"[ReAct] Early Exit: risposta soddisfacente dopo Step 1.")
+                        final_reply = reply
+                        for token in re.findall(r'.*?\s|.*$', final_reply):
+                            yield token
+                        break
+
                     # Aggiungi azione e osservazione alla storia
                     history.append({"role": "assistant", "content": full_response_text})
                     history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale."})

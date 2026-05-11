@@ -561,7 +561,7 @@ async def broadcast_state():
     models_status = await get_models_status()
     ollama_online = any(m.get("online", False) for m in models_status.values())
     
-    _debug_reset_client = False
+    _debug_reset_client = os.environ.get("MAYA_DEBUG_RESET_CLIENT", "").strip().lower() in ("1", "true", "yes")
 
     state_payload = {
         "type": "state",

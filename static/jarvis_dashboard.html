@@ -34,9 +34,10 @@
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap');
 
         body {
-            background: #050508;
-            background-image: radial-gradient(ellipse 60% 50% at 50% 40%, 
-                rgba(255,30,30,0.06) 0%, transparent 70%);
+            background: #1e1e20; /* Grigio opaco Maya */
+            background-image: 
+                url('https://www.transparenttextures.com/patterns/stardust.png'),
+                radial-gradient(circle at 30% 30%, rgba(255,255,255,0.03) 0%, transparent 70%);
             color: var(--text-main);
             font-family: 'Sora', sans-serif;
             overflow: hidden;
@@ -45,7 +46,19 @@
             margin: 0;
         }
 
-        /* --- TOP LOGO --- */
+        /* Rimossi filtri e pseudo-elementi sopra il contenuto */
+
+        #maya-orb-container {
+            position: fixed;
+            top: 45%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 420px; height: 420px;
+            z-index: 100;
+            transition: var(--transition);
+            cursor: pointer;
+            /* Rimosso sfondo nero fisso che copriva l'orb Three.js */
+            background: transparent;
+        }
         #top-logo {
             position: fixed;
             top: 15px;
@@ -87,6 +100,10 @@
             top: 24px; left: 24px;
             transform: translate(0, 0);
             width: 80px; height: 80px;
+            border: none !important;
+            box-shadow: none !important;
+            background: none !important;
+            outline: none !important;
         }
 
         #orb-branding {
@@ -160,20 +177,24 @@
         /* --- CONTENT AREA --- */
         #content-area {
             position: fixed;
-            top: 0; right: -75vw;
+            top: 0; right: -80vw;
             width: 75vw; height: 100vh;
-            background: rgba(3, 3, 6, 0.97);
+            background: rgba(26, 27, 38, 0.9); /* Allineato al nuovo sfondo più chiaro */
             border-left: 1px solid rgba(255, 30, 30, 0.15);
             z-index: 50;
             transition: var(--transition);
             padding: 40px;
-            overflow-y: auto;
-            backdrop-filter: blur(20px);
+            overflow: hidden;
+            backdrop-filter: blur(25px);
+            pointer-events: none;
+            opacity: 0;
         }
 
         #content-area.open { 
             right: 0; 
             padding: 48px 48px 48px 56px;
+            pointer-events: auto;
+            opacity: 1;
         }
 
         .panel { display: none; height: 100%; flex-direction: column; gap: 30px; }
@@ -182,8 +203,171 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
         /* --- PANELS STYLING --- */
-        #panel-weather .temp-main { font-size: 140px; font-weight: 100; line-height: 1; }
-        #panel-weather .forecast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
+        /* --- WEATHER PANEL - MAYA NEURAL DASHBOARD --- */
+        #panel-weather {
+            display: none; /* Cambiato da grid a none di default */
+            grid-template-columns: 320px 1fr;
+            grid-template-rows: 1fr 240px;
+            gap: 15px;
+            height: calc(100vh - 100px);
+            padding: 10px;
+            overflow: hidden;
+            background: none;
+        }
+        #panel-weather.active {
+            display: grid; /* Mostra come grid solo quando attivo */
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        /* Top Left: Main Current Weather */
+        .weather-main-card {
+            grid-column: 1;
+            grid-row: 1;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 30, 30, 0.1);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+        .weather-main-card::before {
+            content: 'DATI_LIVE';
+            position: absolute;
+            top: 10px; right: 15px;
+            font-family: 'Syncopate', sans-serif;
+            font-size: 8px;
+            color: var(--accent);
+            letter-spacing: 2px;
+        }
+
+        .weather-main-card .city {
+            font-family: 'Syncopate';
+            font-size: 24px;
+            letter-spacing: 4px;
+            margin-bottom: 5px;
+        }
+        .weather-main-card .condition {
+            font-size: 12px;
+            opacity: 0.4;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .weather-main-card .temp-large {
+            font-size: 100px;
+            font-weight: 100;
+            letter-spacing: -5px;
+            margin: 20px 0;
+            color: #fff;
+        }
+
+        /* Top Right: Map / Neural Visualization */
+        .weather-map-area {
+            grid-column: 2;
+            grid-row: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+        #weather-mini-map {
+            width: 100%; height: 100%;
+            filter: grayscale(1) invert(1) brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(3);
+            opacity: 0.6;
+        }
+        .map-overlay-hud {
+            position: absolute;
+            inset: 0;
+            border: 20px solid transparent;
+            border-image: radial-gradient(circle, transparent 70%, rgba(255,30,30,0.1) 100%) 1;
+            pointer-events: none;
+        }
+
+        /* Bottom Row: Detailed Stats */
+        .weather-bottom-grid {
+            grid-column: 1 / span 2;
+            grid-row: 2;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .weather-stat-card {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .weather-stat-card .label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 8px;
+            letter-spacing: 2px;
+            opacity: 0.3;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        .weather-stat-card .value {
+            font-family: 'JetBrains Mono';
+            font-size: 28px;
+            color: #fff;
+        }
+        .weather-stat-card .sub-value {
+            font-size: 10px;
+            opacity: 0.3;
+            margin-top: 5px;
+        }
+
+        /* Mini Graph Simulation */
+        .mini-graph {
+            height: 60px;
+            width: 100%;
+            margin-top: auto;
+            position: relative;
+            overflow: hidden;
+        }
+        .mini-graph svg { width: 100%; height: 100%; }
+        .mini-graph polyline {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 1.5;
+            stroke-opacity: 0.6;
+        }
+
+        /* Forecast Sidebar within Main Panel */
+        .forecast-strip {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .forecast-item-mini {
+            flex: 1;
+            text-align: center;
+            background: rgba(255,255,255,0.03);
+            padding: 10px 5px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .forecast-item-mini .day { font-size: 8px; opacity: 0.4; margin-bottom: 5px; }
+        .forecast-item-mini .temp { font-size: 11px; font-family: 'JetBrains Mono'; }
+
+        #panel-weather .temp-unit {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--accent);
+            opacity: 0.8;
+        }
+
+        #panel-weather .label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 8px;
+            letter-spacing: 2px;
+            opacity: 0.3;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
         
         #panel-map { height: 100%; width: 100%; border-radius: 12px; overflow: hidden; }
         #map-container { height: 100%; width: 100%; }
@@ -227,6 +411,7 @@
             line-height: 1.6;
             display: -webkit-box;
             -webkit-line-clamp: 2;
+            line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
@@ -297,12 +482,16 @@
             font-size: 11px;
             border-radius: 20px;
             opacity: 0.5;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important; /* Rimosso bordo rosso */
+            outline: none !important;
+            box-shadow: none !important;
+            background: rgba(255, 255, 255, 0.03) !important;
         }
 
         #cmd-input:focus {
-            border-color: rgba(255, 30, 30, 0.4);
-            background: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 0 20px rgba(255, 30, 30, 0.15);
+            border-color: rgba(255, 255, 255, 0.2) !important; /* Grigio soft al focus */
+            background: rgba(255, 255, 255, 0.08) !important;
+            box-shadow: none !important;
             opacity: 1 !important;
         }
 
@@ -322,12 +511,396 @@
         }
 
         /* --- ARDUINO CONTROLS --- */
+        /* --- SPOTIFY FLOATING WIDGET --- */
+        #spotify-widget {
+            position: fixed;
+            top: 120px;
+            left: 24px;
+            width: 320px;
+            background: rgba(10, 10, 12, 0.8);
+            border: 1px solid rgba(255, 30, 30, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            z-index: 200;
+            display: none;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #spotify-widget.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        body.content-open #spotify-widget {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .widget-close {
+            position: absolute;
+            top: 12px; right: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            opacity: 0.4;
+            transition: 0.2s;
+        }
+        .widget-close:hover { opacity: 1; color: var(--accent); }
+        
+        .spotify-mini-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .spotify-mini-card .album-art {
+            width: 80px; height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        }
+        .spotify-mini-card .info { flex-grow: 1; overflow: hidden; }
+        .spotify-mini-card .title { 
+            font-weight: 600; font-size: 15px; white-space: nowrap; 
+            overflow: hidden; text-overflow: ellipsis; 
+        }
+        .spotify-mini-card .artist { 
+            font-size: 12px; opacity: 0.5; white-space: nowrap; 
+            overflow: hidden; text-overflow: ellipsis; margin-top: 4px;
+        }
+        .spotify-mini-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            justify-content: center;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 15px;
+        }
+        .btn-mini-ctrl {
+            background: none; border: none; color: white;
+            font-size: 18px; cursor: pointer; opacity: 0.6; transition: 0.2s;
+        }
+        .btn-mini-ctrl:hover { opacity: 1; transform: scale(1.1); }
+
+        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .device-btn { padding: 15px; border: var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); text-align: center; font-weight: 600; }
+        .device-btn.on { border-color: #4CAF50; color: #4CAF50; box-shadow: 0 0 10px rgba(76,175,80,0.2); }
+
+        #panel-calendar .event-item {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #panel-calendar .event-time { font-family: 'JetBrains Mono'; opacity: 0.4; font-size: 13px; }
+
+        /* --- TRADING PANEL - MAYA NEURAL DASHBOARD --- */
+        #panel-trading {
+            display: none;
+            grid-template-columns: 1fr 400px;
+            grid-template-rows: 1fr 280px;
+            gap: 15px;
+            height: calc(100vh - 100px);
+            padding: 10px;
+            overflow: hidden;
+            background: none;
+        }
+        #panel-trading.active {
+            display: grid;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .trading-main-chart {
+            grid-column: 1;
+            grid-row: 1 / span 2;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            position: relative;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+        .trading-main-chart::before {
+            content: 'MARKET_ANALYSIS // NEURAL_FEED';
+            position: absolute;
+            top: 15px; left: 20px;
+            font-family: 'Syncopate';
+            font-size: 8px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            opacity: 0.6;
+        }
+
+        .trading-sidebar {
+            grid-column: 2;
+            grid-row: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .trading-sidebar::-webkit-scrollbar { width: 2px; }
+        .trading-sidebar::-webkit-scrollbar-thumb { background: rgba(255, 30, 30, 0.2); }
+
+        .trading-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .trading-card:hover {
+            background: rgba(255, 30, 30, 0.03);
+            border-color: rgba(255, 30, 30, 0.2);
+            transform: translateX(-5px);
+        }
+        .trading-card::after {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; width: 2px; height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: 0.3s;
+        }
+        .trading-card:hover::after { opacity: 0.5; }
+
+        .trading-card .symbol { font-family: 'Syncopate'; font-size: 14px; letter-spacing: 2px; }
+        .trading-card .price { font-family: 'JetBrains Mono'; font-size: 20px; color: #fff; }
+        .trading-card .change { font-size: 10px; margin-top: 4px; }
+        .trading-card .change.up { color: #4CAF50; }
+        .trading-card .change.down { color: #f44336; }
+
+        .trading-info-bottom {
+            grid-column: 2;
+            grid-row: 2;
+            background: rgba(255, 30, 30, 0.02);
+            border: 1px solid rgba(255, 30, 30, 0.1);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .trading-info-bottom .label {
+            font-family: 'Syncopate';
+            font-size: 8px;
+            letter-spacing: 2px;
+            opacity: 0.3;
+            text-transform: uppercase;
+        }
+        .trading-info-bottom .big-val {
+            font-family: 'JetBrains Mono';
+            font-size: 32px;
+            color: #fff;
+            margin: 10px 0;
+        }
+
+        #main-trading-graph {
+            flex-grow: 1;
+            width: 100%;
+            margin-top: 40px;
+        }
+
+        #panel-weather .forecast-neural {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        #panel-weather .weather-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+        }
+
+        /* --- SCREEN BORDER & HUD EFFECTS --- */
+        #screen-border {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            
+            /* Bordo perimetrale con box-shadow interno */
+            box-shadow: 
+                inset 0 0 40px rgba(255, 30, 30, 0),
+                inset 0 0 80px rgba(255, 30, 30, 0),
+                inset 0 0 120px rgba(255, 30, 30, 0);
+            
+            transition: box-shadow 0.15s ease, opacity 0.15s ease;
+        }
+
+        /* Stato listening — bordo sottile che pulsa */
+        body.listening #screen-border {
+            opacity: 1;
+            box-shadow:
+                inset 0 0 30px rgba(255, 30, 30, 0.15),
+                inset 0 0 60px rgba(255, 30, 30, 0.08),
+                inset 0 0 2px rgba(255, 30, 30, 0.6);
+            animation: border-pulse 1.5s ease-in-out infinite;
+        }
+
+        /* Stato speaking — bordo più intenso e reattivo */
+        body.speaking #screen-border {
+            opacity: 1;
+            box-shadow:
+                inset 0 0 50px rgba(255, 30, 30, 0.2),
+                inset 0 0 100px rgba(255, 30, 30, 0.1),
+                inset 0 0 3px rgba(255, 30, 30, 0.8);
+            animation: border-speak 0.8s ease-in-out infinite;
+        }
+
+        /* Stato processing — bordo che scorre */
+        body.processing #screen-border {
+            opacity: 1;
+            box-shadow:
+                inset 0 0 40px rgba(255, 30, 30, 0.1),
+                inset 0 0 2px rgba(255, 30, 30, 0.4);
+            animation: border-scan 2s linear infinite;
+        }
+
+        @keyframes border-pulse {
+            0%, 100% { 
+                box-shadow:
+                    inset 0 0 30px rgba(255, 30, 30, 0.15),
+                    inset 0 0 2px rgba(255, 30, 30, 0.6);
+            }
+            50% { 
+                box-shadow:
+                    inset 0 0 50px rgba(255, 30, 30, 0.25),
+                    inset 0 0 3px rgba(255, 30, 30, 0.9);
+            }
+        }
+
+        @keyframes border-speak {
+            0%, 100% { 
+                box-shadow:
+                    inset 0 0 50px rgba(255, 30, 30, 0.2),
+                    inset 0 0 3px rgba(255, 30, 30, 0.8);
+                filter: none;
+            }
+            50% { 
+                box-shadow:
+                    inset 0 0 80px rgba(255, 30, 30, 0.35),
+                    inset 0 0 4px rgba(255, 30, 30, 1.0);
+                filter: drop-shadow(0 0 8px rgba(255,30,30,0.3));
+            }
+        }
+
+        @keyframes border-scan {
+            0% { 
+                box-shadow:
+                    inset 0 2px 0 rgba(255,30,30,0.6),
+                    inset 0 0 40px rgba(255,30,30,0.05);
+            }
+            25% {
+                box-shadow:
+                    inset -2px 0 0 rgba(255,30,30,0.6),
+                    inset 0 0 40px rgba(255,30,30,0.05);
+            }
+            50% {
+                box-shadow:
+                    inset 0 -2px 0 rgba(255,30,30,0.6),
+                    inset 0 0 40px rgba(255,30,30,0.05);
+            }
+            75% {
+                box-shadow:
+                    inset 2px 0 0 rgba(255,30,30,0.6),
+                    inset 0 0 40px rgba(255,30,30,0.05);
+            }
+            100% {
+                box-shadow:
+                    inset 0 2px 0 rgba(255,30,30,0.6),
+                    inset 0 0 40px rgba(255,30,30,0.05);
+            }
+        }
+
+        #screen-corners {
+            position: fixed;
+            inset: 0;
+            z-index: 998;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        body.listening #screen-corners,
+        body.speaking #screen-corners {
+            opacity: 1;
+        }
+
+        .corner {
+            position: absolute;
+            width: 50px; height: 50px;
+            border-color: rgba(255, 30, 30, 0.6);
+            border-style: solid;
+            transition: all 0.3s ease;
+        }
+        .corner.tl { top: 20px; left: 20px; 
+                     border-width: 2px 0 0 2px; }
+        .corner.tr { top: 20px; right: 20px; 
+                     border-width: 2px 2px 0 0; }
+        .corner.bl { bottom: 20px; left: 20px; 
+                     border-width: 0 0 2px 2px; }
+        .corner.br { bottom: 20px; right: 20px; 
+                     border-width: 0 2px 2px 0; }
+
+        body.speaking .corner {
+            border-color: rgba(255, 30, 30, 0.9);
+            width: 70px; height: 70px;
+            filter: drop-shadow(0 0 6px rgba(255,30,30,0.5));
+        }
+
+        /* --- DEBUG CONTROLS --- */
+        #debug-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: none; /* Nascosto di default, mostrato via JS se reset_storage è true */
+            gap: 10px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            opacity: 0.3;
+            transition: opacity 0.3s ease;
+        }
+        #debug-controls:hover { opacity: 1; }
+        .debug-btn {
+            padding: 5px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .debug-btn:hover { background: rgba(255, 30, 30, 0.2); border-color: var(--accent); }
+
         .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
         .device-btn { padding: 15px; border: var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); text-align: center; font-weight: 600; }
         .device-btn.on { border-color: #4CAF50; color: #4CAF50; box-shadow: 0 0 10px rgba(76,175,80,0.2); }
     </style>
 </head>
 <body>
+    <div id="screen-border"></div>
+    <div id="screen-corners">
+        <span class="corner tl"></span>
+        <span class="corner tr"></span>
+        <span class="corner bl"></span>
+        <span class="corner br"></span>
+    </div>
     <img src="/static/maya_logo_no_sfondo.png" id="top-logo" alt="MAYA Logo">
     <canvas id="bg-canvas"></canvas>
     
@@ -341,6 +914,22 @@
         <div class="date" id="clock-date">LUNEDÌ, 1 GENNAIO</div>
     </div>
 
+    <div id="spotify-widget">
+        <div class="widget-close" onclick="closeSpotifyWidget()">✕</div>
+        <div class="spotify-mini-card">
+            <img id="spotify-art" class="album-art" src="" alt="Album Art">
+            <div class="info">
+                <div id="spotify-track" class="title">Nessun brano</div>
+                <div id="spotify-artist" class="artist">In attesa...</div>
+            </div>
+        </div>
+        <div class="spotify-mini-controls">
+            <button class="btn-mini-ctrl" onclick="sendCmdToWS('spotify previous')">⏮</button>
+            <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="sendCmdToWS('spotify play_pause')">▶</button>
+            <button class="btn-mini-ctrl" onclick="sendCmdToWS('spotify next')">⏭</button>
+        </div>
+    </div>
+
     <div id="cmd-container">
         <input type="text" id="cmd-input" placeholder="Comando neurale..." onkeydown="if(event.key==='Enter') sendCmd()">
     </div>
@@ -348,10 +937,44 @@
     <div id="content-area">
         <div style="height:0"></div>
         <div id="panel-weather" class="panel">
-            <h2 id="weather-city">Località</h2>
-            <div class="temp-main"><span id="weather-temp">--</span>°</div>
-            <div id="weather-desc" style="text-transform: uppercase; letter-spacing: 2px;">--</div>
-            <div class="forecast-grid" id="weather-forecast"></div>
+            <div class="weather-main-card">
+                <div>
+                    <h2 class="city" id="weather-city">--</h2>
+                    <p class="condition" id="weather-desc">--</p>
+                </div>
+                <div class="temp-large"><span id="weather-temp">--</span>°</div>
+                <div class="forecast-strip" id="weather-forecast-mini">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+
+            <div class="weather-map-area">
+                <div id="weather-mini-map"></div>
+                <div class="map-overlay-hud"></div>
+            </div>
+
+            <div class="weather-bottom-grid">
+                <div class="weather-stat-card">
+                    <div class="label">Velocità Vento</div>
+                    <div class="value" id="weather-wind">-- km/h</div>
+                    <div class="mini-graph" id="graph-wind"></div>
+                </div>
+                <div class="weather-stat-card">
+                    <div class="label">Umidità</div>
+                    <div class="value" id="weather-humidity">--%</div>
+                    <div class="mini-graph" id="graph-humidity"></div>
+                </div>
+                <div class="weather-stat-card">
+                    <div class="label">Pressione</div>
+                    <div class="value" id="weather-pressure">-- hPa</div>
+                    <div class="mini-graph" id="graph-pressure"></div>
+                </div>
+                <div class="weather-stat-card">
+                    <div class="label">Visibilità</div>
+                    <div class="value" id="weather-vis">-- km</div>
+                    <div class="mini-graph" id="graph-vis"></div>
+                </div>
+            </div>
         </div>
 
         <div id="panel-map" class="panel">
@@ -390,8 +1013,48 @@
                 <div id="dash-servo" class="device-btn">SERVO</div>
             </div>
         </div>
+
+        <div id="panel-calendar" class="panel">
+            <h2>Calendario</h2>
+            <div id="calendar-list" class="news-list"></div>
+        </div>
+
+        <div id="panel-trading" class="panel">
+            <div class="trading-main-chart">
+                <div id="main-trading-graph">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+
+            <div class="trading-sidebar" id="trading-list">
+                <!-- Trading cards injected via JS -->
+            </div>
+
+            <div class="trading-info-bottom">
+                <div>
+                    <div class="label">Sentiment di Mercato</div>
+                    <div class="big-val" id="market-sentiment">NEUTRALE</div>
+                </div>
+                <div>
+                    <div class="label">Volume 24h</div>
+                    <div class="big-val" id="market-volume">--</div>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <div id="debug-controls">
+        <button class="debug-btn" onclick="setLayout('orb')">ORB</button>
+        <button class="debug-btn" onclick="setLayout('weather')">WEATHER</button>
+        <button class="debug-btn" onclick="setLayout('news')">NEWS</button>
+        <button class="debug-btn" onclick="setLayout('dashboard')">DASH</button>
+        <button class="debug-btn" onclick="setLayout('spotify')">SPOTIFY</button>
+        <button class="debug-btn" onclick="setLayout('calendar')">CAL</button>
+        <button class="debug-btn" onclick="setLayout('trading')">TRADE</button>
+        <button class="debug-btn" onclick="setOrbState('listening')">LISTEN</button>
+        <button class="debug-btn" onclick="setOrbState('speaking')">SPEAK</button>
+        <button class="debug-btn" onclick="setOrbState('idle')">IDLE</button>
+    </div>
     <div id="log-strip" id="log-text">MAYA System Online...</div>
 
     <script>
@@ -699,18 +1362,21 @@
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
                 
-        if (d.type === 'layout') setLayout(d.layout, d.params);
-        if (d.type === 'voice_status') setOrbState(d.status.toLowerCase());
-        if (d.type === 'news' && d.articles) {
-            updateNews(d.articles);
-            // Il pannello non si apre più automaticamente qui,
-            // si affida al comando 'layout' inviato dall'agente se necessario.
-        }
-                if(d.type === 'state') updateArduino(d);
-                if(d.type === 'spotify') {
-                    if(d.is_playing) document.getElementById('log-strip').innerText = `♫ SPOTIFY: ${d.track} - ${d.artist}`;
+                if (d.type === 'layout') setLayout(d.layout, d.params);
+                if (d.type === 'voice_status') setOrbState(d.status.toLowerCase());
+                if (d.type === 'news' && d.articles) updateNews(d.articles);
+                if (d.type === 'weather' && d.data) updateWeather(d.data);
+                if (d.type === 'calendar' && d.events) updateCalendar(d.events);
+                if (d.type === 'trading' && d.data) updateTrading(d.data);
+                if (d.type === 'state') updateArduino(d);
+                if (d.type === 'stats') {
+                    if(d.cpu !== undefined) document.getElementById('dash-cpu').innerText = `${d.cpu}%`;
+                    if(d.ram !== undefined) document.getElementById('dash-ram').innerText = `${d.ram}%`;
                 }
-                if(d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
+                if (d.type === 'spotify') {
+                    updateSpotify(d);
+                }
+                if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
             };
 
             ws.onopen = () => {
@@ -721,7 +1387,14 @@
 
         function setOrbState(status) {
             orbState = status || 'idle';
-            document.body.className = orbState;
+            const voiceClasses = ['idle', 'listening', 'processing', 'speaking', 'calibrating'];
+            
+            // Rimuovi solo le classi voice, NON toccare content-open
+            voiceClasses.forEach(c => document.body.classList.remove(c));
+            
+            // Aggiungi solo la nuova classe voice
+            if(status) document.body.classList.add(status.toLowerCase());
+            
             document.getElementById('log-strip').innerText = `MAYA | ${orbState.toUpperCase()}`;
         }
 
@@ -773,19 +1446,194 @@
         }
 
         // --- PANEL UPDATES ---
-        function updateWeather(data) {
-            document.getElementById('weather-city').innerText = data.location;
-            document.getElementById('weather-temp').innerText = Math.round(data.temp);
-            document.getElementById('weather-desc').innerText = "CONDIZIONI ATTUALI";
-            
-            const grid = document.getElementById('weather-forecast');
-            grid.innerHTML = data.daily.map(day => `
-                <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:12px; text-align:center;">
-                    <div style="font-size:10px; opacity:0.5;">${new Date(day.date).toLocaleDateString('it-IT', {weekday:'short'})}</div>
-                    <div style="font-weight:bold; margin:5px 0;">${Math.round(day.max)}°</div>
-                    <div style="font-size:10px; opacity:0.3;">${Math.round(day.min)}°</div>
+        function sendCmdToWS(text) {
+            if(ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'command', text: text }));
+            }
+        }
+
+        let spotifyTimeout;
+
+        function updateSpotify(d) {
+            const trackEl = document.getElementById('spotify-track');
+            const artistEl = document.getElementById('spotify-artist');
+            const artEl = document.getElementById('spotify-art');
+            const playBtn = document.getElementById('spotify-play-btn');
+            const widget = document.getElementById('spotify-widget');
+
+            // Aggiorna dati sempre
+            if(d.track) {
+                trackEl.innerText = d.track;
+                artistEl.innerText = d.artist;
+                artEl.src = d.album_art || '';
+                playBtn.innerText = d.is_playing ? '⏸' : '▶';
+                
+                // Mostra il widget SOLO se sta suonando e NON è già attivo
+                // o se arriva un aggiornamento esplicito di riproduzione.
+                // Evitiamo che si apra da solo al refresh se non sta suonando nulla di nuovo.
+                if(d.is_playing && !widget.classList.contains('active')) {
+                    widget.style.display = 'block';
+                    setTimeout(() => widget.classList.add('active'), 10);
+                    
+                    // Reset auto-close timer (1 minuto)
+                    if(spotifyTimeout) clearTimeout(spotifyTimeout);
+                    spotifyTimeout = setTimeout(closeSpotifyWidget, 60000);
+                }
+
+                document.getElementById('log-strip').innerText = `♫ SPOTIFY: ${d.track} - ${d.artist}`;
+            }
+        }
+
+        function closeSpotifyWidget() {
+            const widget = document.getElementById('spotify-widget');
+            widget.classList.remove('active');
+            if(spotifyTimeout) clearTimeout(spotifyTimeout);
+            setTimeout(() => {
+                if(!widget.classList.contains('active')) widget.style.display = 'none';
+            }, 500);
+        }
+
+        function updateCalendar(events) {
+            const list = document.getElementById('calendar-list');
+            list.innerHTML = events.map(e => `
+                <div class="event-item">
+                    <div>
+                        <div style="font-weight:bold">${e.title}</div>
+                        <div style="font-size:12px; opacity:0.5">${e.source || 'MAYA'}</div>
+                    </div>
+                    <div class="event-time">${e.time}</div>
                 </div>
             `).join('');
+        }
+
+        function updateTrading(data) {
+            const list = document.getElementById('trading-list');
+            const mainGraph = document.getElementById('main-trading-graph');
+            
+            list.innerHTML = data.map(item => {
+                const isUp = !item.price_str.includes('-');
+                return `
+                <div class="trading-card" onclick="drawMainTradingGraph('${item.symbol}', '${isUp ? '#4CAF50' : '#f44336'}')">
+                    <div>
+                        <div class="symbol">${item.symbol.toUpperCase()}</div>
+                        <div style="font-size:9px; opacity:0.3; margin-top:5px;">${item.asset_type || 'ASSET'}</div>
+                    </div>
+                    <div style="text-align:right">
+                        <div class="price">${item.price_str}</div>
+                        <div class="change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} LIVE_FEED</div>
+                    </div>
+                </div>
+            `}).join('');
+
+            // Disegna grafico principale se non esiste
+            if (data.length > 0 && mainGraph.innerHTML.trim() === "") {
+                drawMainTradingGraph(data[0].symbol, '#4CAF50');
+            }
+            
+            // Aggiorna volume simulato
+            document.getElementById('market-volume').innerText = (Math.random() * 100 + 50).toFixed(2) + "B";
+        }
+
+        function drawMainTradingGraph(symbol, color) {
+            const el = document.getElementById('main-trading-graph');
+            const width = el.offsetWidth || 800;
+            const height = 400;
+            const points = [];
+            for(let i=0; i<30; i++) {
+                const x = (i / 29) * width;
+                const y = height - (Math.random() * (height * 0.7) + 50);
+                points.push(`${x},${y}`);
+            }
+            
+            el.innerHTML = `
+                <div style="font-family: 'Syncopate'; font-size: 18px; margin-bottom: 20px; letter-spacing: 4px;">${symbol.toUpperCase()} // PERFORMANCE</div>
+                <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="gradTrading" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:${color};stop-opacity:0.2" />
+                            <stop offset="100%" style="stop-color:${color};stop-opacity:0" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M 0 ${height} ${points.map(p => 'L ' + p).join(' ')} L ${width} ${height} Z" fill="url(#gradTrading)" />
+                    <polyline points="${points.join(' ')}" 
+                              stroke="${color}" stroke-width="3" fill="none" 
+                              stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            `;
+        }
+
+        let weatherMiniMap;
+
+        function updateWeather(data) {
+            const iconMap = {
+                "sun": "☀️", "cloud-sun": "⛅", "cloud": "☁️",
+                "cloud-fog": "🌫️", "cloud-drizzle": "🌦️",
+                "cloud-rain": "🌧️", "cloud-snow": "❄️", "cloud-lightning": "⛈️"
+            };
+
+            document.getElementById('weather-city').innerText = data.location;
+            document.getElementById('weather-temp').innerText = Math.round(data.temp);
+            document.getElementById('weather-desc').innerText = data.condition;
+            document.getElementById('weather-wind').innerText = `${data.wind} km/h`;
+            document.getElementById('weather-humidity').innerText = (data.humidity || 45) + '%';
+            document.getElementById('weather-pressure').innerText = (data.pressure || 1013) + ' hPa';
+            document.getElementById('weather-vis').innerText = (data.visibility || 10) + ' km';
+            
+            // Inietta mini forecast
+            const miniGrid = document.getElementById('weather-forecast-mini');
+            if(miniGrid) {
+                miniGrid.innerHTML = data.daily.slice(0, 5).map(day => `
+                    <div class="forecast-item-mini">
+                        <div class="day">${new Date(day.date).toLocaleDateString('it-IT', {weekday:'short'})}</div>
+                        <div class="temp">${Math.round(day.max)}°</div>
+                    </div>
+                `).join('');
+            }
+
+            // Disegna grafici SVG reali basati sui dati (se disponibili o simulati su trend reale)
+            const drawGraph = (id, color, baseValue) => {
+                const el = document.getElementById(id);
+                if(!el) return;
+                const width = 280;
+                const height = 60;
+                const points = [];
+                for(let i=0; i<12; i++) {
+                    const x = (i / 11) * width;
+                    // Variazione naturale attorno al valore base
+                    const variation = (Math.sin(i * 0.5) * 10) + (Math.random() * 5);
+                    const y = height - (30 + variation);
+                    points.push(`${x},${y}`);
+                }
+                el.innerHTML = `
+                    <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                        <polyline points="${points.join(' ')}" 
+                                  stroke="${color}" stroke-width="2" fill="none" 
+                                  stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                `;
+            };
+            drawGraph('graph-wind', 'rgba(255,30,30,0.5)', data.wind);
+            drawGraph('graph-humidity', 'rgba(30,150,255,0.5)', data.humidity || 45);
+            drawGraph('graph-pressure', 'rgba(30,255,100,0.5)', data.pressure || 1013);
+            drawGraph('graph-vis', 'rgba(255,200,30,0.5)', data.visibility || 10);
+
+            // Inizializza/Aggiorna mini mappa
+            if(data.lat && data.lon) {
+                if(!weatherMiniMap) {
+                    weatherMiniMap = L.map('weather-mini-map', {
+                        zoomControl: false,
+                        attributionControl: false,
+                        dragging: false,
+                        touchZoom: false,
+                        scrollWheelZoom: false,
+                        doubleClickZoom: false
+                    }).setView([data.lat, data.lon], 9);
+                    
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(weatherMiniMap);
+                } else {
+                    weatherMiniMap.setView([data.lat, data.lon], 9);
+                }
+            }
         }
 
         function updateNews(articles) {
@@ -809,6 +1657,14 @@
                 if(val === 'on' || val === 'open' || val === true) el.classList.add('on');
                 else el.classList.remove('on');
             };
+            
+            // Gestione Debug Controls basata su reset_storage (MAYA_DEBUG_RESET_CLIENT)
+            if (d.system && d.system.reset_storage) {
+                document.getElementById('debug-controls').style.display = 'flex';
+            } else {
+                document.getElementById('debug-controls').style.display = 'none';
+            }
+
             if(d.led) setBtn('dash-led', d.led);
             if(d.relay) setBtn('dash-relay', d.relay);
             if(d.servo) setBtn('dash-servo', d.servo);

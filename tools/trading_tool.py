@@ -42,7 +42,16 @@ class TradingTool:
                     res = requests.get(url).json()
                     if symbol.lower() in res:
                         price = res[symbol.lower()]["usd"]
-                        return {"status": "ok", "message": f"Il prezzo di {symbol.capitalize()} è ${price:,.2f}."}
+                        return {
+                            "status": "ok", 
+                            "message": f"Il prezzo di {symbol.capitalize()} è ${price:,.2f}.",
+                            "data": {
+                                "symbol": symbol,
+                                "price": price,
+                                "price_str": f"${price:,.2f}",
+                                "asset_type": "crypto"
+                            }
+                        }
                     else:
                         return {"status": "error", "message": f"Criptovaluta '{symbol}' non trovata."}
                 elif asset_type == "stock":
@@ -51,7 +60,16 @@ class TradingTool:
                     data = ticker.history(period="1d")
                     if not data.empty:
                         price = data["Close"].iloc[-1]
-                        return {"status": "ok", "message": f"Il prezzo delle azioni {symbol.upper()} è ${price:,.2f}."}
+                        return {
+                            "status": "ok", 
+                            "message": f"Il prezzo delle azioni {symbol.upper()} è ${price:,.2f}.",
+                            "data": {
+                                "symbol": symbol,
+                                "price": float(price),
+                                "price_str": f"${price:,.2f}",
+                                "asset_type": "stock"
+                            }
+                        }
                     else:
                         return {"status": "error", "message": f"Ticker azionario '{symbol}' non trovato."}
             else:
