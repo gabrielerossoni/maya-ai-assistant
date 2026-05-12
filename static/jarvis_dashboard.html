@@ -520,15 +520,224 @@
         .ns-title { font-size: 11px; line-height: 1.5; opacity: 0.78; }
 
         /* =============================================
-           DASHBOARD PANEL
+           DASHBOARD / DOMOTICA PANEL
            ============================================= */
-        #panel-dashboard .dash-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-        .stat-card { padding: 30px; border: var(--glass-border); border-radius: 16px; background: rgba(255,255,255,0.02); }
-        .stat-card h3 { font-size: 12px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 10px; }
-        .stat-card .val { font-size: 32px; font-weight: 600; }
-        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
-        .device-btn { padding: 15px; border: var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); text-align: center; font-weight: 600; cursor: pointer; }
-        .device-btn.on { border-color: #4CAF50; color: #4CAF50; box-shadow: 0 0 10px rgba(76,175,80,0.2); }
+        #panel-dashboard {
+            display: none;
+            flex-direction: column;
+            height: calc(100vh - 80px);
+            padding: 0;
+            overflow: hidden;
+            gap: 0;
+        }
+        #panel-dashboard.active {
+            display: flex;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        /* Header bar */
+        .dom-topbar {
+            display: flex;
+            align-items: center;
+            padding: 18px 32px;
+            gap: 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+        }
+        .dom-tag {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 3px;
+            color: var(--accent);
+            opacity: 0.6;
+        }
+        .dom-title {
+            font-size: 22px;
+            font-weight: 100;
+            letter-spacing: -0.5px;
+        }
+        .dom-status-pills {
+            margin-left: auto;
+            display: flex;
+            gap: 12px;
+        }
+        .dom-pill {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 2px;
+            padding: 5px 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            opacity: 0.4;
+        }
+        .dom-pill.online { border-color: rgba(76,175,80,0.4); color: #4CAF50; opacity: 0.7; }
+
+        /* Main body: house map + sidebar */
+        .dom-body {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        /* House floor plan */
+        .dom-house {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 3px;
+            padding: 20px;
+            overflow: hidden;
+        }
+        .dom-room {
+            position: relative;
+            background: rgba(255,255,255,0.015);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        .dom-room:hover {
+            background: rgba(255,30,30,0.02);
+            border-color: rgba(255,30,30,0.15);
+        }
+        .dom-room-name {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 16px;
+            letter-spacing: 3px;
+            opacity: 0.35;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+        }
+        .dom-room-devices {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .dom-device {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            user-select: none;
+        }
+        .dom-device:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .dom-device.active {
+            border-color: rgba(76,175,80,0.5);
+            background: rgba(76,175,80,0.06);
+        }
+        .dom-device.active .dom-dev-dot { background: #4CAF50; box-shadow: 0 0 8px rgba(76,175,80,0.5); }
+        .dom-dev-icon {
+            font-size: 18px;
+            width: 28px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .dom-dev-info { flex: 1; min-width: 0; }
+        .dom-dev-name {
+            font-size: 11px;
+            font-weight: 400;
+            opacity: 0.8;
+        }
+        .dom-dev-state {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 1px;
+            opacity: 0.3;
+            margin-top: 2px;
+        }
+        .dom-dev-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        /* Sidebar: scenes + stats */
+        .dom-sidebar {
+            border-left: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: rgba(255,255,255,0.01);
+        }
+        .dom-sidebar-hdr {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 3px;
+            opacity: 0.18;
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            flex-shrink: 0;
+        }
+        .dom-scenes {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .dom-scene-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #fff;
+            font-family: 'Sora', sans-serif;
+            font-size: 11px;
+            border-left: 2px solid transparent;
+        }
+        .dom-scene-btn:hover {
+            background: rgba(255,30,30,0.04);
+            border-left-color: rgba(255,30,30,0.4);
+        }
+        .dom-scene-btn .scene-icon { font-size: 16px; width: 24px; text-align: center; }
+        .dom-scene-btn .scene-label { opacity: 0.7; }
+
+        /* Stats bottom */
+        .dom-stats {
+            margin-top: auto;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(255,255,255,0.04);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .dom-stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dom-stat-label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 2px;
+            opacity: 0.22;
+        }
+        .dom-stat-val {
+            font-size: 16px;
+            font-weight: 200;
+        }
 
         /* =============================================
            CALENDAR PANEL
@@ -1122,21 +1331,141 @@
                 </div>
 
                 <div id="panel-dashboard" class="panel">
-                    <h2>Sistema & Domotica</h2>
-                    <div class="dash-grid">
-                        <div class="stat-card">
-                            <h3>Neural Load (CPU)</h3>
-                            <div class="val" id="dash-cpu">--%</div>
+                    <!-- Top bar -->
+                    <div class="dom-topbar">
+                        <div>
+                            <div class="dom-tag">DOMOTIC_CONTROL // LIVE</div>
+                            <div class="dom-title">Casa M.A.Y.A.</div>
                         </div>
-                        <div class="stat-card">
-                            <h3>Memory Unit (RAM)</h3>
-                            <div class="val" id="dash-ram">--%</div>
+                        <div class="dom-status-pills">
+                            <span class="dom-pill" id="dom-arduino-pill">ARDUINO</span>
+                            <span class="dom-pill online">MAYA ONLINE</span>
                         </div>
                     </div>
-                    <div class="device-grid" style="margin-top:20px;">
-                        <div id="dash-led" class="device-btn">LUCI</div>
-                        <div id="dash-relay" class="device-btn">RELAIS</div>
-                        <div id="dash-servo" class="device-btn">SERVO</div>
+
+                    <div class="dom-body">
+                        <!-- House floor plan -->
+                        <div class="dom-house">
+                            <!-- Soggiorno -->
+                            <div class="dom-room">
+                                <div class="dom-room-name">Soggiorno</div>
+                                <div class="dom-room-devices">
+                                    <div class="dom-device" id="dev-light" onclick="toggleDevice('light')">
+                                        <span class="dom-dev-icon">💡</span>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Luci principali</div>
+                                            <div class="dom-dev-state" id="dev-light-state">OFF</div>
+                                        </div>
+                                        <span class="dom-dev-dot" id="dev-light-dot"></span>
+                                    </div>
+                                    <div class="dom-device" id="dev-relay" onclick="toggleDevice('relay')">
+                                        <span class="dom-dev-icon">⚡</span>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Relè / RGB</div>
+                                            <div class="dom-dev-state" id="dev-relay-state">OFF</div>
+                                        </div>
+                                        <span class="dom-dev-dot" id="dev-relay-dot"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Camera -->
+                            <div class="dom-room">
+                                <div class="dom-room-name">Camera</div>
+                                <div class="dom-room-devices">
+                                    <div class="dom-device" id="dev-blind" onclick="toggleDevice('blind')">
+                                        <span class="dom-dev-icon">🪟</span>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Tapparella</div>
+                                            <div class="dom-dev-state" id="dev-blind-state">CHIUSA</div>
+                                        </div>
+                                        <span class="dom-dev-dot" id="dev-blind-dot"></span>
+                                    </div>
+                                    <div class="dom-device" id="dev-fan" onclick="toggleDevice('fan')">
+                                        <span class="dom-dev-icon">🌀</span>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Ventilazione</div>
+                                            <div class="dom-dev-state" id="dev-fan-state">OFF</div>
+                                        </div>
+                                        <span class="dom-dev-dot" id="dev-fan-dot"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Ingresso -->
+                            <div class="dom-room">
+                                <div class="dom-room-name">Ingresso</div>
+                                <div class="dom-room-devices">
+                                    <div class="dom-device" id="dev-servo" onclick="toggleDevice('servo')">
+                                        <span class="dom-dev-icon">🚪</span>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Porta principale</div>
+                                            <div class="dom-dev-state" id="dev-servo-state">CHIUSA</div>
+                                        </div>
+                                        <span class="dom-dev-dot" id="dev-servo-dot"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Cucina -->
+                            <div class="dom-room">
+                                <div class="dom-room-name">Cucina</div>
+                                <div class="dom-room-devices">
+                                    <div class="dom-device" id="dev-alarm" onclick="toggleDevice('alarm')">
+                                        <span class="dom-dev-icon">🔔</span>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Allarme</div>
+                                            <div class="dom-dev-state" id="dev-alarm-state">OFF</div>
+                                        </div>
+                                        <span class="dom-dev-dot" id="dev-alarm-dot"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sidebar: scene + stats -->
+                        <div class="dom-sidebar">
+                            <div class="dom-sidebar-hdr">SCENE // ATTIVAZIONE RAPIDA</div>
+                            <div class="dom-scenes">
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità notte')">
+                                    <span class="scene-icon">🌙</span>
+                                    <span class="scene-label">Modalità Notte</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità studio')">
+                                    <span class="scene-icon">📖</span>
+                                    <span class="scene-label">Modalità Studio</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità relax')">
+                                    <span class="scene-icon">🛋️</span>
+                                    <span class="scene-label">Modalità Relax</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità uscita')">
+                                    <span class="scene-icon">🏠</span>
+                                    <span class="scene-label">Modalità Uscita</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità ospite')">
+                                    <span class="scene-icon">👋</span>
+                                    <span class="scene-label">Modalità Ospite</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità gaming')">
+                                    <span class="scene-icon">🎮</span>
+                                    <span class="scene-label">Modalità Gaming</span>
+                                </div>
+                            </div>
+
+                            <!-- System stats -->
+                            <div class="dom-stats">
+                                <div class="dom-sidebar-hdr" style="padding:0 0 8px 0">SISTEMA</div>
+                                <div class="dom-stat-row">
+                                    <span class="dom-stat-label">CPU</span>
+                                    <span class="dom-stat-val" id="dash-cpu">--%</span>
+                                </div>
+                                <div class="dom-stat-row">
+                                    <span class="dom-stat-label">RAM</span>
+                                    <span class="dom-stat-val" id="dash-ram">--%</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1894,18 +2223,76 @@
             track.innerHTML = tickerItems + tickerItems;
         }
 
-        function updateArduino(d) {
-            const setBtn = (id, val) => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                (val === 'on' || val === 'open' || val === true) ? el.classList.add('on') : el.classList.remove('on');
+        // Stato locale dispositivi per la mappa casa
+        const domState = {
+            light: false, relay: false, servo: false,
+            blind: false, fan: false, alarm: false
+        };
+
+        function toggleDevice(dev) {
+            // Mappa device -> comando Arduino
+            const cmdMap = {
+                light: () => domState.light ? 'LIGHT_OFF' : 'LIGHT_ON',
+                relay:  () => domState.relay  ? 'RELAY_OFF'  : 'RELAY_ON',
+                servo:  () => domState.servo  ? 'SERVO_CLOSE': 'SERVO_OPEN',
+                blind:  () => domState.blind  ? 'BLIND_CLOSE': 'BLIND_OPEN',
+                fan:    () => domState.fan    ? 'FAN_OFF'    : 'FAN_ON',
+                alarm:  () => domState.alarm  ? 'BUZZER_OFF' : 'BUZZER_ON',
             };
+            const cmd = cmdMap[dev]?.();
+            if (!cmd) return;
+
+            // Invia via WebSocket come comando utente
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', command: cmd } }));
+            }
+
+            // Aggiorna stato locale ottimisticamente
+            domState[dev] = !domState[dev];
+            refreshDomUI();
+        }
+
+        function refreshDomUI() {
+            const devMap = {
+                light: { onLabel: 'ON',     offLabel: 'OFF' },
+                relay: { onLabel: 'ON',     offLabel: 'OFF' },
+                servo: { onLabel: 'APERTA', offLabel: 'CHIUSA' },
+                blind: { onLabel: 'APERTA', offLabel: 'CHIUSA' },
+                fan:   { onLabel: 'ON',     offLabel: 'OFF' },
+                alarm: { onLabel: 'ATTIVO', offLabel: 'OFF' },
+            };
+            for (const [dev, labels] of Object.entries(devMap)) {
+                const el = document.getElementById(`dev-${dev}`);
+                const stateEl = document.getElementById(`dev-${dev}-state`);
+                if (!el) continue;
+                if (domState[dev]) {
+                    el.classList.add('active');
+                    if (stateEl) stateEl.textContent = labels.onLabel;
+                } else {
+                    el.classList.remove('active');
+                    if (stateEl) stateEl.textContent = labels.offLabel;
+                }
+            }
+        }
+
+        function updateArduino(d) {
             if (d.system && d.system.reset_storage) {
                 document.getElementById('debug-controls').style.display = 'flex';
             }
-            if (d.led) setBtn('dash-led', d.led);
-            if (d.relay) setBtn('dash-relay', d.relay);
-            if (d.servo) setBtn('dash-servo', d.servo);
+
+            // Aggiorna stato dal server
+            if (d.led) domState.light = (d.led === 'on');
+            if (d.relay) domState.relay = (d.relay === 'on');
+            if (d.servo) domState.servo = (d.servo === 'open' || d.servo === '90');
+
+            // Aggiorna pill Arduino
+            const pill = document.getElementById('dom-arduino-pill');
+            if (pill) {
+                const isOnline = d.system || d.led || d.relay || d.servo;
+                if (isOnline) pill.classList.add('online');
+            }
+
+            refreshDomUI();
         }
 
         async function updateMap(query) {

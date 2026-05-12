@@ -9,12 +9,29 @@
 ![Stars](https://img.shields.io/github/stars/gabrielerossoni/maya-ai-assistant?style=for-the-badge&logo=github)
 ![Issues](https://img.shields.io/github/issues/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
 ![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
- 
-Sistema AI agentico locale, offline-first, costruito su **Ollama** + **FastAPI** con architettura **Planner → Executor → Validator**.
-Dashboard HUD ispirata a Jarvis/MAYA con due schermate, orb 3D, WebSocket real-time e pannelli live per meteo, trading, notizie, domotica e calendario.
- 
+
+**Sistema domotico intelligente per una casa fisica interattiva**, con dashboard dinamica e controllo centralizzato dei dispositivi.  
+Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
+
+> *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
+
 ---
- 
+
+## Idea Centrale
+
+M.A.Y.A. non è un chatbot generico: è il **cervello unico che orchestra la casa**.  
+Una casa intelligente in miniatura dove il PC fa i calcoli pesanti e Arduino gestisce il mondo fisico — luci, porte, sensori, ventilazione, allarmi.
+
+La differenza rispetto ai sistemi già esistenti:
+
+- **Controllo locale e privacy** — il cuore del sistema funziona offline, senza cloud
+- **Gestione multi-stanza e multi-scenario** — non un singolo dispositivo acceso/spento, ma un ambiente coordinato
+- **Interfaccia dinamica** — la dashboard mostra la casa come un sistema vivo, non come un menu statico
+- **Linguaggio naturale in italiano** — comandi normali, senza formule rigide
+- **Scene e routine** — modalità studio, notte, relax, uscita, ospiti
+
+---
+
 ## Architettura
 
 ```mermaid
@@ -23,248 +40,273 @@ flowchart LR
         HTTP["HTTP /"]
         WS["WS /ws"]
         CLI["CLI"]
+        MIC["🎤 Voce"]
     end
 
-    subgraph CORE["AgentCore"]
-        P["Planner (ReAct)"] --> E["Executor"] --> V["Validator"]
+    subgraph CORE["AgentCore (PC)"]
+        R["Router Intent"] --> P["Planner (ReAct)"]
+        P --> E["Executor"] --> V["Validator"]
     end
 
     subgraph TOOLS["ToolManager"]
-        T["arduino · calendar · weather\nnetwork · trading · search\nnotes · timer · news · spotify"]
+        T["arduino · mqtt · calendar · weather\nnetwork · trading · search\nnotes · timer · news · spotify"]
     end
 
-    subgraph SUP["Support"]
-        M["Memory (ChromaDB)"]
+    subgraph HW["Hardware (Arduino)"]
+        LED["💡 Luci"]
+        SERVO["🚪 Porta"]
+        RGB["🌈 RGB"]
+        RELAY["⚡ Relè"]
+        SENSOR["🌡️ Sensori"]
+        BUZZ["🔔 Allarme"]
+    end
+
+    subgraph SUP["Supporto"]
+        M["Memoria (ChromaDB)"]
         W["WebSocketManager"]
-        D["DisplayTool"]
-        V["VoiceManager"]
+        VM["VoiceManager"]
     end
 
     IN --> CORE
-    V --> TOOLS
+    E --> TOOLS
+    TOOLS --> HW
     CORE --> SUP
 ```
- 
+
+**Divisione dei ruoli:**
+
+| | PC | Arduino |
+|---|---|---|
+| **Ruolo** | Unità intelligente | Unità fisica |
+| **Fa** | Interpreta comandi, gestisce logica, LLM | Accende, muove, legge, risponde |
+| **Comunicazione** | Seriale USB (JSON) | Seriale USB (JSON) |
+
 ---
- 
+
+## Elementi Domotici
+
+### MVP (minimo per la demo)
+
+| Elemento | Hardware | Comandi |
+|---|---|---|
+| **Luci principali** | LED + Relè | `LIGHT_ON`, `LIGHT_OFF`, `LIGHT_PWM` (dimmer) |
+| **Porta/accesso** | Servo motore | `SERVO_OPEN`, `SERVO_CLOSE` |
+| **Scena ambiente** | LED RGB / NeoPixel | Colori e scene configurabili |
+
+### Obiettivo Esteso
+
+| Elemento | Hardware | Scopo |
+|---|---|---|
+| **Tapparella/tendina** | Secondo servo o stepper | Simula presenza e routine |
+| **Ventilazione** | Ventola + relè | Comfort e clima |
+| **Allarme** | Buzzer | Segnale stato anomalo |
+| **Sensore contesto** | DHT11/DHT22, PIR | Temperatura, movimento, contesto credibile |
+
+---
+
+## Scene e Automazioni
+
+Il sistema gestisce la casa come un **ambiente che cambia stato**, non come una lista di device.
+
+| Scena | Cosa succede |
+|---|---|
+| `buonanotte` | Luci off, RGB spento, porta chiusa |
+| `modalità lavoro` | Luci accese, apri browser, notifica secondo PC |
+| `modalità film` | Relè on, luci off, browser aperto |
+| `modalità studio` | Luce concentrazione, RGB warm, ventola off |
+| `modalità relax` | Luci dim, RGB viola, ambiente soft |
+| `modalità uscita` | Tutto off, porta chiusa, allarme attivo |
+
+Le scene sono attivabili via:
+- **Linguaggio naturale**: *"Maya, buonanotte"*
+- **Dashboard**: bottoni rapidi
+- **Voce**: *"Ehi Maya, modalità studio"*
+
+---
+
 ## Caratteristiche
 
-- **Agentic ReAct Loop** — ciclo di ragionamento asincrono (Ragiona → Agisci → Osserva) con routing intelligente dell'intent fuori dal loop per massime performance.
-- **Voice I/O Integrato** — STT via `faster-whisper` (tiny) e TTS via `Piper` (modello Paola) con VAD (Voice Activity Detection) adattivo e calibrazione rumore ambientale.
-- **Memoria Semantica Vettoriale** — Memory persistente con database vettoriale **ChromaDB** per recupero contesto a lungo termine e sliding window per la coerenza immediata.
-- **Monitoraggio Proattivo** — Checker in background per CPU/RAM alta ed eventi calendario imminenti, broadcast via WebSocket.
-- **Dashboard HUD bimodale** — Schermata idle con orologio e particelle, schermata work con orb 3D Three.js, slider verticale animato tra le due. Pannelli: Meteo, Notizie, Trading, Dashboard, Calendario, Mappa, Browser, Spotify.
-- **Trading live senza API key** — Overview automatica di BTC/ETH/SOL/SPY/AAPL/NVDA/TSLA con prezzi e variazioni 24h (CoinGecko + yfinance). Grafico reale via TradingView embed.
-- **Meteo HUD** — Mappa Leaflet, temperatura hero, forecast 5 giorni, umidità/pressione/visibilità con mini-grafici animati.
-- **News HUD** — Featured article + sidebar + ticker scorrevole da RSS ANSA.
-- **Sicurezza & Robustezza** — Shell injection protection, Futures timeout, thread-safe broadcast, graceful degradation hardware.
-- **Display ASCII** — Pannello di stato animato su terminale separato.
+- **Agentic ReAct Loop** — ciclo di ragionamento asincrono (Ragiona → Agisci → Osserva) con routing intelligente dell'intent
+- **Voice I/O Integrato** — STT via `faster-whisper` (tiny) e TTS via `Piper` (modello Paola) con VAD adattivo e calibrazione rumore ambientale
+- **Memoria Semantica Vettoriale** — database vettoriale **ChromaDB** per recupero contesto a lungo termine e sliding window per coerenza immediata
+- **Monitoraggio Proattivo** — checker in background per CPU/RAM alta ed eventi calendario imminenti, broadcast via WebSocket
+- **Dashboard HUD Dinamica** — schermata idle con orologio e particelle, schermata work con orb 3D Three.js, pannelli live per Meteo, Notizie, Trading, Stato Casa, Calendario, Spotify
+- **Comandi in Italiano** — linguaggio naturale, senza formule rigide
+- **Graceful Degradation** — senza Arduino il sistema degrada in simulazione automatica, senza Ollama fallback a Groq o parser keyword
+
 ---
- 
+
 ## Stack Tecnologico
- 
-| Layer | Tecnologia |
+
+| Livello | Tecnologia |
 |---|---|
-| LLM Runtime | Ollama (llama3.2, phi4, mistral-small) |
-| Backend API | FastAPI + Uvicorn |
-| Real-time | WebSockets (fastapi native) |
+| Modelli LLM | Ollama (llama3.2, phi4, mistral-small) |
+| Fallback LLM | Groq API (llama-3.3-70b-versatile) |
+| API Backend | FastAPI + Uvicorn |
+| Tempo reale | WebSockets (nativo FastAPI) |
 | Hardware | PySerial + Arduino (C++) |
-| Rete | socket TCP raw |
-| Crypto/Stock | CoinGecko API + yfinance |
+| Rete | Socket TCP raw (secondo PC) |
+| Finanza | CoinGecko API + yfinance |
 | Meteo | Open-Meteo API (geocoding + forecast) |
-| News | feedparser (RSS ANSA) |
-| Ricerca | DuckDuckGo Search (duckduckgo-search) |
-| Wikipedia | wikipedia python SDK |
+| Notizie | feedparser (RSS ANSA) |
+| Ricerca | DuckDuckGo Search |
 | Traduzione | deep-translator (Google backend) |
-| Monitoring | psutil |
-| Media | keyboard (media keys) + webbrowser |
-| Frontend | Three.js (orb 3D) + Leaflet.js (mappe) + TradingView Widget |
+| Monitoraggio | psutil |
+| Media | keyboard (tasti multimediali) + Spotify API |
+| Interfaccia | Three.js (orb 3D) + Leaflet.js (mappe) + TradingView Widget |
 | Persistenza | ChromaDB (vettoriale) + JSON locale |
-| Voice | Faster-Whisper + Piper TTS |
- 
+| Voce | Faster-Whisper (STT) + Piper TTS |
+| Multi-stanza | MQTT (paho-mqtt) |
+| Desktop | Electron (wrapper opzionale) |
+
 ---
- 
+
 ## Struttura Repository
- 
+
 ```
 maya/
-├── main.py                  # Entrypoint: FastAPI, lifecycle, CLI, WS, stats broadcaster
-├── agent_core.py            # Planner/Executor/Validator, LLM routing, automazioni
-├── tool_manager.py          # Registry e dispatcher di tutti i tool
-├── memory_manager.py        # Sliding window memory, load/save JSON
-├── websocket_manager.py     # Broadcast manager WebSocket
+├── main.py                    # Entrypoint: FastAPI, lifecycle, CLI, WS, broadcaster
+├── instance_guard.py          # Lock single-instance
+├── MAYA_DESKTOP.bat           # Launcher rapido Windows
+│
+├── core/
+│   ├── agent_core.py          # Planner/Executor/Validator, LLM routing, automazioni
+│   ├── tool_manager.py        # Registry e dispatcher di tutti i tool
+│   ├── memory_manager.py      # Memoria semantica ChromaDB + sliding window
+│   ├── voice_manager.py       # Voice I/O: Whisper STT + Piper TTS + VAD
+│   ├── websocket_manager.py   # Broadcast manager WebSocket
+│   ├── plugin_loader.py       # Caricamento dinamico plugin
+│   ├── proactive_manager.py   # Monitor proattivo CPU/RAM/calendario
+│   └── log_utils.py           # Filtro log per dashboard
 │
 ├── tools/
-│   ├── arduino_tool.py      # Seriale USB → Arduino (auto-discovery + sim mode)
-│   ├── network_tool.py      # TCP client + TCP server (secondo PC)
-│   ├── system_tool.py       # OS commands (shutdown, browser, screenshot, volume)
-│   ├── calendar_tool.py     # Calendario locale JSON (add/list/delete/next)
-│   ├── weather_tool.py      # Open-Meteo geocoding + forecast
-│   ├── news_tool.py         # RSS reader (ANSA default)
-│   ├── wikipedia_tool.py    # Wikipedia summary (it)
-│   ├── notes_tool.py        # Todo list e appunti JSON
-│   ├── trading_tool.py      # CoinGecko (crypto) + yfinance (stocks) + TradingView
-│   ├── timer_tool.py        # Timer asincrono (asyncio.create_task)
-│   ├── translate_tool.py    # deep-translator (auto-detect source)
-│   ├── search_tool.py       # DuckDuckGo web search (it-it, 3 risultati)
-│   ├── spotify_tool.py      # Media keys: play/pause/next/prev + webbrowser
-│   ├── sys_monitor_tool.py  # CPU % + RAM % via psutil
-│   └── display_tool.py      # ASCII status panel (thread separato)
+│   ├── arduino_tool.py        # Seriale USB → Arduino (auto-discovery + sim mode)
+│   ├── mqtt_tool.py           # Controllo multi-room via MQTT
+│   ├── network_tool.py        # TCP client + server (secondo PC)
+│   ├── system_tool.py         # Comandi OS (shutdown, browser, screenshot, volume)
+│   ├── calendar_tool.py       # Calendario locale JSON
+│   ├── weather_tool.py        # Open-Meteo geocoding + forecast
+│   ├── news_tool.py           # RSS reader (ANSA)
+│   ├── wikipedia_tool.py      # Wikipedia summary (IT)
+│   ├── notes_tool.py          # Todo list e appunti JSON
+│   ├── trading_tool.py        # CoinGecko + yfinance + TradingView
+│   ├── timer_tool.py          # Timer asincrono
+│   ├── translate_tool.py      # deep-translator
+│   ├── search_tool.py         # DuckDuckGo web search
+│   ├── spotify_tool.py        # Spotify API + media keys
+│   ├── sys_monitor_tool.py    # CPU % + RAM % via psutil
+│   ├── display_tool.py        # ASCII status panel (terminale)
+│   └── code_generator_tool.py # Generazione tool a runtime
 │
 ├── arduino/
 │   └── jarvis_controller.ino  # Firmware Arduino: LED, relay, servo, serial protocol
 │
 ├── static/
-│   ├── jarvis_dashboard.html  # SPA dashboard HUD — Two-screen slider, Three.js orb, pannelli live
-│   ├── sfondo-maya.png        # Background work-mode (griglia HUD)
+│   ├── jarvis_dashboard.html  # SPA dashboard HUD — slider, Three.js orb, pannelli live
+│   ├── sfondo-maya.png        # Background work-mode
+│   ├── maya_logo.png          # Logo MAYA
 │   └── maya_logo_no_sfondo.png
 │
-├── data/                    # Runtime data (gitignored)
-│   ├── memory.json
+├── electron/
+│   ├── main.js                # Electron wrapper (fullscreen, shortcuts)
+│   └── preload.js
+│
+├── voice/
+│   ├── piper.exe              # TTS engine
+│   ├── it_IT-paola-medium.onnx # Modello voce italiana
+│   └── hey_maya.onnx          # Wake word model
+│
+├── data/                      # Runtime data (gitignored)
+│   ├── chroma_db/             # Vector database
+│   ├── memory_metadata.json
 │   ├── calendar.json
 │   └── notes.json
 │
-├── scratch/
-│   └── verify_env.py        # Utility verifica env + import AgentCore
-│
+├── tests/                     # Test suite
+├── plugins/                   # Plugin dinamici (hot-reload)
 ├── requirements.txt
 ├── .env.example
 └── .gitignore
 ```
- 
+
 ---
- 
-## Setup
- 
+
+## Installazione e Avvio
+
 ### 1. Prerequisiti
- 
+
 - Python 3.10+
-- [Ollama](https://ollama.com/) installato e in esecuzione (`ollama serve`)
+- [Ollama](https://ollama.com/) installato e in esecuzione
 - Arduino (opzionale — il sistema degrada in simulazione automaticamente)
+
 ### 2. Installazione
- 
+
 ```bash
-git clone https://github.com/tuo-username/maya-agent.git
-cd maya-agent
+git clone https://github.com/gabrielerossoni/maya-ai-assistant.git
+cd maya-ai-assistant
 pip install -r requirements.txt
 ```
- 
+
 ### 3. Configurazione
- 
+
 ```bash
 cp .env.example .env
 # Edita .env con i tuoi parametri
 ```
- 
-Variabili disponibili:
- 
+
+Variabili principali:
+
 ```env
 # LLM
 OLLAMA_HOST=127.0.0.1
-MODEL_ULTRA_FAST=llama3.2      # task semplici / filler
-MODEL_FAST=phi4                 # task medi
-MODEL_BALANCED=mistral-small    # task complessi
- 
+MODEL_CHITCHAT=llama3.2       # chiacchiere
+MODEL_DOMOTIC=phi4             # domotica e tool
+MODEL_REASONING=mistral-small  # ragionamento complesso
+MODEL_ROUTER=llama3.2:1b       # classificazione intent
+
 # Hardware
 ARDUINO_PORT=AUTO              # oppure COM3, /dev/ttyUSB0
 ARDUINO_BAUD_RATE=9600
- 
+
 # Rete secondo PC
 REMOTE_HOST=192.168.1.100
 REMOTE_PORT=9999
- 
+
 # Tool defaults
-DEFAULT_WEATHER_LOCATION=Roma
+DEFAULT_WEATHER_LOCATION=Crema
 NEWS_FEED_URL=https://www.ansa.it/sito/ansait_rss.xml
- 
-# Personalità LLM (opzionale override)
-SYSTEM_PROMPT_PERSONALITY=...
+
+# Groq (fallback cloud, opzionale)
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
- 
+
 ### 4. Download modelli Ollama
- 
+
 ```bash
 ollama pull llama3.2
+ollama pull llama3.2:1b
 ollama pull phi4
 ollama pull mistral-small
+ollama pull nomic-embed-text   # per memoria semantica
 ```
- 
+
 ### 5. Avvio
- 
+
 ```bash
 python main.py
 ```
- 
-Dashboard disponibile su: `http://127.0.0.1:8000`
- 
+
+La dashboard si apre automaticamente su `http://127.0.0.1:8000`
+
 ---
- 
-## Protocollo Tool
- 
-Ogni tool implementa l'interfaccia:
- 
-```python
-class MyTool:
-    def initialize(self) -> None: ...
-    def execute(self, action: dict) -> dict: ...
-    # Per tool asincroni:
-    async def execute(self, action: dict) -> dict: ...
-```
- 
-Il `ToolManager` rileva automaticamente se `execute` è coroutine e lo awaita di conseguenza.
- 
-Response contract:
- 
-```json
-{ "status": "ok" | "error" | "warning", "message": "..." }
-```
- 
----
- 
-## Formato JSON LLM
- 
-Il sistema prompt forza l'LLM a rispondere esclusivamente in questo schema:
- 
-```json
-{
-  "intent": "descrizione breve del task",
-  "actions": [
-    { "tool": "weather", "location": "Milano" },
-    { "tool": "arduino", "command": "LIGHT_ON" }
-  ],
-  "reply": "Risposta naturale in italiano"
-}
-```
- 
-In caso di fallback (Ollama non disponibile), `AgentCore._fallback_parse()` gestisce le keyword più comuni senza LLM.
- 
----
- 
-## Automazioni
- 
-Definite in `AUTOMATIONS` su `agent_core.py`. Trigger a keyword esatte nel testo utente.
- 
-| Trigger | Azioni |
-|---|---|
-| `buonanotte` | LIGHT_OFF → network GOODNIGHT → shutdown |
-| `modalità lavoro` | LIGHT_ON → open_browser → network WORK_MODE |
-| `modalità film` | RELAY_ON → LIGHT_OFF → open_browser |
- 
-Per aggiungere un'automazione:
- 
-```python
-AUTOMATIONS["modalità gaming"] = [
-    {"tool": "arduino", "command": "RELAY_ON"},
-    {"tool": "system", "command": "open_browser"},
-]
-```
- 
----
- 
-## Arduino — Protocollo Seriale
- 
-Baud: `9600` | Terminatore: `\n`
- 
+
+## Protocollo Arduino
+
+### Comunicazione Seriale
+
+Baud: `9600` | Formato: comandi stringa con terminatore `\n`
+
 | Comando | Effetto | Risposta |
 |---|---|---|
 | `LIGHT_ON` | LED pin 13 HIGH | `OK:LIGHT_ON` |
@@ -274,111 +316,186 @@ Baud: `9600` | Terminatore: `\n`
 | `SERVO_OPEN` | Servo → 90° | `OK:SERVO_OPEN` |
 | `SERVO_CLOSE` | Servo → 0° | `OK:SERVO_CLOSE` |
 | `STATUS` | Report stato | `STATUS:LIGHT=ON,RELAY=OFF,SERVO=0` |
- 
-Senza Arduino connesso o senza `pyserial`, il sistema entra in **modalità simulazione** automaticamente — nessuna modifica al codice necessaria.
- 
----
- 
-## Secondo PC — Server TCP
- 
-Sul secondo nodo, avviare il server incluso:
- 
-```bash
-python -c "from tools.network_tool import run_server; run_server()"
+
+Senza Arduino connesso, il sistema entra in **modalità simulazione** — nessuna modifica al codice necessaria.
+
+### Schema Hardware
+
 ```
- 
-Il server accetta payload JSON `{ "command": "...", "source": "jarvis" }` e risponde con `{ "status": "ok", "executed": "..." }`.
- 
+Arduino Uno/Nano
+├── Pin 13 → LED (luce principale)
+├── Pin  7 → Relè (attuatore generico)
+├── Pin  9 → Servo (porta/accesso)
+└── USB    → Seriale verso PC
+```
+
 ---
- 
+
 ## WebSocket API
- 
+
 Il frontend si connette a `ws://127.0.0.1:8000/ws`.
- 
-Messaggi server → client:
+
+### Messaggi server → client
 
 ```json
 { "type": "log",     "text": "...", "level": "ok|info|warn" }
+{ "type": "stream",  "token": "...", "full_text": "..." }
 { "type": "stats",   "neural_load": 12.4, "memory": 45.2 }
-{ "type": "state",   "led": "on", "relay": "off", "servo": "closed" }
-{ "type": "weather", "location": "Crema", "temp": 21, "wind": 12, "humidity": 65, "pressure": 1013, "visibility": 20, "lat": 45.3, "lon": 9.6, "forecast": [...] }
-{ "type": "trading", "symbol": "BTC", "price": 68000, "price_str": "$68,000.00", "change_pct": 2.4, "asset_type": "crypto" }
-{ "type": "news",    "articles": [ {"title": "...", "summary": "...", "source": "ANSA", "link": "..."} ] }
+{ "type": "state",   "led": "on", "relay": "off", "servo": "closed", "models": {...} }
+{ "type": "weather", "data": {...} }
+{ "type": "trading", "symbol": "BTC", "price": 68000, "change_pct": 2.4 }
+{ "type": "news",    "articles": [...] }
 { "type": "calendar_data", "events": [...] }
-{ "type": "spotify", "track": "...", "artist": "...", "art": "..." }
+{ "type": "spotify", "track": "...", "artist": "...", "is_playing": true }
 { "type": "voice_status", "status": "listening|speaking|idle" }
+{ "type": "layout",  "layout": "orb|weather|news|dashboard", "params": {...} }
 ```
 
-Messaggi client → server:
+### Messaggi client → server
 
 ```json
 { "type": "command", "text": "accendi la luce" }
 { "type": "tool", "action": { "tool": "trading", "operation": "overview" } }
 { "type": "tool", "action": { "tool": "calendar", "operation": "list" } }
 ```
- 
+
 ---
- 
+
 ## Aggiungere un Tool
- 
+
 1. Creare `tools/my_tool.py` con classe `MyTool` che implementa `initialize()` e `execute()`
-2. Registrarlo in `tool_manager.py`:
+2. Registrarlo in `core/tool_manager.py`:
    ```python
    from tools.my_tool import MyTool
    # in initialize():
    "my_tool": MyTool(),
    ```
-3. Aggiungerlo al `SYSTEM_PROMPT` in `agent_core.py` nella sezione "Tool disponibili"
----
- 
-## Note Tecniche
- 
-- Il routing del modello in `_route_intent()` utilizza una logica ibrida: Hard Routing per task comuni e LLM Router per quelli complessi, ottimizzando i tempi di risposta.
-- Il **ReAct Loop** è ottimizzato per evitare il "double routing", determinando l'intent una sola volta fuori dal ciclo.
-- `VoiceManager` include una fase di calibrazione automatica per adattarsi al rumore ambientale e migliorare l'accuratezza del trigger.
-- `ChromaDB` garantisce che l'agente possa ricordare fatti avvenuti mesi prima, iniettandoli come contesto nel prompt.
----
- 
-## .gitignore — Cosa viene escluso
- 
+3. Aggiungerlo al `SYSTEM_PROMPT` in `core/agent_core.py` nella sezione "Tool disponibili"
+
+### Interfaccia Tool
+
+```python
+class MyTool:
+    def initialize(self) -> None: ...
+    def execute(self, action: dict) -> dict: ...
+    # Per tool asincroni:
+    async def execute(self, action: dict) -> dict: ...
 ```
-data/          # memory.json, calendar.json, notes.json
+
+Contratto di risposta:
+
+```json
+{ "status": "ok" | "error" | "warning", "message": "..." }
+```
+
+---
+
+## Formato JSON LLM
+
+Il sistema prompt forza l'LLM a rispondere in questo schema:
+
+```json
+{
+  "intent": "descrizione breve del task",
+  "layout": "orb | weather | map | browser | news | dashboard",
+  "layout_params": {},
+  "actions": [
+    { "tool": "weather", "location": "Crema" },
+    { "tool": "arduino", "command": "LIGHT_ON" }
+  ],
+  "reply": "Risposta naturale in italiano"
+}
+```
+
+In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le keyword più comuni senza LLM.
+
+---
+
+## Note Tecniche
+
+- Il **routing dell'intent** utilizza una logica ibrida: instradamento diretto per task comuni e router LLM per quelli complessi, ottimizzando i tempi di risposta
+- Il **ReAct Loop** è ottimizzato per evitare il "doppio routing": l'intent viene determinato una sola volta fuori dal ciclo
+- **Uscita anticipata**: se il tool produce un risultato soddisfacente al primo step, il sistema non fa riformulazione superflua
+- `VoiceManager` include una fase di calibrazione VAD automatica per adattarsi al rumore ambientale
+- `ChromaDB` garantisce che l'agente ricordi fatti avvenuti giorni o settimane prima
+- Catena di fallback: **Groq (cloud) → Ollama (locale) → Parser a keyword (offline)**
+
+---
+
+## Milestone di Progetto
+
+| Data | Verifica | Obiettivo |
+|---|---|---|
+| 16/05/2026 | Verifica 1 | Schema scelto, prime prove hardware, dashboard aperta, almeno un dispositivo che risponde |
+| 23/05/2026 | Verifica 2 | Flusso completo comando → elaborazione → Arduino → feedback |
+| 30/05/2026 | Verifica 3 | Demo stabile, correzione errori, prova con pubblico interno, video di backup pronto |
+| 04/06/2026 | Arduino Day | Solo rifinitura e presentazione. Niente nuove funzioni |
+
+---
+
+## Roadmap
+
+### Completati
+- [x] Architettura agentica ReAct con routing ibrido
+- [x] Voce bidirezionale (Whisper locale + Piper TTS)
+- [x] Memoria semantica (ChromaDB + embedding Ollama)
+- [x] Monitoraggio proattivo (CPU/RAM/calendario)
+- [x] Dashboard HUD bimodale con orb 3D e slider animato
+- [x] Panoramica trading live senza API key
+- [x] Meteo HUD con mappa Leaflet e previsioni
+- [x] Notizie HUD con articolo in evidenza + ticker
+- [x] Comunicazione seriale Arduino con auto-discovery e simulazione
+- [x] Multi-modello LLM con catena di fallback (Groq → Ollama → Parser)
+- [x] Wrapper desktop Electron
+
+### In corso
+- [ ] Allineamento protocollo firmware Arduino ↔ Python
+- [ ] Espansione elementi domotici (RGB, tapparella, ventola, allarme, sensori)
+- [ ] Scene e routine aggiuntive (notte, studio, uscita, ospite)
+- [ ] Pannello "stato casa" nella dashboard con comandi rapidi
+
+### Futuro
+- [ ] Google Calendar sync (OAuth2)
+- [ ] Streaming LLM token-by-token via WebSocket
+- [ ] Plugin system dinamico (hot-reload senza restart)
+- [ ] Multi-room Arduino con broker MQTT
+- [ ] Dashboard mobile (PWA)
+- [ ] Notifiche visive su cambio stato casa
+- [ ] Memoria preferenze utente persistente
+
+---
+
+## .gitignore — Cosa viene escluso
+
+```
+data/          # chroma_db, memory_metadata, calendar, notes
 .env           # credenziali e configurazioni locali
 .venv/         # virtualenv
 __pycache__/
+node_modules/
 .vscode/
+.windsurf/
+logs/
+scratch/
+.dist/
 ```
- 
----
- 
-## Roadmap
 
-- [x] Voice I/O (Whisper local + TTS)
-- [x] Semantic Memory (ChromaDB)
-- [x] Proactive Monitoring System
-- [x] Dashboard HUD bimodale con orb 3D e slider animato
-- [x] Trading live overview (BTC/ETH/SOL/SPY/AAPL/NVDA/TSLA) senza API key
-- [x] Grafico TradingView reale embed nel pannello trading
-- [x] Meteo HUD con mappa Leaflet e dati estesi (umidità, pressione, visibilità)
-- [x] News HUD con featured article + sidebar + ticker
-- [ ] Google Calendar sync (oauth2 già predisposto in requirements)
-- [ ] Streaming LLM response via WebSocket (token-by-token)
-- [ ] Plugin system dinamico (hot-reload tool senza restart)
-- [ ] Multi-room Arduino (broker MQTT)
-- [ ] Dashboard mobile (PWA)
 ---
- 
+
 ## Autori
- 
-Progetto sviluppato da studenti dell'**ITIS di Crema**.
- 
+
+Progetto sviluppato da studenti dell'**ITIS di Crema** per l'**Arduino Day 2026**.
+
 | | |
 |---|---|
 | **Gabriele Rossoni** — *Project Manager & Lead Developer* | Ideazione, architettura e sviluppo principale del sistema. |
 | **Marcello Patrini** — *Co-Developer* | Contributi allo sviluppo e testing. |
- 
+
 [![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-gabrielerossoni-181717?style=flat-square&logo=github)](https://github.com/gabrielerossoni)
- 
+
 ---
- 
-<p align="center">Fatto dall'<strong>ITIS di Crema</strong></p>
+
+<p align="center">
+  <strong>M.A.Y.A.</strong> — Un cervello per la casa, non l'ennesimo chatbot.<br>
+  <em>ITIS di Crema • Arduino Day 2026</em>
+</p>

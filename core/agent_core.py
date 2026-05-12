@@ -109,9 +109,12 @@ Esempi:
 Rispondi SOLO con la categoria: DOMOTIC, REASONING o CHITCHAT."""
 
 SPECIALIST_PROMPTS = {
-    "DOMOTIC": DEFAULT_PROMPT + "\nFOCUS: Sii estremamente concisa e usa i tool appropriati. Rispondi SEMPRE in JSON.",
-    "REASONING": DEFAULT_PROMPT + "\nFOCUS: Fornisci risposte approfondite e strutturate. Se l'utente chiede CODICE, scrivi codice pulito e commentato.",
-    "CHITCHAT": DEFAULT_PROMPT + "\nFOCUS: Sii amichevole ma professionale (personalità 'tough'). Mantieni le risposte brevi.",
+    "DOMOTIC": DEFAULT_PROMPT
+    + "\nFOCUS: Sii estremamente concisa e usa i tool appropriati. Rispondi SEMPRE in JSON.",
+    "REASONING": DEFAULT_PROMPT
+    + "\nFOCUS: Fornisci risposte approfondite e strutturate. Se l'utente chiede CODICE, scrivi codice pulito e commentato.",
+    "CHITCHAT": DEFAULT_PROMPT
+    + "\nFOCUS: Sii amichevole ma professionale (personalità 'tough'). Mantieni le risposte brevi.",
 }
 
 # Messaggi di filler per il feedback durante l'elaborazione (zero latenza aggiuntiva)
@@ -125,13 +128,26 @@ FILLER_MESSAGES = [
 
 
 # ──────────────────────────────────────────────
-# AUTOMAZIONI PREDEFINITE
+# AUTOMAZIONI PREDEFINITE (SCENE CASA)
 # ──────────────────────────────────────────────
+# Ogni scena è una lista di azioni eseguite in sequenza.
+# Per aggiungere una scena: AUTOMATIONS["nome scena"] = [azioni...]
+# Per aggiungere dispositivi futuri (RGB, buzzer, ventola, tapparella):
+#   {"tool": "arduino", "command": "RGB_SET", "value": "#FF8800"}
+#   {"tool": "arduino", "command": "BUZZER_ON"}
+#   {"tool": "arduino", "command": "FAN_ON"}
+#   {"tool": "arduino", "command": "BLIND_OPEN"}
+# ──────────────────────────────────────────────
+
 AUTOMATIONS = {
+    # ── Scene esistenti ──────────────────────────
     "buonanotte": [
         {"tool": "arduino", "command": "LIGHT_OFF"},
+        {"tool": "arduino", "command": "SERVO_CLOSE"},
         {"tool": "network", "message": "GOODNIGHT"},
         {"tool": "system", "command": "shutdown"},
+        # TODO: {"tool": "arduino", "command": "RGB_OFF"},
+        # TODO: {"tool": "arduino", "command": "BLIND_CLOSE"},
     ],
     "modalità lavoro": [
         {"tool": "arduino", "command": "LIGHT_ON"},
@@ -142,6 +158,48 @@ AUTOMATIONS = {
         {"tool": "arduino", "command": "RELAY_ON"},
         {"tool": "arduino", "command": "LIGHT_OFF"},
         {"tool": "system", "command": "open_browser"},
+        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#1A0033"},
+    ],
+    # ── Scene nuove (template per espansione futura) ──
+    "modalità notte": [
+        {"tool": "arduino", "command": "LIGHT_OFF"},
+        {"tool": "arduino", "command": "SERVO_CLOSE"},
+        {"tool": "arduino", "command": "RELAY_OFF"},
+        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#000033"},  # blu notte
+        # TODO: {"tool": "arduino", "command": "BLIND_CLOSE"},
+        # TODO: {"tool": "arduino", "command": "FAN_OFF"},
+    ],
+    "modalità studio": [
+        {"tool": "arduino", "command": "LIGHT_ON"},
+        {"tool": "arduino", "command": "RELAY_OFF"},
+        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FFE0B2"},  # bianco caldo
+        # TODO: {"tool": "arduino", "command": "FAN_OFF"},
+    ],
+    "modalità relax": [
+        {"tool": "arduino", "command": "LIGHT_OFF"},
+        {"tool": "arduino", "command": "RELAY_ON"},
+        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#6A0DAD"},  # viola
+        # TODO: {"tool": "arduino", "command": "FAN_ON"},
+    ],
+    "modalità uscita": [
+        {"tool": "arduino", "command": "LIGHT_OFF"},
+        {"tool": "arduino", "command": "RELAY_OFF"},
+        {"tool": "arduino", "command": "SERVO_CLOSE"},
+        # TODO: {"tool": "arduino", "command": "RGB_OFF"},
+        # TODO: {"tool": "arduino", "command": "BLIND_CLOSE"},
+        # TODO: {"tool": "arduino", "command": "BUZZER_ON"},  # conferma allarme attivo
+    ],
+    "modalità ospite": [
+        {"tool": "arduino", "command": "LIGHT_ON"},
+        {"tool": "arduino", "command": "SERVO_OPEN"},
+        {"tool": "arduino", "command": "RELAY_ON"},
+        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FFFFFF"},  # bianco pieno
+    ],
+    "modalità gaming": [
+        {"tool": "arduino", "command": "LIGHT_OFF"},
+        {"tool": "arduino", "command": "RELAY_ON"},
+        {"tool": "system", "command": "open_browser"},
+        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FF0044"},  # rosso gaming
     ],
 }
 
@@ -179,30 +237,50 @@ class AgentCore:
         lower = user_input.lower()
         words = lower.split()
         word_count = len(words)
-        
+
         # --- 0. ECCEZIONI (MAI HARD-ROUTE) ---
         # Se contiene citazioni, domande di spiegazione o è troppo lunga
         never_hard_route = [
-            "parla di", "spiegami", "cosa pensi", "perché", "come mai", "cosa significa"
+            "parla di",
+            "spiegami",
+            "cosa pensi",
+            "perché",
+            "come mai",
+            "cosa significa",
         ]
-        if (any(x in lower for x in never_hard_route) or 
-            '"' in user_input or 
-            "'" in user_input or
-            word_count > 12):
+        if (
+            any(x in lower for x in never_hard_route)
+            or '"' in user_input
+            or "'" in user_input
+            or word_count > 12
+        ):
             return await self._llm_routing(user_input)
 
         # --- 1. HARD ROUTING: DOMOTIC ---
         # Azione hardware esplicita: VERBO + OGGETTO
         domotic_verbs = ["accendi", "spegni", "apri", "chiudi"]
         domotic_objects = ["luce", "led", "relè", "servo", "tapparella"]
-        if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
+        if any(v in lower for v in domotic_verbs) and any(
+            o in lower for o in domotic_objects
+        ):
             print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Hardware)")
             return "DOMOTIC"
 
         # Finanza: PREZZO/QUANTO VALE + ASSET
         crypto_verbs = ["prezzo", "quanto vale", "quotazione"]
-        crypto_assets = ["bitcoin", "btc", "eth", "ethereum", "crypto", "azioni", "sp500", "nasdaq"]
-        if any(v in lower for v in crypto_verbs) and any(a in lower for a in crypto_assets):
+        crypto_assets = [
+            "bitcoin",
+            "btc",
+            "eth",
+            "ethereum",
+            "crypto",
+            "azioni",
+            "sp500",
+            "nasdaq",
+        ]
+        if any(v in lower for v in crypto_verbs) and any(
+            a in lower for a in crypto_assets
+        ):
             print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Finance)")
             return "DOMOTIC"
 
@@ -210,15 +288,26 @@ class AgentCore:
         if any(x in lower for x in ["meteo", "che tempo fa", "temperatura"]):
             print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Meteo)")
             return "DOMOTIC"
-        
-        if any(x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]):
+
+        if any(
+            x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]
+        ):
             print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (News)")
             return "DOMOTIC"
 
         # Spotify: VERBO + OGGETTO
-        spotify_verbs = ["metti", "riproduci", "play", "pausa", "prossimo brano", "volume"]
+        spotify_verbs = [
+            "metti",
+            "riproduci",
+            "play",
+            "pausa",
+            "prossimo brano",
+            "volume",
+        ]
         spotify_objects = ["musica", "spotify", "canzone", "brano"]
-        if any(v in lower for v in spotify_verbs) and any(o in lower for o in spotify_objects):
+        if any(v in lower for v in spotify_verbs) and any(
+            o in lower for o in spotify_objects
+        ):
             print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Spotify)")
             return "DOMOTIC"
 
@@ -226,12 +315,12 @@ class AgentCore:
         # Saluto puro o messaggio brevissimo senza keyword tool
         greetings = ["ciao", "hey", "salve", "buon"]
         is_greeting = any(lower.startswith(g) for g in greetings)
-        
+
         # Se è un saluto e non ci sono altre keyword (finanza/meteo/ecc già controllate sopra)
         if is_greeting and word_count <= 4:
             print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Saluto)")
             return "CHITCHAT"
-        
+
         if word_count <= 2:
             print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Short)")
             return "CHITCHAT"
@@ -246,7 +335,7 @@ class AgentCore:
             if os.getenv("GROQ_API_KEY"):
                 messages = [
                     {"role": "system", "content": ROUTER_PROMPT},
-                    {"role": "user", "content": user_input}
+                    {"role": "user", "content": user_input},
                 ]
                 response_text = await self._call_groq(messages, json_mode=False)
                 if response_text:
@@ -267,7 +356,7 @@ class AgentCore:
                     "temperature": 0.0,
                     "num_predict": 10,
                 },
-                keep_alive="10m"
+                keep_alive="10m",
             )
             intent = response.get("response", "CHITCHAT").strip().upper()
             for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
@@ -287,7 +376,7 @@ class AgentCore:
         # Rimuovi markdown code fences
         text = re.sub(r"```(?:json)?\s*", "", text).strip()
         # Estrai il primo oggetto JSON completo
-        match = re.search(r'\{.*\}', text, re.DOTALL)
+        match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             text = match.group(0)
         try:
@@ -295,7 +384,7 @@ class AgentCore:
             # Salvataggio layout per propagazione
             self._last_layout = {
                 "type": result.get("layout", "orb"),
-                "params": result.get("layout_params", {})
+                "params": result.get("layout_params", {}),
             }
             return result
         except json.JSONDecodeError:
@@ -311,11 +400,13 @@ class AgentCore:
 
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {"Authorization": f"Bearer {api_key}"}
-        
+
         # Scegli il modello in base al contenuto dei messaggi (se router o meno)
         # Se json_mode è False, probabilmente siamo nel routing
         model_env = "GROQ_ROUTER_MODEL" if not json_mode else "GROQ_MODEL"
-        default_model = "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
+        default_model = (
+            "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
+        )
         model = os.getenv(model_env, default_model)
 
         payload = {
@@ -347,14 +438,14 @@ class AgentCore:
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         payload = {
             "model": "llama-3.3-70b-versatile",
             "messages": messages,
             "response_format": {"type": "json_object"},
             "temperature": 0.1,
-            "max_tokens": 1000
+            "max_tokens": 1000,
         }
 
         try:
@@ -372,16 +463,18 @@ class AgentCore:
         """Pipeline specialistica ottimizzata: Router e Retrieval in parallelo."""
         # 1. Avvia Routing e Retrieval semantico in parallelo per risparmiare tempo
         routing_task = asyncio.create_task(self._route_intent(user_input))
-        context_task = asyncio.create_task(self.memory.get_context(query=user_input, top_k=5))
-        
+        context_task = asyncio.create_task(
+            self.memory.get_context(query=user_input, top_k=5)
+        )
+
         # Aspetta il risultato del router
         intent = await routing_task
-        
+
         # 2. Selezione Specialista
         model_key = intent.lower()
         model_name = MODELS.get(model_key, MODELS["chitchat"])
         system_prompt = SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)
-        
+
         print(f"[PIPELINE] Specialist: {model_key.upper()} | Model: {model_name}")
 
         # Feedback all'utente se il modello è pesante
@@ -393,10 +486,10 @@ class AgentCore:
             # Aspetta che il contesto sia pronto (potrebbe essere già finito)
             context = await context_task
             prompt = f"{context}\nUtente: {user_input}"
-            
+
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt},
             ]
 
             # PRIORITÀ GROQ
@@ -415,15 +508,15 @@ class AgentCore:
                     format="json",
                     stream=False,
                     options={"temperature": 0.3 if intent == "CHITCHAT" else 0.1},
-                    keep_alive="10m"
+                    keep_alive="10m",
                 )
 
                 text = response.get("response", "{}")
                 result = self._clean_json(text)
-                
+
                 if "reply" not in result and "response" in result:
                     result["reply"] = result["response"]
-                
+
                 return result
 
             except (ollama.ResponseError, httpx.ConnectError, ConnectionError) as e:
@@ -431,8 +524,8 @@ class AgentCore:
                 groq_res = await self._call_groq_fallback(messages)
                 if groq_res:
                     return groq_res
-                raise # Rilancia per il fallback parse se anche Groq fallisce
-        
+                raise  # Rilancia per il fallback parse se anche Groq fallisce
+
         except Exception as e:
             print(f"[LLM] Errore pipeline {intent}: {e}")
             return self._fallback_parse(user_input)
@@ -457,6 +550,7 @@ class AgentCore:
             reply = "Servo aperto!"
         elif "aggiungi" in lower or "evento" in lower or "riunione" in lower:
             from datetime import datetime
+
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
             actions.append(
                 {
@@ -495,14 +589,14 @@ class AgentCore:
                     "spotify": "spotify",
                     "calendar": "calendar",
                     "trading": "trading",
-                    "sys_monitor": "stats"
+                    "sys_monitor": "stats",
                 }
-                
+
                 if tool_name in ws_map and result.get("status") == "ok":
                     msg_type = ws_map[tool_name]
                     # Alcuni tool mettono i dati in 'data', altri no
                     payload = {"type": msg_type}
-                    
+
                     if "data" in result:
                         if isinstance(result["data"], dict):
                             payload.update(result["data"])
@@ -511,11 +605,11 @@ class AgentCore:
                     else:
                         # Fallback: metti tutto il risultato nel payload
                         payload.update(result)
-                    
+
                     # Rimuovi campi ridondanti
                     payload.pop("status", None)
                     payload.pop("message", None)
-                    
+
                     print(f"[EXECUTOR] Broadcasting {msg_type} for dashboard")
                     await self.socket_manager.broadcast(payload)
 
@@ -548,7 +642,7 @@ class AgentCore:
         # 2. ReAct Loop
         max_steps = 5
         current_step = 0
-        
+
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
         intent = await self._route_intent(user_input)
 
@@ -557,13 +651,13 @@ class AgentCore:
             print(f"[PIPELINE] Single-shot CHITCHAT per: '{user_input}'")
             messages = [
                 {"role": "system", "content": SPECIALIST_PROMPTS["CHITCHAT"]},
-                {"role": "user", "content": user_input}
+                {"role": "user", "content": user_input},
             ]
-            
+
             res_text = None
             if os.getenv("GROQ_API_KEY"):
                 res_text = await self._call_groq(messages, json_mode=True)
-            
+
             if not res_text:
                 client = ollama.AsyncClient()
                 response = await client.chat(
@@ -571,29 +665,35 @@ class AgentCore:
                     messages=messages,
                     format="json",
                     options={"temperature": 0.7},
-                    keep_alive="10m"
+                    keep_alive="10m",
                 )
                 res_text = response["message"]["content"]
-            
+
             result = self._clean_json(res_text)
             final_reply = result.get("reply", "")
             if final_reply:
-                for token in re.findall(r'.*?\s|.*$', final_reply):
+                for token in re.findall(r".*?\s|.*$", final_reply):
                     yield token
                 await self.memory.add_turn("jarvis", final_reply)
                 return
 
         context = await self.memory.get_context(query=user_input, top_k=5)
-        
+
         # Inizializziamo la memoria di lavoro per il loop
         history = [
-            {"role": "system", "content": SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)},
-            {"role": "user", "content": f"CONTESTO PASSATO RILEVANTE:\n{context}\n\nRichiesta utente: {user_input}"}
+            {
+                "role": "system",
+                "content": SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT),
+            },
+            {
+                "role": "user",
+                "content": f"CONTESTO PASSATO RILEVANTE:\n{context}\n\nRichiesta utente: {user_input}",
+            },
         ]
 
         final_reply = ""
         model_name = MODELS.get(intent.lower(), MODELS["domotic"])
-        
+
         print(f"[ReAct] Avvio loop ({intent}) per: '{user_input}'")
 
         while current_step < max_steps:
@@ -603,32 +703,32 @@ class AgentCore:
             # 2b. Chiedi all'LLM cosa fare
             try:
                 full_response_text = ""
-                
+
                 # PRIORITÀ GROQ
                 if os.getenv("GROQ_API_KEY"):
                     full_response_text = await self._call_groq(history, json_mode=True)
-                
+
                 # FALLBACK OLLAMA
                 if not full_response_text:
                     client = ollama.AsyncClient()
-                    
+
                     # Streaming della risposta dell'LLM
                     # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
                     # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
                     # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
-                    
+
                     response = await client.chat(
                         model=model_name,
                         messages=history,
                         format="json",
                         options={"temperature": 0.1},
                         keep_alive="10m",
-                        stream=False
+                        stream=False,
                     )
                     full_response_text = response["message"]["content"]
-                
+
                 plan = self._clean_json(full_response_text)
-                
+
                 actions = plan.get("actions", [])
                 thought = plan.get("thought", "")
                 reply = plan.get("reply", "")
@@ -641,14 +741,16 @@ class AgentCore:
                     if reply:
                         final_reply = reply
                         # Stream the final reply token by token
-                        for token in re.findall(r'.*?\s|.*$', final_reply):
+                        for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token
-                            await asyncio.sleep(0.02) # Piccola pausa per effetto streaming
+                            await asyncio.sleep(
+                                0.02
+                            )  # Piccola pausa per effetto streaming
                     else:
                         print(f"[ReAct] Reply vuota — richiamo pipeline specialistica.")
                         fallback = await self._call_llm(user_input, progress_cb)
                         final_reply = fallback.get("reply") or "Come posso aiutarti?"
-                        for token in re.findall(r'.*?\s|.*$', final_reply):
+                        for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token
                             await asyncio.sleep(0.01)
                     break
@@ -657,9 +759,9 @@ class AgentCore:
                 if actions:
                     if progress_cb and reply:
                         await progress_cb(reply)
-                    
+
                     results = await self._execute_actions(actions)
-                    
+
                     # 2d. Crea osservazione per il prossimo step
                     observation = ""
                     for res in results:
@@ -670,30 +772,44 @@ class AgentCore:
                         observation += f"Risultato tool '{tool}' ({status}): {msg}\n"
 
                     print(f"[ReAct] Osservazione: {observation.strip()}")
-                    
+
                     # --- EARLY EXIT CHECK ---
                     # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
                     # consistente, usciamo senza fare lo Step 2 (riformulazione).
-                    is_error = any(res.get("result", {}).get("status") == "error" for res in results)
+                    is_error = any(
+                        res.get("result", {}).get("status") == "error"
+                        for res in results
+                    )
                     is_short_q_reply = "?" in user_input and len(reply) < 30
-                    
+
                     critical_tools = ["none", "code_generator"]
-                    has_critical_tool = any(res["tool"] in critical_tools for res in results)
-                    
-                    if (not is_error and 
-                        len(actions) == 1 and 
-                        not has_critical_tool and 
-                        len(reply) > 15 and 
-                        not is_short_q_reply):
-                        print(f"[ReAct] Early Exit: risposta soddisfacente dopo Step 1.")
+                    has_critical_tool = any(
+                        res["tool"] in critical_tools for res in results
+                    )
+
+                    if (
+                        not is_error
+                        and len(actions) == 1
+                        and not has_critical_tool
+                        and len(reply) > 15
+                        and not is_short_q_reply
+                    ):
+                        print(
+                            f"[ReAct] Early Exit: risposta soddisfacente dopo Step 1."
+                        )
                         final_reply = reply
-                        for token in re.findall(r'.*?\s|.*$', final_reply):
+                        for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token
                         break
 
                     # Aggiungi azione e osservazione alla storia
                     history.append({"role": "assistant", "content": full_response_text})
-                    history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale."})
+                    history.append(
+                        {
+                            "role": "user",
+                            "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale.",
+                        }
+                    )
 
             except Exception as e:
                 print(f"[ReAct] Errore step {current_step}: {e}")
@@ -707,7 +823,10 @@ class AgentCore:
 
         # Salva risposta nella memoria
         await self.memory.add_turn("jarvis", final_reply)
-        
-        # In un async generator non si può usare 'return value' prima di Python 3.10 
+
+        # In un async generator non si può usare 'return value' prima di Python 3.10
         # o in contesti specifici. Usiamo un attributo per passare il layout finale.
-        self._last_final_data = (final_reply, getattr(self, '_last_layout', {"type": "orb", "params": {}}))
+        self._last_final_data = (
+            final_reply,
+            getattr(self, "_last_layout", {"type": "orb", "params": {}}),
+        )

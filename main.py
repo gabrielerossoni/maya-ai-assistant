@@ -21,6 +21,7 @@ from core.websocket_manager import WebSocketManager
 from core.log_utils import setup_dashboard_log_filter, user_log
 from core.voice_manager import VoiceManager
 from core.websocket_manager import manager
+
 # Variabili globali per i task in background
 _bg_tasks = []
 _log_filter_applied = False
@@ -47,6 +48,7 @@ def _ollama_addr() -> tuple[str, int]:
 
 async def _ollama_api_reachable(timeout: float = 0.75) -> bool:
     """Versione non-bloccante del check raggiungibilità Ollama."""
+
     def _check():
         host, port = _ollama_addr()
         try:
@@ -54,6 +56,7 @@ async def _ollama_api_reachable(timeout: float = 0.75) -> bool:
                 return True
         except OSError:
             return False
+
     return await asyncio.to_thread(_check)
 
 
@@ -219,7 +222,7 @@ def start_ngrok(port: int) -> str | None:
             popen_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
         subprocess.Popen(**popen_kw)
-        
+
         # Aspetta che ngrok sia pronto (max 5s)
         for _ in range(10):
             time.sleep(0.5)
@@ -231,7 +234,7 @@ def start_ngrok(port: int) -> str | None:
                         return t["public_url"]
             except Exception:
                 continue
-        
+
         return None
     except FileNotFoundError:
         print("[NGROK] ngrok non trovato nel PATH")
@@ -251,29 +254,23 @@ async def weather_broadcaster():
                 result = await asyncio.to_thread(weather_tool.execute, {})
                 if result.get("status") == "ok":
                     user_log(f"Meteo aggiornato per {result['data']['location']}.")
-                    await manager.broadcast({
-                        "type": "weather",
-                        "data": result.get("data")
-                    })
+                    await manager.broadcast(
+                        {"type": "weather", "data": result.get("data")}
+                    )
                 else:
-                    await manager.broadcast({
-                        "type": "weather",
-                        "error": True
-                    })
+                    await manager.broadcast({"type": "weather", "error": True})
         except Exception as e:
             print(f"[BROADCASTER] Errore meteo: {e}")
-            await manager.broadcast({
-                "type": "weather",
-                "error": True
-            })
+            await manager.broadcast({"type": "weather", "error": True})
         await asyncio.sleep(1800)
+
 
 async def news_broadcaster():
     """Trasmette le ultime notizie alla dashboard ogni 10 minuti."""
     # Aspetta che almeno un client sia connesso prima di caricare le notizie all'avvio
     while not manager.active_connections:
         await asyncio.sleep(1)
-        
+
     while True:
         try:
             # Recupera il news_tool ogni volta dal tool_manager dell'agente globale
@@ -283,13 +280,13 @@ async def news_broadcaster():
                 result = await asyncio.to_thread(news_tool.execute, {"limit": 5})
                 if result.get("status") == "ok":
                     user_log("Ultime notizie caricate.")
-                    await manager.broadcast({
-                        "type": "news",
-                        "articles": result.get("news", [])
-                    })
+                    await manager.broadcast(
+                        {"type": "news", "articles": result.get("news", [])}
+                    )
         except Exception as e:
             print(f"[BROADCASTER] Errore news: {e}")
         await asyncio.sleep(600)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -317,22 +314,22 @@ async def lifespan(app: FastAPI):
         print(f"{'='*50}\n")
     else:
         print("[NGROK] Tunnel non avviato, solo accesso locale.")
-    
+
     # Inizializza PluginLoader e ProactiveManager
     plugins_dir = os.path.join(os.getcwd(), "plugins")
     os.makedirs(plugins_dir, exist_ok=True)
-    
+
     plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
     plugin_loader.start()
-    
+
     proactive_manager = ProactiveManager(agent.tool_manager, manager)
     asyncio.create_task(proactive_manager.start_loop())
-    
+
     print("[SYSTEM] Online.")
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
 
     dashboard_path = os.path.abspath("static/jarvis_dashboard.html")
-    
+
     # Avvia la console e i broadcaster in background
     global _bg_tasks
     _bg_tasks = [
@@ -340,9 +337,9 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(stats_broadcaster()),
         asyncio.create_task(spotify_broadcaster()),
         asyncio.create_task(news_broadcaster()),
-        asyncio.create_task(weather_broadcaster())
+        asyncio.create_task(weather_broadcaster()),
     ]
-    
+
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
     def _open_browser():
         time.sleep(1.5)
@@ -357,18 +354,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[VOICE] Impossibile avviare il sistema vocale: {e}")
         import traceback
+
         traceback.print_exc()
 
     # Registra hook Arduino per eventi push
     arduino_tool = agent.tool_manager.tools.get("arduino")
     if arduino_tool:
+
         def arduino_event_handler(event: dict):
             asyncio.run_coroutine_threadsafe(
                 manager.broadcast({"type": "arduino_event", **event}),
-                asyncio.get_event_loop()
+                asyncio.get_event_loop(),
             )
+
         arduino_tool.register_event_hook(arduino_event_handler)
-    
+
     yield
     # Shutdown
     print("\n[SYSTEM] Spegnimento in corso...")
@@ -376,7 +376,7 @@ async def lifespan(app: FastAPI):
     # Cancella i task in background al termine
     for task in _bg_tasks:
         task.cancel()
-    
+
     # Tool Cleanup
     for name, tool in agent.tool_manager.tools.items():
         if hasattr(tool, "close"):
@@ -441,11 +441,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     if action:
                         result = await agent.tool_manager.execute(action)
                         if action.get("tool") == "calendar" and "events" in result:
-                            await manager.broadcast({
-                                "type": "calendar_data",
-                                "events": result.get("events", [])
-                            })
-                        elif action.get("tool") == "trading" and result.get("status") == "ok":
+                            await manager.broadcast(
+                                {
+                                    "type": "calendar_data",
+                                    "events": result.get("events", []),
+                                }
+                            )
+                        elif (
+                            action.get("tool") == "trading"
+                            and result.get("status") == "ok"
+                        ):
                             rdata = result.get("data", {})
                             if rdata.get("overview"):
                                 # Broadcast ogni item singolarmente (accumulator nel frontend)
@@ -492,37 +497,34 @@ async def execute_and_broadcast(cmd: str):
     # Streaming dei token
     full_reply = ""
     # Inizia con l'emoji
-    await manager.broadcast({
-        "type": "stream",
-        "token": "🤖 MAYA: ",
-        "full_text": "🤖 MAYA: "
-    })
+    await manager.broadcast(
+        {"type": "stream", "token": "🤖 MAYA: ", "full_text": "🤖 MAYA: "}
+    )
     full_reply = "🤖 MAYA: "
 
     layout_data = {"type": "orb", "params": {}}
     try:
         async for token in agent.process(cmd, progress_cb=send_progress):
             full_reply += token
-            await manager.broadcast({
-                "type": "stream",
-                "token": token,
-                "full_text": full_reply
-            })
-        
+            await manager.broadcast(
+                {"type": "stream", "token": token, "full_text": full_reply}
+            )
+
         # Dopo la fine del generatore, recuperiamo i dati finali dall'attributo dell'agente
-        if hasattr(agent, '_last_final_data'):
+        if hasattr(agent, "_last_final_data"):
             _, layout_data = agent._last_final_data
-            
+
     except Exception as e:
         print(f"[PROCESS] Errore: {e}")
 
-
     # Invia il layout finale alla dashboard
-    await manager.broadcast({
-        "type": "layout",
-        "layout": layout_data.get("type", "orb"),
-        "params": layout_data.get("params", {})
-    })
+    await manager.broadcast(
+        {
+            "type": "layout",
+            "layout": layout_data.get("type", "orb"),
+            "params": layout_data.get("params", {}),
+        }
+    )
 
     print(f"MAYA > {full_reply}")
 
@@ -568,8 +570,10 @@ async def broadcast_state():
     arduino_tool = agent.tool_manager.tools.get("arduino")
     models_status = await get_models_status()
     ollama_online = any(m.get("online", False) for m in models_status.values())
-    
-    _debug_reset_client = os.environ.get("MAYA_DEBUG_RESET_CLIENT", "").strip().lower() in ("1", "true", "yes")
+
+    _debug_reset_client = os.environ.get(
+        "MAYA_DEBUG_RESET_CLIENT", ""
+    ).strip().lower() in ("1", "true", "yes")
 
     state_payload = {
         "type": "state",
@@ -676,17 +680,19 @@ async def interactive_console():
             try:
                 async for token in agent.process(user_input):
                     full_reply += token
-                
-                if hasattr(agent, '_last_final_data'):
+
+                if hasattr(agent, "_last_final_data"):
                     _, layout_data = agent._last_final_data
             except Exception as e:
                 print(f"[CONSOLE] Errore: {e}")
-            
-            await manager.broadcast({
-                "type": "layout",
-                "layout": layout_data.get("type", "orb"),
-                "params": layout_data.get("params", {})
-            })
+
+            await manager.broadcast(
+                {
+                    "type": "layout",
+                    "layout": layout_data.get("type", "orb"),
+                    "params": layout_data.get("params", {}),
+                }
+            )
             print(f"MAYA > {full_reply}")
 
         except EOFError:
