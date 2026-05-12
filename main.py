@@ -243,7 +243,6 @@ def start_ngrok(port: int) -> str | None:
 
 async def weather_broadcaster():
     """Trasmette il meteo alla dashboard ogni 30 minuti."""
-    print("[BROADCASTER] Avvio loop meteo.")
     while True:
         try:
             weather_tool = agent.tool_manager.tools.get("weather")
@@ -271,7 +270,10 @@ async def weather_broadcaster():
 
 async def news_broadcaster():
     """Trasmette le ultime notizie alla dashboard ogni 10 minuti."""
-    print("[BROADCASTER] Avvio loop news.")
+    # Aspetta che almeno un client sia connesso prima di caricare le notizie all'avvio
+    while not manager.active_connections:
+        await asyncio.sleep(1)
+        
     while True:
         try:
             # Recupera il news_tool ogni volta dal tool_manager dell'agente globale
@@ -293,7 +295,6 @@ async def news_broadcaster():
 async def lifespan(app: FastAPI):
     # Startup
     print_banner()
-    print("\n[SYSTEM] Avvio dei sistemi MAYA...\n")
     # Imposta il loop prima di ogni altra cosa
     try:
         agent.loop = asyncio.get_running_loop()
@@ -327,12 +328,11 @@ async def lifespan(app: FastAPI):
     proactive_manager = ProactiveManager(agent.tool_manager, manager)
     asyncio.create_task(proactive_manager.start_loop())
     
-    print("\n[SYSTEM] Sistemi operativi. Avvio interfaccia visiva...\n")
+    print("[SYSTEM] Online.")
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
 
     dashboard_path = os.path.abspath("static/jarvis_dashboard.html")
-    print(f"[MAYA] Apertura dashboard: {dashboard_path}")
-
+    
     # Avvia la console e i broadcaster in background
     global _bg_tasks
     _bg_tasks = [
@@ -401,24 +401,25 @@ async def get_dashboard():
     return FileResponse("static/jarvis_dashboard.html")
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global _log_filter_applied
-    print(f"[WS] Nuova connessione da {websocket.client}")
     try:
         await manager.connect(websocket)
-        print(f"[WS] Connessione accettata. Client attivi: {len(manager.active_connections)}")
 
         # Applica il filtro log al primo collegamento del client (una sola volta)
         if not _log_filter_applied:
-            print("[WS] Applicazione filtro log alla dashboard.")
             setup_dashboard_log_filter(manager)
             _log_filter_applied = True
 
-        print("[WS] Invio stato iniziale...")
         await broadcast_state()
         try:
             await websocket.send_json(voice_manager.voice_status_message())
@@ -444,6 +445,14 @@ async def websocket_endpoint(websocket: WebSocket):
                                 "type": "calendar_data",
                                 "events": result.get("events", [])
                             })
+                        elif action.get("tool") == "trading" and result.get("status") == "ok":
+                            rdata = result.get("data", {})
+                            if rdata.get("overview"):
+                                # Broadcast ogni item singolarmente (accumulator nel frontend)
+                                for item in rdata.get("items", []):
+                                    await manager.broadcast({"type": "trading", **item})
+                            else:
+                                await manager.broadcast({"type": "trading", **rdata})
                         else:
                             await manager.broadcast(
                                 {
@@ -490,17 +499,31 @@ async def execute_and_broadcast(cmd: str):
     })
     full_reply = "🤖 MAYA: "
 
-    async for token in agent.process(cmd, progress_cb=send_progress):
-        full_reply += token
-        await manager.broadcast({
-            "type": "stream",
-            "token": token,
-            "full_text": full_reply
-        })
+    layout_data = {"type": "orb", "params": {}}
+    try:
+        async for token in agent.process(cmd, progress_cb=send_progress):
+            full_reply += token
+            await manager.broadcast({
+                "type": "stream",
+                "token": token,
+                "full_text": full_reply
+            })
+        
+        # Dopo la fine del generatore, recuperiamo i dati finali dall'attributo dell'agente
+        if hasattr(agent, '_last_final_data'):
+            _, layout_data = agent._last_final_data
+            
+    except Exception as e:
+        print(f"[PROCESS] Errore: {e}")
 
-    # Stampa finale nel terminale per i log della dashboard (filtro esistente)
-    # Rimuoviamo il prefisso MAYA > se vogliamo gestire lo streaming separatamente lato UI
-    # ma lo lasciamo per compatibilità con il filtro log attuale se necessario.
+
+    # Invia il layout finale alla dashboard
+    await manager.broadcast({
+        "type": "layout",
+        "layout": layout_data.get("type", "orb"),
+        "params": layout_data.get("params", {})
+    })
+
     print(f"MAYA > {full_reply}")
 
     # Aggiorna lo stato del sistema (modelli, stats, ecc)
@@ -546,7 +569,7 @@ async def broadcast_state():
     models_status = await get_models_status()
     ollama_online = any(m.get("online", False) for m in models_status.values())
     
-    _debug_reset_client = False
+    _debug_reset_client = os.environ.get("MAYA_DEBUG_RESET_CLIENT", "").strip().lower() in ("1", "true", "yes")
 
     state_payload = {
         "type": "state",
@@ -581,7 +604,6 @@ async def broadcast_state():
 
 async def stats_broadcaster():
     import psutil
-    print("[BROADCASTER] Avvio loop statistiche.")
 
     # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
     psutil.cpu_percent(interval=None)
@@ -608,7 +630,6 @@ async def stats_broadcaster():
 
 
 async def spotify_broadcaster():
-    print("[BROADCASTER] Avvio loop spotify.")
     while True:
         try:
             spotify_tool = agent.tool_manager.tools.get("spotify")
@@ -650,7 +671,23 @@ async def interactive_console():
 
             # Invia il comando dal terminale come se venisse dalla dashboard
             print(f"Richiesta: {user_input}")
-            await execute_and_broadcast(user_input)
+            full_reply = ""
+            layout_data = {"type": "orb", "params": {}}
+            try:
+                async for token in agent.process(user_input):
+                    full_reply += token
+                
+                if hasattr(agent, '_last_final_data'):
+                    _, layout_data = agent._last_final_data
+            except Exception as e:
+                print(f"[CONSOLE] Errore: {e}")
+            
+            await manager.broadcast({
+                "type": "layout",
+                "layout": layout_data.get("type", "orb"),
+                "params": layout_data.get("params", {})
+            })
+            print(f"MAYA > {full_reply}")
 
         except EOFError:
             # Terminale chiuso

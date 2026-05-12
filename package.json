@@ -1,0 +1,12 @@
+{
+  "name": "maya-ai-assistant",
+  "version": "1.0.0",
+  "description": "MAYA - Multitask Advanced Yielding Assistant",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron electron/main.js"
+  },
+  "dependencies": {
+    "electron": "^28.0.0"
+  }
+}

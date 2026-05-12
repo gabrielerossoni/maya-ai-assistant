@@ -20,7 +20,7 @@ class NetworkTool:
     """Tool per comunicazione TCP con il secondo PC."""
 
     def initialize(self):
-        print(f"[NETWORK] Target: {REMOTE_HOST}:{REMOTE_PORT}")
+        pass
 
     def execute(self, action: dict) -> dict:
         """

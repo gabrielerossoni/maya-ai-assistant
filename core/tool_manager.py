@@ -37,7 +37,6 @@ class ToolManager:
             if hasattr(tool_instance, "initialize"):
                 tool_instance.initialize()
             self.tools[name] = tool_instance
-            print(f"  [✓] Tool '{name}' registrato/aggiornato")
             return True
         except Exception as e:
             print(f"  [✗] Errore registrazione tool '{name}': {e}")
@@ -47,7 +46,6 @@ class ToolManager:
         """Rimuove un tool dal registro."""
         if name in self.tools:
             del self.tools[name]
-            print(f"  [-] Tool '{name}' rimosso")
             return True
         return False
 
@@ -77,9 +75,10 @@ class ToolManager:
         for name, tool in self.tools.items():
             try:
                 tool.initialize()
-                print(f"  [✓] Tool '{name}' inizializzato")
             except Exception as e:
                 print(f"  [✗] Tool '{name}' errore init: {e}")
+        
+        print(f"[TOOLS] {len(self.tools)} tool inizializzati.")
 
     async def execute(self, action: dict) -> dict:
         """

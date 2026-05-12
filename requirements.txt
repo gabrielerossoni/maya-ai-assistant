@@ -14,6 +14,7 @@ google-api-python-client
 
 # Nuove integrazioni Jarvis
 requests
+httpx>=0.27.0
 wikipedia
 feedparser
 deep-translator

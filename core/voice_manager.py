@@ -61,19 +61,10 @@ class VoiceManager:
     def set_loop_ready(self):
         """Segnala che il loop è pronto per i broadcast."""
         self._loop_ready.set()
-        print("[VOICE] Loop di sistema pronto per i broadcast.")
 
     def _initialize_models(self):
-        print("[VOICE] Caricamento modelli vocali...")
         # STT: faster-whisper (tiny per velocità estrema)
         self.stt_model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        print("[VOICE] Attivazione con frase tipo «Ehi Maya» (Whisper + VAD RMS adattivo).")
-        print(
-            f"[VOICE] Fallback statico: RMS voce≥{self.speech_rms_threshold:.0f}, "
-            f"silenzio<{self.silence_rms_threshold:.0f}, min chunk={self.min_utterance_chunks} "
-            "(sovrascrivi con MAYA_*; MAYA_DISABLE_ADAPTIVE_VAD=1 usa solo queste)."
-        )
-        print("[VOICE] Modelli caricati con successo.")
 
     def get_dashboard_voice_status(self) -> str:
         """Stato voce da propagare sulla dashboard (WebSocket reconnect / piggyback)."""
@@ -103,7 +94,6 @@ class VoiceManager:
 
         self._broadcast("CALIBRATING")
         n = int(os.environ.get("MAYA_CALIB_CHUNKS", "36"))
-        print("[VOICE] Calibrazione rumore (~3 s): meglio ambiente tranquillo davanti al microfono.")
         chunks: list[float] = []
         for _ in range(max(12, n)):
             if not self.is_running:
@@ -322,7 +312,7 @@ class VoiceManager:
 
             self._calibrate_vad_from_stream(stream)
 
-            print("[VOICE] Microfono pronto: di' «Ehi Maya» e poi il comando.")
+            print("[VOICE] Microfono pronto.")
             self._broadcast("IDLE")
 
             while self.is_running:
@@ -362,7 +352,10 @@ class VoiceManager:
 
                 # LISTENING è già emesso dentro _record_utterance_*; dopo wake + comando inline va in PROCESSING
                 if cmd:
-                    self._process_voice_text(cmd)
+                    # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
+                    loop = self._voice_event_loop()
+                    if loop:
+                        asyncio.run_coroutine_threadsafe(self._process_voice_text(cmd), loop)
                 else:
                     self._handle_voice_command(stream)
 
@@ -423,26 +416,52 @@ class VoiceManager:
             return
 
         print(f"[VOICE] Trascrizione: {cmd_text}")
-        self._process_voice_text(cmd_text.strip())
-
-    def _process_voice_text(self, text: str):
+        # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
         loop = self._voice_event_loop()
-        if loop is None:
-            print("[VOICE] Nessun asyncio loop (agent/manager.loop): comando vocale ignorato.")
-            self._broadcast("IDLE")
-            return
+        if loop:
+            asyncio.run_coroutine_threadsafe(self._process_voice_text(cmd_text.strip()), loop)
+
+    async def _process_voice_text(self, text: str):
         self._broadcast("PROCESSING")
         try:
-            response = asyncio.run_coroutine_threadsafe(
-                self.agent.process(text),
-                loop,
-            ).result(timeout=180)
-            if response and str(response).strip():
-                self.speak(response)
+            # Per le notizie, vogliamo che l'agente legga i titoli con pause
+            is_news_request = any(word in text.lower() for word in ["notizie", "news", "notiziario", "aggiornamenti"])
+            
+            full_reply = ""
+            async for token in self.agent.process(text):
+                full_reply += token
+            
+            # Recupera dati finali (layout) salvati dall'agente
+            layout_data = {"type": "orb", "params": {}}
+            if hasattr(self.agent, '_last_final_data'):
+                _, layout_data = self.agent._last_final_data
+            
+            if full_reply.strip():
+                if self.socket_manager:
+                    await self.socket_manager.broadcast({
+                        "type": "layout",
+                        "layout": layout_data.get("type", "orb"),
+                        "params": layout_data.get("params", {})
+                    })
+                
+                if is_news_request:
+                    # Se è una richiesta di notizie, dividiamo per punti elenco o articoli
+                    articles = re.split(r'\n-|\n\*', full_reply)
+                    for article in articles:
+                        if article.strip():
+                            clean_text = article.strip().lstrip('-').lstrip('*').strip()
+                            self.speak(clean_text)
+                            time.sleep(1.5)
+                else:
+                    self.speak(full_reply)
             else:
                 print("[VOICE] Risposta agente vuota, niente TTS.")
+
         except Exception as e:
             print(f"[VOICE] Errore durante l'elaborazione: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
             self._broadcast("IDLE")
 
     def speak(self, text):

@@ -14,7 +14,6 @@ class PluginHandler(FileSystemEventHandler):
 
     def _load_all(self):
         """Carica tutti i plugin presenti all'avvio."""
-        print(f"[PLUGIN] Caricamento iniziale da {self.plugins_dir}...")
         for file in self.plugins_dir.glob("*.py"):
             if file.name != "__init__.py":
                 self._load_plugin(file)
@@ -38,9 +37,7 @@ class PluginHandler(FileSystemEventHandler):
                     self.tool_manager.register_tool(tool_name, attr())
                     found = True
             
-            if found:
-                print(f"[PLUGIN] Plugin '{module_name}' caricato con successo.")
-            else:
+            if not found:
                 print(f"[PLUGIN] Avviso: Nessuna classe *Tool trovata in {module_name}.")
                 
         except Exception as e:
@@ -74,7 +71,7 @@ class PluginLoader:
         """Avvia il monitoraggio della cartella plugins."""
         self.observer.schedule(self.event_handler, self.plugins_dir, recursive=False)
         self.observer.start()
-        print(f"[PLUGIN] Hot-reload attivo sulla cartella '{self.plugins_dir}'.")
+        print("[PLUGIN] Hot-reload attivo.")
 
     def stop(self):
         self.observer.stop()

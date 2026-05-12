@@ -9,6 +9,7 @@ import re
 import random
 import ollama
 import asyncio
+import httpx
 from .tool_manager import ToolManager
 from .memory_manager import MemoryManager
 from dotenv import load_dotenv
@@ -42,9 +43,19 @@ REGOLE DI COMPORTAMENTO:
 Struttura:
 {
   "intent": "cosa vuole l'utente",
+  "layout": "uno tra [orb, weather, map, browser, news, dashboard]",
+  "layout_params": {"chiave": "valore"},
   "actions": [{"tool": "nome_tool", "parametro": "valore"}],
   "reply": "Tua risposta discorsiva e naturale in italiano"
 }
+REGOLE LAYOUT:
+- weather: se l'utente chiede il meteo o previsioni (params: location).
+- map: se l'utente chiede una posizione geografica o indicazioni (params: query, zoom).
+- browser: se devi mostrare un sito web specifico o ricerca (params: url).
+- news: se l'utente chiede ultime notizie (params: category).
+- dashboard: per riepiloghi generali o stato casa.
+- orb: default per chitchat o quando non serve un pannello specifico.
+
 SE NON HAI BISOGNO DI TOOL, lascia "actions" come lista vuota [].
 NON aggiungere testo fuori dal JSON.
 4. NO INVENZIONE: Non inventare mai dati. Se usi un tool informativo, scrivi nella reply che stai controllando.
@@ -145,12 +156,11 @@ class AgentCore:
         self.tool_manager = ToolManager()
         self.memory = MemoryManager()
         self.conversation_history = []
+        self._last_layout = {"type": "orb", "params": {}}
 
     async def initialize(self):
         """Inizializza tutti i componenti."""
-        print("[AGENT] Inizializzazione tool manager...")
         self.tool_manager.initialize()
-        print("[AGENT] Caricamento memoria conversazioni...")
         self.memory.load()
         print("[AGENT] AgentCore pronto.\n")
 
@@ -167,22 +177,86 @@ class AgentCore:
     async def _route_intent(self, user_input: str) -> str:
         """Determina l'intent dell'utente con logica ibrida: Hard Routing + LLM."""
         lower = user_input.lower()
+        words = lower.split()
+        word_count = len(words)
         
-        # 1. HARD ROUTING: Se ci sono parole chiave critiche, usa direttamente i tool
-        tool_keywords = [
-            "bitcoin", "btc", "eth", "cripto", "s&p", "sp500", "nasdaq", 
-            "meteo", "news", "notizie", "borsa", "azioni", "prezzo", "valore",
-            "luce", "chiudi", "apri", "wikipedia", "cerca", "search"
+        # --- 0. ECCEZIONI (MAI HARD-ROUTE) ---
+        # Se contiene citazioni, domande di spiegazione o è troppo lunga
+        never_hard_route = [
+            "parla di", "spiegami", "cosa pensi", "perché", "come mai", "cosa significa"
         ]
-        if any(k in lower for k in tool_keywords):
-            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC")
+        if (any(x in lower for x in never_hard_route) or 
+            '"' in user_input or 
+            "'" in user_input or
+            word_count > 12):
+            return await self._llm_routing(user_input)
+
+        # --- 1. HARD ROUTING: DOMOTIC ---
+        # Azione hardware esplicita: VERBO + OGGETTO
+        domotic_verbs = ["accendi", "spegni", "apri", "chiudi"]
+        domotic_objects = ["luce", "led", "relè", "servo", "tapparella"]
+        if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Hardware)")
             return "DOMOTIC"
 
-        # 2. FAST PATH: se l'input è brevissimo e non è un tool, usa CHITCHAT
-        if len(user_input.split()) <= 2:
+        # Finanza: PREZZO/QUANTO VALE + ASSET
+        crypto_verbs = ["prezzo", "quanto vale", "quotazione"]
+        crypto_assets = ["bitcoin", "btc", "eth", "ethereum", "crypto", "azioni", "sp500", "nasdaq"]
+        if any(v in lower for v in crypto_verbs) and any(a in lower for a in crypto_assets):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Finance)")
+            return "DOMOTIC"
+
+        # Meteo e News (già filtrati per lunghezza > 12 sopra)
+        if any(x in lower for x in ["meteo", "che tempo fa", "temperatura"]):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Meteo)")
+            return "DOMOTIC"
+        
+        if any(x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (News)")
+            return "DOMOTIC"
+
+        # Spotify: VERBO + OGGETTO
+        spotify_verbs = ["metti", "riproduci", "play", "pausa", "prossimo brano", "volume"]
+        spotify_objects = ["musica", "spotify", "canzone", "brano"]
+        if any(v in lower for v in spotify_verbs) and any(o in lower for o in spotify_objects):
+            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Spotify)")
+            return "DOMOTIC"
+
+        # --- 2. HARD ROUTING: CHITCHAT ---
+        # Saluto puro o messaggio brevissimo senza keyword tool
+        greetings = ["ciao", "hey", "salve", "buon"]
+        is_greeting = any(lower.startswith(g) for g in greetings)
+        
+        # Se è un saluto e non ci sono altre keyword (finanza/meteo/ecc già controllate sopra)
+        if is_greeting and word_count <= 4:
+            print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Saluto)")
             return "CHITCHAT"
-            
+        
+        if word_count <= 2:
+            print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Short)")
+            return "CHITCHAT"
+
+        # --- 3. FALLBACK LLM ---
+        return await self._llm_routing(user_input)
+
+    async def _llm_routing(self, user_input: str) -> str:
+        """Routing tramite LLM (Groq -> Ollama)."""
         try:
+            # PRIORITÀ GROQ PER ROUTING
+            if os.getenv("GROQ_API_KEY"):
+                messages = [
+                    {"role": "system", "content": ROUTER_PROMPT},
+                    {"role": "user", "content": user_input}
+                ]
+                response_text = await self._call_groq(messages, json_mode=False)
+                if response_text:
+                    intent = response_text.strip().upper()
+                    for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
+                        if category in intent:
+                            print(f"[ROUTER] Intent rilevato (Groq): {category}")
+                            return category
+
+            # FALLBACK OLLAMA
             client = ollama.AsyncClient()
             response = await client.generate(
                 model=MODELS["router"],
@@ -191,19 +265,18 @@ class AgentCore:
                 stream=False,
                 options={
                     "temperature": 0.0,
-                    "num_predict": 10,  # Risposta brevissima
+                    "num_predict": 10,
                 },
-                keep_alive="10m"  # Mantieni in VRAM per 10 minuti
+                keep_alive="10m"
             )
             intent = response.get("response", "CHITCHAT").strip().upper()
-            # Pulizia output: cerca parole chiave nelle risposte discorsive
             for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
                 if category in intent:
                     print(f"[ROUTER] Intent rilevato: {category}")
                     return category
             return "CHITCHAT"
         except Exception as e:
-            print(f"[ROUTER] Errore routing: {e}")
+            print(f"[ROUTER] Errore routing LLM: {e}")
             return "CHITCHAT"
 
     def _clean_json(self, text: str) -> dict:
@@ -218,9 +291,82 @@ class AgentCore:
         if match:
             text = match.group(0)
         try:
-            return json.loads(text)
+            result = json.loads(text)
+            # Salvataggio layout per propagazione
+            self._last_layout = {
+                "type": result.get("layout", "orb"),
+                "params": result.get("layout_params", {})
+            }
+            return result
         except json.JSONDecodeError:
-            return self._fallback_parse(text)
+            result = self._fallback_parse(text)
+            self._last_layout = {"type": "orb", "params": {}}
+            return result
+
+    async def _call_groq(self, messages, json_mode=True):
+        """Chiamata primaria a Groq."""
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            return None
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        
+        # Scegli il modello in base al contenuto dei messaggi (se router o meno)
+        # Se json_mode è False, probabilmente siamo nel routing
+        model_env = "GROQ_ROUTER_MODEL" if not json_mode else "GROQ_MODEL"
+        default_model = "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
+        model = os.getenv(model_env, default_model)
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            print(f"[GROQ] Errore: {e}")
+            return None
+
+    async def _call_groq_fallback(self, messages: list) -> dict:
+        """Chiamata di fallback a Groq se Ollama non è disponibile."""
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            print("[LLM] Groq fallback saltato: GROQ_API_KEY non trovata.")
+            return {}
+
+        print("[LLM] Utilizzo fallback Groq (Llama 3.3 70B)...")
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+            "max_tokens": 1000
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                text = data["choices"][0]["message"]["content"]
+                return self._clean_json(text)
+        except Exception as e:
+            print(f"[LLM] Errore critico Groq fallback: {e}")
+            return {}
 
     async def _call_llm(self, user_input: str, progress_cb=None) -> dict:
         """Pipeline specialistica ottimizzata: Router e Retrieval in parallelo."""
@@ -247,28 +393,48 @@ class AgentCore:
             # Aspetta che il contesto sia pronto (potrebbe essere già finito)
             context = await context_task
             prompt = f"{context}\nUtente: {user_input}"
-
-            client = ollama.AsyncClient()
-            response = await client.generate(
-                model=model_name,
-                system=system_prompt,
-                prompt=prompt,
-                format="json",
-                stream=False,
-                options={"temperature": 0.3 if intent == "CHITCHAT" else 0.1},
-                keep_alive="10m"
-            )
-
-            text = response.get("response", "{}")
-            result = self._clean_json(text)
             
-            if "reply" not in result and "response" in result:
-                result["reply"] = result["response"]
-            
-            return result
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
 
+            # PRIORITÀ GROQ
+            if os.getenv("GROQ_API_KEY"):
+                response_text = await self._call_groq(messages, json_mode=True)
+                if response_text:
+                    return self._clean_json(response_text)
+
+            # FALLBACK OLLAMA
+            try:
+                client = ollama.AsyncClient()
+                response = await client.generate(
+                    model=model_name,
+                    system=system_prompt,
+                    prompt=prompt,
+                    format="json",
+                    stream=False,
+                    options={"temperature": 0.3 if intent == "CHITCHAT" else 0.1},
+                    keep_alive="10m"
+                )
+
+                text = response.get("response", "{}")
+                result = self._clean_json(text)
+                
+                if "reply" not in result and "response" in result:
+                    result["reply"] = result["response"]
+                
+                return result
+
+            except (ollama.ResponseError, httpx.ConnectError, ConnectionError) as e:
+                print(f"[LLM] Ollama non raggiungibile ({e}). Provo fallback Groq...")
+                groq_res = await self._call_groq_fallback(messages)
+                if groq_res:
+                    return groq_res
+                raise # Rilancia per il fallback parse se anche Groq fallisce
+        
         except Exception as e:
-            print(f"[LLM] Errore specialista {intent}: {e}")
+            print(f"[LLM] Errore pipeline {intent}: {e}")
             return self._fallback_parse(user_input)
 
     def _fallback_parse(self, user_input: str) -> dict:
@@ -320,6 +486,39 @@ class AgentCore:
             result = await self.tool_manager.execute(action)
             results.append({"tool": tool_name, "result": result})
             print(f"[EXECUTOR] Risultato: {result}")
+
+            # --- BROADCAST AUTOMATICO PER DASHBOARD ---
+            if self.socket_manager:
+                # Mappa i tool ai messaggi websocket
+                ws_map = {
+                    "weather": "weather",
+                    "spotify": "spotify",
+                    "calendar": "calendar",
+                    "trading": "trading",
+                    "sys_monitor": "stats"
+                }
+                
+                if tool_name in ws_map and result.get("status") == "ok":
+                    msg_type = ws_map[tool_name]
+                    # Alcuni tool mettono i dati in 'data', altri no
+                    payload = {"type": msg_type}
+                    
+                    if "data" in result:
+                        if isinstance(result["data"], dict):
+                            payload.update(result["data"])
+                        else:
+                            payload["data"] = result["data"]
+                    else:
+                        # Fallback: metti tutto il risultato nel payload
+                        payload.update(result)
+                    
+                    # Rimuovi campi ridondanti
+                    payload.pop("status", None)
+                    payload.pop("message", None)
+                    
+                    print(f"[EXECUTOR] Broadcasting {msg_type} for dashboard")
+                    await self.socket_manager.broadcast(payload)
+
         return results
 
     # ── FASE 3: VALIDATOR ────────────────────────────────
@@ -352,6 +551,38 @@ class AgentCore:
         
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
         intent = await self._route_intent(user_input)
+
+        # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
+        if intent == "CHITCHAT":
+            print(f"[PIPELINE] Single-shot CHITCHAT per: '{user_input}'")
+            messages = [
+                {"role": "system", "content": SPECIALIST_PROMPTS["CHITCHAT"]},
+                {"role": "user", "content": user_input}
+            ]
+            
+            res_text = None
+            if os.getenv("GROQ_API_KEY"):
+                res_text = await self._call_groq(messages, json_mode=True)
+            
+            if not res_text:
+                client = ollama.AsyncClient()
+                response = await client.chat(
+                    model=MODELS["chitchat"],
+                    messages=messages,
+                    format="json",
+                    options={"temperature": 0.7},
+                    keep_alive="10m"
+                )
+                res_text = response["message"]["content"]
+            
+            result = self._clean_json(res_text)
+            final_reply = result.get("reply", "")
+            if final_reply:
+                for token in re.findall(r'.*?\s|.*$', final_reply):
+                    yield token
+                await self.memory.add_turn("jarvis", final_reply)
+                return
+
         context = await self.memory.get_context(query=user_input, top_k=5)
         
         # Inizializziamo la memoria di lavoro per il loop
@@ -371,24 +602,31 @@ class AgentCore:
 
             # 2b. Chiedi all'LLM cosa fare
             try:
-                client = ollama.AsyncClient()
-                
-                # Streaming della risposta dell'LLM
                 full_response_text = ""
-                # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
-                # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
-                # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
                 
-                response = await client.chat(
-                    model=model_name,
-                    messages=history,
-                    format="json",
-                    options={"temperature": 0.1},
-                    keep_alive="10m",
-                    stream=False
-                )
+                # PRIORITÀ GROQ
+                if os.getenv("GROQ_API_KEY"):
+                    full_response_text = await self._call_groq(history, json_mode=True)
                 
-                full_response_text = response["message"]["content"]
+                # FALLBACK OLLAMA
+                if not full_response_text:
+                    client = ollama.AsyncClient()
+                    
+                    # Streaming della risposta dell'LLM
+                    # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
+                    # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
+                    # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
+                    
+                    response = await client.chat(
+                        model=model_name,
+                        messages=history,
+                        format="json",
+                        options={"temperature": 0.1},
+                        keep_alive="10m",
+                        stream=False
+                    )
+                    full_response_text = response["message"]["content"]
+                
                 plan = self._clean_json(full_response_text)
                 
                 actions = plan.get("actions", [])
@@ -433,6 +671,26 @@ class AgentCore:
 
                     print(f"[ReAct] Osservazione: {observation.strip()}")
                     
+                    # --- EARLY EXIT CHECK ---
+                    # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
+                    # consistente, usciamo senza fare lo Step 2 (riformulazione).
+                    is_error = any(res.get("result", {}).get("status") == "error" for res in results)
+                    is_short_q_reply = "?" in user_input and len(reply) < 30
+                    
+                    critical_tools = ["none", "code_generator"]
+                    has_critical_tool = any(res["tool"] in critical_tools for res in results)
+                    
+                    if (not is_error and 
+                        len(actions) == 1 and 
+                        not has_critical_tool and 
+                        len(reply) > 15 and 
+                        not is_short_q_reply):
+                        print(f"[ReAct] Early Exit: risposta soddisfacente dopo Step 1.")
+                        final_reply = reply
+                        for token in re.findall(r'.*?\s|.*$', final_reply):
+                            yield token
+                        break
+
                     # Aggiungi azione e osservazione alla storia
                     history.append({"role": "assistant", "content": full_response_text})
                     history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale."})
@@ -449,3 +707,7 @@ class AgentCore:
 
         # Salva risposta nella memoria
         await self.memory.add_turn("jarvis", final_reply)
+        
+        # In un async generator non si può usare 'return value' prima di Python 3.10 
+        # o in contesti specifici. Usiamo un attributo per passare il layout finale.
+        self._last_final_data = (final_reply, getattr(self, '_last_layout', {"type": "orb", "params": {}}))

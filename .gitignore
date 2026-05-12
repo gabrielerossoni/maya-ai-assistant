@@ -112,6 +112,10 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Node.js
+node_modules/
+package-lock.json
+
 # Environments
 .env
 .venv
@@ -157,6 +161,7 @@ Thumbs.db
 # IDEs
 .idea/
 .vscode/
+.windsurf/
 *.swp
 *.swo
 *.sublime-project

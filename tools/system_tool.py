@@ -13,7 +13,6 @@ class SystemTool:
 
     def initialize(self):
         self.os = platform.system()  # "Windows", "Linux", "Darwin"
-        print(f"[SYSTEM] OS rilevato: {self.os}")
 
     def execute(self, action: dict) -> dict:
         """

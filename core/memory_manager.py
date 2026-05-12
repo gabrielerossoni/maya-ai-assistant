@@ -42,7 +42,6 @@ class MemoryManager:
                 name="jarvis_memory",
                 metadata={"hnsw:space": "cosine"}
             )
-            print(f"[MEMORY] ChromaDB inizializzato in: {CHROMA_PERSIST_DIR}")
         except Exception as e:
             print(f"[MEMORY] Errore inizializzazione ChromaDB: {e}")
             # Fallback o gestione errore silenziosa per non bloccare l'agente
@@ -57,13 +56,14 @@ class MemoryManager:
                 with open(METADATA_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.turns = data.get("turns", [])
-                    print(f"[MEMORY] {len(self.turns)} turni caricati dai metadati.")
+                    if len(self.turns) > 0:
+                        print(f"[MEMORY] {len(self.turns)} turni in memoria.")
             except Exception as e:
                 print(f"[MEMORY] Errore caricamento metadati: {e}")
                 self.turns = []
         else:
             self.turns = []
-            print("[MEMORY] Nuova memoria inizializzata.")
+
 
     async def save(self):
         """Salva metadata su JSON."""
