@@ -39,20 +39,34 @@ class WeatherTool:
             # Secondo step: Meteo + Previsioni
             weather_url = (
                 f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-                "&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode"
+                "&current_weather=true"
+                "&hourly=relativehumidity_2m,surface_pressure,visibility"
+                "&daily=temperature_2m_max,temperature_2m_min,weathercode"
                 "&timezone=auto"
             )
             w_res = requests.get(weather_url).json()
             current = w_res.get("current_weather", {})
             daily = w_res.get("daily", {})
+            hourly = w_res.get("hourly", {})
             
             code = current.get("weathercode")
             condition, icon = self.WMO_CODES.get(code, ("Variabile", "cloud-sun"))
+
+            # Prendi valori attuali da hourly (prima ora disponibile)
+            humidity = hourly.get("relativehumidity_2m", [None])[0]
+            pressure = hourly.get("surface_pressure", [None])[0]
+            visibility_m = hourly.get("visibility", [None])[0]
+            visibility_km = round(visibility_m / 1000, 1) if visibility_m else None
             
             data = {
                 "location": name,
+                "lat": lat,
+                "lon": lon,
                 "temp": current.get("temperature"),
                 "wind": current.get("windspeed"),
+                "humidity": humidity,
+                "pressure": round(pressure) if pressure else None,
+                "visibility": visibility_km,
                 "code": code,
                 "condition": condition,
                 "icon": icon,

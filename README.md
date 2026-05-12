@@ -1,5 +1,5 @@
-# M.A.Y.A. 🧠 — Multitask Advanced Yielding Assistant
- 
+# M.A.Y.A. — Multitask Advanced Yielding Assistant
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-black?style=for-the-badge&logo=ollama&logoColor=white)
@@ -10,7 +10,8 @@
 ![Issues](https://img.shields.io/github/issues/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
 ![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
  
-Sistema AI agentico locale, offline-first, costruito su **Ollama** + **FastAPI** con architettura **Planner → Executor → Validator** e dashboard WebSocket in tempo reale.
+Sistema AI agentico locale, offline-first, costruito su **Ollama** + **FastAPI** con architettura **Planner → Executor → Validator**.
+Dashboard HUD ispirata a Jarvis/MAYA con due schermate, orb 3D, WebSocket real-time e pannelli live per meteo, trading, notizie, domotica e calendario.
  
 ---
  
@@ -47,15 +48,17 @@ flowchart LR
 ---
  
 ## Caratteristiche
- 
+
 - **Agentic ReAct Loop** — ciclo di ragionamento asincrono (Ragiona → Agisci → Osserva) con routing intelligente dell'intent fuori dal loop per massime performance.
 - **Voice I/O Integrato** — STT via `faster-whisper` (tiny) e TTS via `Piper` (modello Paola) con VAD (Voice Activity Detection) adattivo e calibrazione rumore ambientale.
-- **Memoria Semantica Vettoriale** — Memory persistente con database vettoriale **ChromaDB** per il recupero del contesto a lungo termine e sliding window per la coerenza immediata.
-- **Monitoraggio Proattivo** — Sistema di checker in background che notificano all'utente eventi critici (CPU/RAM alta, eventi calendario imminenti) via WebSocket.
-- **Sicurezza & Robustezza** — Protezione da shell injection, gestione automatica dei leak di memoria (Futures timeout) e sincronizzazione thread-safe per i broadcast.
-- **Setup Semplificato** — Avvio automatico di Ollama locale (se configurato) e gestione intelligente della simulazione hardware.
-- **Dashboard WebSocket real-time** — CPU, RAM, log, stato vocale e controlli hardware aggiornati istantaneamente.
-- **Display ASCII** — Pannello di stato animato su terminale separato per un feedback visivo immediato.
+- **Memoria Semantica Vettoriale** — Memory persistente con database vettoriale **ChromaDB** per recupero contesto a lungo termine e sliding window per la coerenza immediata.
+- **Monitoraggio Proattivo** — Checker in background per CPU/RAM alta ed eventi calendario imminenti, broadcast via WebSocket.
+- **Dashboard HUD bimodale** — Schermata idle con orologio e particelle, schermata work con orb 3D Three.js, slider verticale animato tra le due. Pannelli: Meteo, Notizie, Trading, Dashboard, Calendario, Mappa, Browser, Spotify.
+- **Trading live senza API key** — Overview automatica di BTC/ETH/SOL/SPY/AAPL/NVDA/TSLA con prezzi e variazioni 24h (CoinGecko + yfinance). Grafico reale via TradingView embed.
+- **Meteo HUD** — Mappa Leaflet, temperatura hero, forecast 5 giorni, umidità/pressione/visibilità con mini-grafici animati.
+- **News HUD** — Featured article + sidebar + ticker scorrevole da RSS ANSA.
+- **Sicurezza & Robustezza** — Shell injection protection, Futures timeout, thread-safe broadcast, graceful degradation hardware.
+- **Display ASCII** — Pannello di stato animato su terminale separato.
 ---
  
 ## Stack Tecnologico
@@ -75,7 +78,7 @@ flowchart LR
 | Traduzione | deep-translator (Google backend) |
 | Monitoring | psutil |
 | Media | keyboard (media keys) + webbrowser |
-| Frontend | Tailwind CDN + Chart.js + GSAP + Lucide |
+| Frontend | Three.js (orb 3D) + Leaflet.js (mappe) + TradingView Widget |
 | Persistenza | ChromaDB (vettoriale) + JSON locale |
 | Voice | Faster-Whisper + Piper TTS |
  
@@ -112,7 +115,9 @@ maya/
 │   └── jarvis_controller.ino  # Firmware Arduino: LED, relay, servo, serial protocol
 │
 ├── static/
-│   └── jarvis_dashboard.html  # SPA dashboard (Tailwind + Chart.js + GSAP)
+│   ├── jarvis_dashboard.html  # SPA dashboard HUD — Two-screen slider, Three.js orb, pannelli live
+│   ├── sfondo-maya.png        # Background work-mode (griglia HUD)
+│   └── maya_logo_no_sfondo.png
 │
 ├── data/                    # Runtime data (gitignored)
 │   ├── memory.json
@@ -291,17 +296,25 @@ Il server accetta payload JSON `{ "command": "...", "source": "jarvis" }` e risp
 Il frontend si connette a `ws://127.0.0.1:8000/ws`.
  
 Messaggi server → client:
- 
+
 ```json
-{ "type": "log",   "text": "...", "level": "ok|info|warn" }
-{ "type": "stats", "neural_load": 12.4, "memory": 45.2, ... }
-{ "type": "state", "led": "on", "relay": "off", "servo": "closed", ... }
+{ "type": "log",     "text": "...", "level": "ok|info|warn" }
+{ "type": "stats",   "neural_load": 12.4, "memory": 45.2 }
+{ "type": "state",   "led": "on", "relay": "off", "servo": "closed" }
+{ "type": "weather", "location": "Crema", "temp": 21, "wind": 12, "humidity": 65, "pressure": 1013, "visibility": 20, "lat": 45.3, "lon": 9.6, "forecast": [...] }
+{ "type": "trading", "symbol": "BTC", "price": 68000, "price_str": "$68,000.00", "change_pct": 2.4, "asset_type": "crypto" }
+{ "type": "news",    "articles": [ {"title": "...", "summary": "...", "source": "ANSA", "link": "..."} ] }
+{ "type": "calendar_data", "events": [...] }
+{ "type": "spotify", "track": "...", "artist": "...", "art": "..." }
+{ "type": "voice_status", "status": "listening|speaking|idle" }
 ```
- 
+
 Messaggi client → server:
- 
+
 ```json
 { "type": "command", "text": "accendi la luce" }
+{ "type": "tool", "action": { "tool": "trading", "operation": "overview" } }
+{ "type": "tool", "action": { "tool": "calendar", "operation": "list" } }
 ```
  
 ---
@@ -339,10 +352,15 @@ __pycache__/
 ---
  
 ## Roadmap
- 
-- [X] Voice I/O (Whisper local + TTS)
-- [X] Semantic Memory (ChromaDB)
-- [X] Proactive Monitoring System
+
+- [x] Voice I/O (Whisper local + TTS)
+- [x] Semantic Memory (ChromaDB)
+- [x] Proactive Monitoring System
+- [x] Dashboard HUD bimodale con orb 3D e slider animato
+- [x] Trading live overview (BTC/ETH/SOL/SPY/AAPL/NVDA/TSLA) senza API key
+- [x] Grafico TradingView reale embed nel pannello trading
+- [x] Meteo HUD con mappa Leaflet e dati estesi (umidità, pressione, visibilità)
+- [x] News HUD con featured article + sidebar + ticker
 - [ ] Google Calendar sync (oauth2 già predisposto in requirements)
 - [ ] Streaming LLM response via WebSocket (token-by-token)
 - [ ] Plugin system dinamico (hot-reload tool senza restart)

@@ -445,6 +445,14 @@ async def websocket_endpoint(websocket: WebSocket):
                                 "type": "calendar_data",
                                 "events": result.get("events", [])
                             })
+                        elif action.get("tool") == "trading" and result.get("status") == "ok":
+                            rdata = result.get("data", {})
+                            if rdata.get("overview"):
+                                # Broadcast ogni item singolarmente (accumulator nel frontend)
+                                for item in rdata.get("items", []):
+                                    await manager.broadcast({"type": "trading", **item})
+                            else:
+                                await manager.broadcast({"type": "trading", **rdata})
                         else:
                             await manager.broadcast(
                                 {

@@ -6,10 +6,7 @@
     <title>MAYA | Neural Interface</title>
     <link rel="icon" type="image/png" href="/static/maya_logo_no_sfondo.png">
     
-    <!-- Three.js r128 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <!-- Leaflet 1.9.4 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -26,18 +23,16 @@
             --hud-color: rgba(255, 0, 0, 0.4);
         }
 
-        @font-face {
-            font-family: 'Geometos';
-            src: url('https://fonts.cdnfonts.com/s/14885/Geometos.woff') format('woff');
-        }
-
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap');
 
+        /* =============================================
+           SCREEN SLIDER SYSTEM
+           Screen 1 (idle): sfondo nero, orb, clock
+           Screen 2 (work): sfondo-maya.png "tavolo da lavoro"
+           ============================================= */
+
         body {
-            background: #1e1e20; /* Grigio opaco Maya */
-            background-image: 
-                url('https://www.transparenttextures.com/patterns/stardust.png'),
-                radial-gradient(circle at 30% 30%, rgba(255,255,255,0.03) 0%, transparent 70%);
+            background: #000000;
             color: var(--text-main);
             font-family: 'Sora', sans-serif;
             overflow: hidden;
@@ -46,19 +41,48 @@
             margin: 0;
         }
 
-        /* Rimossi filtri e pseudo-elementi sopra il contenuto */
-
-        #maya-orb-container {
-            position: fixed;
-            top: 45%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 420px; height: 420px;
-            z-index: 100;
-            transition: var(--transition);
-            cursor: pointer;
-            /* Rimosso sfondo nero fisso che copriva l'orb Three.js */
-            background: transparent;
+        #screen-slider {
+            width: 100vw;
+            height: 200vh;
+            transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
         }
+
+        body.work-mode #screen-slider {
+            transform: translateY(-100vh);
+        }
+
+        #screen-idle {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background: #000000;
+        }
+
+        #screen-work {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background-color: #0a0406;
+            background-image: url('/static/sfondo-maya.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* Vignette sottile su screen-work */
+        #screen-work::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.45) 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* =============================================
+           LOGO
+           ============================================= */
         #top-logo {
             position: fixed;
             top: 15px;
@@ -72,20 +96,16 @@
             transition: var(--transition);
         }
 
+        body.work-mode #top-logo,
         body.content-open #top-logo {
             opacity: 0;
             transform: translateX(-20px);
-        }
-        body::after {
-            content: "";
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.4) 100%);
             pointer-events: none;
-            z-index: 201;
         }
 
-        /* --- MAYA ORB --- */
+        /* =============================================
+           ORB
+           ============================================= */
         #maya-orb-container {
             position: fixed;
             top: 45%; left: 50%;
@@ -94,6 +114,7 @@
             z-index: 100;
             transition: var(--transition);
             cursor: pointer;
+            background: transparent;
         }
 
         #maya-orb-container.corner {
@@ -120,7 +141,7 @@
             text-align: center;
             opacity: 0.8;
             display: block;
-            text-indent: 12px; /* Bilancia l'ultimo letter-spacing */
+            text-indent: 12px;
             transition: var(--transition);
         }
 
@@ -136,6 +157,7 @@
             display: block;
         }
 
+
         #orb-canvas {
             position: absolute;
             top: 0; left: 0;
@@ -143,25 +165,28 @@
             z-index: 101;
         }
 
-        /* --- CLOCK --- */
+        /* =============================================
+           CLOCK — Screen 1
+           ============================================= */
         #idle-clock {
-            position: fixed;
+            position: absolute;
             top: 78%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
             z-index: 10;
-            transition: var(--transition);
+            transition: opacity 0.6s ease, visibility 0.6s ease, transform 0.6s ease;
             pointer-events: none;
         }
+
         #idle-clock .time { 
             font-family: 'Sora', sans-serif;
             font-size: 58px; 
             font-weight: 100; 
             letter-spacing: -1px; 
             color: rgba(255, 255, 255, 0.35);
-            text-shadow: none;
             line-height: 1;
         }
+
         #idle-clock .date { 
             font-family: 'Syncopate', sans-serif;
             font-size: 9px; 
@@ -169,30 +194,35 @@
             text-transform: uppercase; 
             letter-spacing: 0.5em;
             margin-top: 12px;
-            opacity: 1;
         }
-        
-        body.content-open #idle-clock { opacity: 0; visibility: hidden; transform: translate(-50%, -60%); }
 
-        /* --- CONTENT AREA --- */
+        body.content-open #idle-clock {
+            opacity: 0;
+            visibility: hidden;
+            transform: translate(-50%, -60%);
+        }
+
+        /* =============================================
+           CONTENT AREA — Screen 2
+           ============================================= */
         #content-area {
-            position: fixed;
-            top: 0; right: -80vw;
-            width: 75vw; height: 100vh;
-            background: rgba(26, 27, 38, 0.9); /* Allineato al nuovo sfondo più chiaro */
-            border-left: 1px solid rgba(255, 30, 30, 0.15);
-            z-index: 50;
+            position: absolute;
+            top: 0; right: -100vw;
+            width: 100vw; height: 100vh;
+            box-sizing: border-box;
+            background: rgba(4, 4, 8, 0.94);
+            z-index: 10;
             transition: var(--transition);
             padding: 40px;
             overflow: hidden;
-            backdrop-filter: blur(25px);
+            backdrop-filter: blur(40px);
             pointer-events: none;
             opacity: 0;
         }
 
         #content-area.open { 
             right: 0; 
-            padding: 48px 48px 48px 56px;
+            padding: 32px 48px 40px 156px;
             pointer-events: auto;
             opacity: 1;
         }
@@ -200,237 +230,534 @@
         .panel { display: none; height: 100%; flex-direction: column; gap: 30px; }
         .panel.active { display: flex; animation: fadeIn 0.5s ease forwards; }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
 
-        /* --- PANELS STYLING --- */
-        /* --- WEATHER PANEL - MAYA NEURAL DASHBOARD --- */
+        /* =============================================
+           WEATHER PANEL — redesign
+           ============================================= */
         #panel-weather {
-            display: none; /* Cambiato da grid a none di default */
-            grid-template-columns: 320px 1fr;
-            grid-template-rows: 1fr 240px;
-            gap: 15px;
-            height: calc(100vh - 100px);
-            padding: 10px;
+            display: none;
+            height: calc(100vh - 80px);
+            padding: 0;
             overflow: hidden;
-            background: none;
         }
         #panel-weather.active {
-            display: grid; /* Mostra come grid solo quando attivo */
+            display: flex;
+            flex-direction: row;
             animation: fadeIn 0.5s ease forwards;
         }
-
-        /* Top Left: Main Current Weather */
-        .weather-main-card {
-            grid-column: 1;
-            grid-row: 1;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 30, 30, 0.1);
-            padding: 30px;
+        .wx-left {
+            flex: 1;
+            min-width: 0;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            position: relative;
-            backdrop-filter: blur(10px);
         }
-        .weather-main-card::before {
-            content: 'DATI_LIVE';
-            position: absolute;
-            top: 10px; right: 15px;
+        .wx-topbar {
+            display: flex;
+            align-items: center;
+            padding: 26px 40px;
+            gap: 52px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(20px);
+        }
+        .wx-tag {
             font-family: 'Syncopate', sans-serif;
-            font-size: 8px;
+            font-size: 7px;
+            letter-spacing: 3px;
             color: var(--accent);
-            letter-spacing: 2px;
-        }
-
-        .weather-main-card .city {
-            font-family: 'Syncopate';
-            font-size: 24px;
-            letter-spacing: 4px;
-            margin-bottom: 5px;
-        }
-        .weather-main-card .condition {
-            font-size: 12px;
-            opacity: 0.4;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-        .weather-main-card .temp-large {
-            font-size: 100px;
-            font-weight: 100;
-            letter-spacing: -5px;
-            margin: 20px 0;
-            color: #fff;
-        }
-
-        /* Top Right: Map / Neural Visualization */
-        .weather-map-area {
-            grid-column: 2;
-            grid-row: 1;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            position: relative;
-            overflow: hidden;
-        }
-        #weather-mini-map {
-            width: 100%; height: 100%;
-            filter: grayscale(1) invert(1) brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(3);
             opacity: 0.6;
+            margin-bottom: 7px;
         }
-        .map-overlay-hud {
-            position: absolute;
-            inset: 0;
-            border: 20px solid transparent;
-            border-image: radial-gradient(circle, transparent 70%, rgba(255,30,30,0.1) 100%) 1;
-            pointer-events: none;
+        .wx-city {
+            font-size: 34px;
+            font-weight: 100;
+            letter-spacing: -1px;
+            line-height: 1;
         }
-
-        /* Bottom Row: Detailed Stats */
-        .weather-bottom-grid {
-            grid-column: 1 / span 2;
-            grid-row: 2;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-        }
-
-        .weather-stat-card {
-            background: rgba(255, 255, 255, 0.01);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-        .weather-stat-card .label {
+        .wx-cond {
             font-family: 'Syncopate', sans-serif;
             font-size: 8px;
-            letter-spacing: 2px;
-            opacity: 0.3;
-            margin-bottom: 15px;
+            opacity: 0.28;
+            letter-spacing: 3px;
             text-transform: uppercase;
+            margin-top: 8px;
         }
-        .weather-stat-card .value {
-            font-family: 'JetBrains Mono';
-            font-size: 28px;
-            color: #fff;
+        .wx-temp-block {
+            display: flex;
+            align-items: flex-start;
+            line-height: 1;
         }
-        .weather-stat-card .sub-value {
-            font-size: 10px;
-            opacity: 0.3;
+        .wx-temp {
+            font-size: 88px;
+            font-weight: 100;
+            letter-spacing: -6px;
+            line-height: 0.85;
+            transition: color 1s ease, text-shadow 1s ease;
+        }
+        .wx-unit {
+            font-size: 22px;
+            opacity: 0.18;
+            margin-top: 8px;
+            margin-left: 5px;
+        }
+        .wx-feels { margin-left: auto; text-align: right; }
+        .wx-feels-val { font-size: 22px; font-weight: 200; opacity: 0.55; }
+        .wx-feels-label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px; letter-spacing: 2px; opacity: 0.22; margin-top: 4px;
+        }
+        .wx-wind {
+            border-left: 1px solid rgba(255,255,255,0.06);
+            padding-left: 52px;
+        }
+        .wx-wind-val {
+            font-size: 34px;
+            font-weight: 200;
+            letter-spacing: -1px;
+        }
+        .wx-wind-val span { font-size: 13px; opacity: 0.28; }
+        .wx-wind-label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 2px;
+            opacity: 0.22;
             margin-top: 5px;
         }
-
-        /* Mini Graph Simulation */
-        .mini-graph {
-            height: 60px;
-            width: 100%;
-            margin-top: auto;
-            position: relative;
-            overflow: hidden;
-        }
-        .mini-graph svg { width: 100%; height: 100%; }
-        .mini-graph polyline {
-            fill: none;
-            stroke: var(--accent);
-            stroke-width: 1.5;
-            stroke-opacity: 0.6;
-        }
-
-        /* Forecast Sidebar within Main Panel */
-        .forecast-strip {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .forecast-item-mini {
+        .wx-radar {
             flex: 1;
-            text-align: center;
-            background: rgba(255,255,255,0.03);
-            padding: 10px 5px;
-            border: 1px solid rgba(255,255,255,0.05);
+            min-height: 0;
+            position: relative;
         }
-        .forecast-item-mini .day { font-size: 8px; opacity: 0.4; margin-bottom: 5px; }
-        .forecast-item-mini .temp { font-size: 11px; font-family: 'JetBrains Mono'; }
-
-        #panel-weather .temp-unit {
+        #weather-mini-map { width: 100%; height: 100%; }
+        .wx-forecast {
+            width: 260px;
+            flex-shrink: 0;
+            border-left: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: rgba(255,255,255,0.01);
+        }
+        .wx-fc-hdr {
             font-family: 'Syncopate', sans-serif;
-            font-size: 40px;
-            font-weight: 700;
-            color: var(--accent);
-            opacity: 0.8;
+            font-size: 7px;
+            letter-spacing: 3px;
+            opacity: 0.18;
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            flex-shrink: 0;
         }
-
-        #panel-weather .label {
+        .wx-fc-row {
+            display: flex;
+            align-items: center;
+            padding: 16px 22px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            gap: 10px;
+            transition: all 0.2s;
+            border-left: 2px solid transparent;
+        }
+        .wx-fc-row:hover {
+            background: rgba(255,255,255,0.02);
+            border-left-color: rgba(255,30,30,0.35);
+        }
+        .wx-fc-day {
             font-family: 'Syncopate', sans-serif;
             font-size: 8px;
-            letter-spacing: 2px;
-            opacity: 0.3;
-            margin-bottom: 15px;
-            text-transform: uppercase;
-        }
-        
-        #panel-map { height: 100%; width: 100%; border-radius: 12px; overflow: hidden; }
-        #map-container { height: 100%; width: 100%; }
-
-        #panel-browser iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: white; }
-
-        #panel-news .news-list { display: flex; flex-direction: column; gap: 20px; }
-        .news-item { 
-            padding: 24px 28px; 
-            border: 1px solid rgba(255,255,255,0.06); 
-            border-radius: 16px; 
-            background: rgba(255,255,255,0.02);
-            cursor: pointer; 
-            transition: all 0.2s ease; 
-        }
-        .news-item:hover { 
-            background: rgba(255,255,255,0.04); 
-            border-color: rgba(255,30,30,0.2);
-            transform: translateX(4px);
-        }
-        .news-item .news-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 10px;
-        }
-        .news-item .news-source { opacity: 0.3; }
-        .news-item .news-date { opacity: 0.2; }
-        .news-item .news-title {
-            font-size: 15px;
-            font-weight: 600;
-            line-height: 1.4;
-            margin-bottom: 8px;
-            color: rgba(255,255,255,0.9);
-        }
-        .news-item .news-summary {
-            font-size: 12px;
+            letter-spacing: 1px;
             opacity: 0.4;
-            line-height: 1.6;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            -webkit-box-orient: vertical;
+            width: 36px;
+            text-transform: uppercase;
+        }
+        .wx-fc-desc {
+            flex: 1;
+            font-size: 10px;
+            opacity: 0.45;
+            text-transform: capitalize;
+        }
+        .wx-fc-temps { font-size: 14px; font-weight: 200; }
+        .wx-fc-min { opacity: 0.28; font-size: 11px; margin-left: 5px; }
+
+        /* =============================================
+           NEWS PANEL — HUD redesign
+           ============================================= */
+        #panel-news {
+            display: none;
+            flex-direction: column;
+            height: calc(100vh - 80px);
+            padding: 0;
+            gap: 0;
             overflow: hidden;
         }
-        .news-item .news-more {
-            font-size: 10px;
-            margin-top: 12px;
-            opacity: 0;
-            transition: 0.2s;
+        #panel-news.active {
+            display: flex;
+            animation: fadeIn 0.5s ease forwards;
         }
-        .news-item:hover .news-more {
+        .news-ticker-bar {
+            flex-shrink: 0;
+            height: 36px;
+            background: rgba(255, 30, 30, 0.04);
+            border-bottom: 1px solid rgba(255, 30, 30, 0.12);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+        .news-ticker-track {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+            height: 100%;
+            padding: 0 16px;
+            white-space: nowrap;
+            animation: scroll-ticker 50s linear infinite;
+        }
+        .ntk-label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 3px;
+            color: var(--accent);
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+        .ntk-item { font-size: 11px; opacity: 0.65; flex-shrink: 0; }
+        .ntk-sep { opacity: 0.15; font-size: 10px; flex-shrink: 0; }
+        .news-main-area {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 12px;
+            padding: 12px 0 0 0;
+            overflow: hidden;
+        }
+        /* Live news stream grid */
+        .news-live-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 3px;
+            overflow: hidden;
+            background: #000;
+        }
+        .news-stream-tile {
+            position: relative;
+            overflow: hidden;
+            background: #0a0406;
+        }
+        .news-stream-tile iframe {
+            width: 100%; height: 100%;
+            border: none; display: block;
+        }
+        .ns-live-label {
+            position: absolute;
+            top: 7px; left: 7px;
+            font-family: 'Syncopate', sans-serif;
+            font-size: 6px;
+            letter-spacing: 2px;
+            color: #fff;
+            background: rgba(0,0,0,0.65);
+            padding: 3px 7px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .ns-live-dot {
+            display: inline-block;
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: var(--accent);
+            margin-right: 5px;
+            animation: pulse 1.5s ease infinite;
+            vertical-align: middle;
+        }
+        .news-sidebar {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.04);
+            background: rgba(255,255,255,0.01);
+            overflow: hidden;
+        }
+        .news-sidebar-header {
+            padding: 12px 18px;
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 3px;
+            opacity: 0.22;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            flex-shrink: 0;
+        }
+        .news-sidebar-list { flex: 1; overflow-y: auto; }
+        .ns-item {
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .ns-item:hover { background: rgba(255,30,30,0.03); }
+        .ns-rank {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 9px;
+            color: var(--accent);
+            opacity: 0.35;
+            flex-shrink: 0;
+            padding-top: 2px;
+            min-width: 20px;
+        }
+        .ns-content { flex: 1; min-width: 0; }
+        .ns-source {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 6px;
+            letter-spacing: 2px;
+            color: var(--accent);
             opacity: 0.5;
+            margin-bottom: 5px;
         }
+        .ns-title { font-size: 11px; line-height: 1.5; opacity: 0.78; }
 
+        /* =============================================
+           DASHBOARD PANEL
+           ============================================= */
         #panel-dashboard .dash-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
         .stat-card { padding: 30px; border: var(--glass-border); border-radius: 16px; background: rgba(255,255,255,0.02); }
         .stat-card h3 { font-size: 12px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 10px; }
-        .stat-card .val { font-size: 32px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .stat-card .val { font-size: 32px; font-weight: 600; }
+        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .device-btn { padding: 15px; border: var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); text-align: center; font-weight: 600; cursor: pointer; }
+        .device-btn.on { border-color: #4CAF50; color: #4CAF50; box-shadow: 0 0 10px rgba(76,175,80,0.2); }
 
-        /* --- CMD INPUT --- */
+        /* =============================================
+           CALENDAR PANEL
+           ============================================= */
+        #panel-calendar .event-item {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #panel-calendar .event-time { opacity: 0.4; font-size: 13px; }
+
+        /* =============================================
+           TRADING PANEL — Redesigned
+           ============================================= */
+        #panel-trading {
+            display: none;
+            flex-direction: column;
+            height: calc(100vh - 100px);
+            padding: 0;
+            overflow: hidden;
+            gap: 0;
+        }
+        #panel-trading.active {
+            display: flex;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        /* Ticker strip — top bar con asset e % change */
+        .trading-ticker-strip {
+            width: 100%;
+            height: 40px;
+            background: rgba(255, 30, 30, 0.04);
+            border-bottom: 1px solid rgba(255, 30, 30, 0.12);
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .ticker-track {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            height: 100%;
+            padding: 0 20px;
+            white-space: nowrap;
+            animation: scroll-ticker 30s linear infinite;
+        }
+        @keyframes scroll-ticker {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .ticker-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .ticker-item .tk-symbol {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 10px;
+            letter-spacing: 2px;
+            opacity: 0.7;
+        }
+        .ticker-item .tk-price { color: #fff; font-weight: 400; }
+        .ticker-item .tk-change { font-size: 10px; font-weight: 600; }
+        .up { color: #4CAF50; }
+        .down { color: #f44336; }
+        .ticker-item .tk-change.up { color: #4CAF50; }
+        .ticker-item .tk-change.down { color: #f44336; }
+        .ticker-item .tk-sep {
+            width: 1px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.08);
+            margin-left: 10px;
+        }
+
+        /* Trading body — news left, chart+info right */
+        .trading-body {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 15px;
+            padding: 15px;
+            overflow: hidden;
+        }
+
+        .trading-news-feed {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .trading-news-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .trading-tag {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            opacity: 0.7;
+        }
+        .trading-news-title {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 10px;
+            letter-spacing: 3px;
+            opacity: 0.4;
+            text-transform: uppercase;
+        }
+        .trading-news-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .trading-news-item {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 2px solid transparent;
+        }
+        .trading-news-item:hover {
+            background: rgba(255, 30, 30, 0.03);
+            border-left-color: rgba(255,30,30,0.3);
+        }
+        .tn-logo-wrap { width: 26px; height: 26px; flex-shrink: 0; position: relative; }
+        .tn-logo {
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            object-fit: contain;
+            background: rgba(255,255,255,0.06);
+            flex-shrink: 0;
+        }
+        .tn-logo-badge {
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            background: rgba(255,30,30,0.1);
+            border: 1px solid rgba(255,30,30,0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Syncopate', sans-serif;
+            font-size: 6px; letter-spacing: 0;
+            flex-shrink: 0;
+        }
+        .tn-body { flex: 1; min-width: 0; }
+        .trading-news-item .tn-title {
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.3;
+            margin-bottom: 5px;
+        }
+        .trading-news-item .tn-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            opacity: 0.3;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .trading-right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .trading-chart-area {
+            flex: 1;
+            background: #000;
+            border: 1px solid rgba(255, 30, 30, 0.12);
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .trading-chart-area::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 28px; height: 28px;
+            border-top: 1px solid rgba(255,30,30,0.5);
+            border-left: 1px solid rgba(255,30,30,0.5);
+            z-index: 5; pointer-events: none;
+        }
+        .trading-chart-area::after {
+            content: '';
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 28px; height: 28px;
+            border-bottom: 1px solid rgba(255,30,30,0.5);
+            border-right: 1px solid rgba(255,30,30,0.5);
+            z-index: 5; pointer-events: none;
+        }
+        #main-trading-graph { flex: 1; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+        #main-trading-graph iframe { width: 100%; height: 100%; border: none; display: block; }
+
+        .trading-info-bottom {
+            background: rgba(255, 30, 30, 0.02);
+            border: 1px solid rgba(255, 30, 30, 0.08);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        .trading-info-bottom .label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 2px;
+            opacity: 0.3;
+        }
+        .trading-info-bottom .big-val {
+            font-size: 22px;
+            color: #fff;
+            margin-top: 6px;
+        }
+
+        /* =============================================
+           CMD INPUT
+           ============================================= */
         #cmd-container {
             position: fixed;
             bottom: 50px;
@@ -476,26 +803,26 @@
             box-shadow: 0 0 20px rgba(255, 30, 30, 0.15);
         }
 
+        body.content-open #cmd-container {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         #cmd-container.corner #cmd-input {
             text-align: left;
-            padding: 8px 12px;
-            font-size: 11px;
-            border-radius: 20px;
-            opacity: 0.5;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important; /* Rimosso bordo rosso */
+            padding: 6px 10px;
+            font-size: 10px;
+            border-radius: 4px;
+            opacity: 0;
+            border: none !important;
             outline: none !important;
             box-shadow: none !important;
-            background: rgba(255, 255, 255, 0.03) !important;
+            background: transparent !important;
         }
 
-        #cmd-input:focus {
-            border-color: rgba(255, 255, 255, 0.2) !important; /* Grigio soft al focus */
-            background: rgba(255, 255, 255, 0.08) !important;
-            box-shadow: none !important;
-            opacity: 1 !important;
-        }
-
-        /* --- LOG STRIP --- */
+        /* =============================================
+           LOG STRIP
+           ============================================= */
         #log-strip {
             position: fixed;
             bottom: 0; left: 0; width: 100%;
@@ -510,8 +837,9 @@
             text-overflow: ellipsis;
         }
 
-        /* --- ARDUINO CONTROLS --- */
-        /* --- SPOTIFY FLOATING WIDGET --- */
+        /* =============================================
+           SPOTIFY WIDGET
+           ============================================= */
         #spotify-widget {
             position: fixed;
             top: 120px;
@@ -528,15 +856,8 @@
             backdrop-filter: blur(20px);
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        #spotify-widget.active {
-            display: block;
-            opacity: 1;
-            transform: translateY(0);
-        }
-        body.content-open #spotify-widget {
-            opacity: 0;
-            pointer-events: none;
-        }
+        #spotify-widget.active { display: block; opacity: 1; }
+        body.content-open #spotify-widget { opacity: 0; pointer-events: none; }
         .widget-close {
             position: absolute;
             top: 12px; right: 15px;
@@ -546,27 +867,15 @@
             transition: 0.2s;
         }
         .widget-close:hover { opacity: 1; color: var(--accent); }
-        
-        .spotify-mini-card {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
+        .spotify-mini-card { display: flex; align-items: center; gap: 20px; }
         .spotify-mini-card .album-art {
             width: 80px; height: 80px;
             border-radius: 8px;
             object-fit: cover;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
         }
         .spotify-mini-card .info { flex-grow: 1; overflow: hidden; }
-        .spotify-mini-card .title { 
-            font-weight: 600; font-size: 15px; white-space: nowrap; 
-            overflow: hidden; text-overflow: ellipsis; 
-        }
-        .spotify-mini-card .artist { 
-            font-size: 12px; opacity: 0.5; white-space: nowrap; 
-            overflow: hidden; text-overflow: ellipsis; margin-top: 4px;
-        }
+        .spotify-mini-card .title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .spotify-mini-card .artist { font-size: 12px; opacity: 0.5; margin-top: 4px; }
         .spotify-mini-controls {
             display: flex;
             gap: 15px;
@@ -575,169 +884,21 @@
             border-top: 1px solid rgba(255,255,255,0.05);
             padding-top: 15px;
         }
-        .btn-mini-ctrl {
-            background: none; border: none; color: white;
-            font-size: 18px; cursor: pointer; opacity: 0.6; transition: 0.2s;
-        }
+        .btn-mini-ctrl { background: none; border: none; color: white; font-size: 18px; cursor: pointer; opacity: 0.6; transition: 0.2s; }
         .btn-mini-ctrl:hover { opacity: 1; transform: scale(1.1); }
 
-        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
-        .device-btn { padding: 15px; border: var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); text-align: center; font-weight: 600; }
-        .device-btn.on { border-color: #4CAF50; color: #4CAF50; box-shadow: 0 0 10px rgba(76,175,80,0.2); }
-
-        #panel-calendar .event-item {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        #panel-calendar .event-time { font-family: 'JetBrains Mono'; opacity: 0.4; font-size: 13px; }
-
-        /* --- TRADING PANEL - MAYA NEURAL DASHBOARD --- */
-        #panel-trading {
-            display: none;
-            grid-template-columns: 1fr 400px;
-            grid-template-rows: 1fr 280px;
-            gap: 15px;
-            height: calc(100vh - 100px);
-            padding: 10px;
-            overflow: hidden;
-            background: none;
-        }
-        #panel-trading.active {
-            display: grid;
-            animation: fadeIn 0.5s ease forwards;
-        }
-
-        .trading-main-chart {
-            grid-column: 1;
-            grid-row: 1 / span 2;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            position: relative;
-            padding: 30px;
-            display: flex;
-            flex-direction: column;
-            backdrop-filter: blur(10px);
-        }
-        .trading-main-chart::before {
-            content: 'MARKET_ANALYSIS // NEURAL_FEED';
-            position: absolute;
-            top: 15px; left: 20px;
-            font-family: 'Syncopate';
-            font-size: 8px;
-            color: var(--accent);
-            letter-spacing: 2px;
-            opacity: 0.6;
-        }
-
-        .trading-sidebar {
-            grid-column: 2;
-            grid-row: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-        .trading-sidebar::-webkit-scrollbar { width: 2px; }
-        .trading-sidebar::-webkit-scrollbar-thumb { background: rgba(255, 30, 30, 0.2); }
-
-        .trading-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .trading-card:hover {
-            background: rgba(255, 30, 30, 0.03);
-            border-color: rgba(255, 30, 30, 0.2);
-            transform: translateX(-5px);
-        }
-        .trading-card::after {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; width: 2px; height: 100%;
-            background: var(--accent);
-            opacity: 0;
-            transition: 0.3s;
-        }
-        .trading-card:hover::after { opacity: 0.5; }
-
-        .trading-card .symbol { font-family: 'Syncopate'; font-size: 14px; letter-spacing: 2px; }
-        .trading-card .price { font-family: 'JetBrains Mono'; font-size: 20px; color: #fff; }
-        .trading-card .change { font-size: 10px; margin-top: 4px; }
-        .trading-card .change.up { color: #4CAF50; }
-        .trading-card .change.down { color: #f44336; }
-
-        .trading-info-bottom {
-            grid-column: 2;
-            grid-row: 2;
-            background: rgba(255, 30, 30, 0.02);
-            border: 1px solid rgba(255, 30, 30, 0.1);
-            padding: 25px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .trading-info-bottom .label {
-            font-family: 'Syncopate';
-            font-size: 8px;
-            letter-spacing: 2px;
-            opacity: 0.3;
-            text-transform: uppercase;
-        }
-        .trading-info-bottom .big-val {
-            font-family: 'JetBrains Mono';
-            font-size: 32px;
-            color: #fff;
-            margin: 10px 0;
-        }
-
-        #main-trading-graph {
-            flex-grow: 1;
-            width: 100%;
-            margin-top: 40px;
-        }
-
-        #panel-weather .forecast-neural {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        #panel-weather .weather-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 40px;
-        }
-
-        /* --- SCREEN BORDER & HUD EFFECTS --- */
+        /* =============================================
+           SCREEN BORDER HUD
+           ============================================= */
         #screen-border {
             position: fixed;
             inset: 0;
             z-index: 999;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.3s ease;
-            
-            /* Bordo perimetrale con box-shadow interno */
-            box-shadow: 
-                inset 0 0 40px rgba(255, 30, 30, 0),
-                inset 0 0 80px rgba(255, 30, 30, 0),
-                inset 0 0 120px rgba(255, 30, 30, 0);
-            
             transition: box-shadow 0.15s ease, opacity 0.15s ease;
         }
 
-        /* Stato listening — bordo sottile che pulsa */
         body.listening #screen-border {
             opacity: 1;
             box-shadow:
@@ -747,7 +908,6 @@
             animation: border-pulse 1.5s ease-in-out infinite;
         }
 
-        /* Stato speaking — bordo più intenso e reattivo */
         body.speaking #screen-border {
             opacity: 1;
             box-shadow:
@@ -757,7 +917,6 @@
             animation: border-speak 0.8s ease-in-out infinite;
         }
 
-        /* Stato processing — bordo che scorre */
         body.processing #screen-border {
             opacity: 1;
             box-shadow:
@@ -767,59 +926,21 @@
         }
 
         @keyframes border-pulse {
-            0%, 100% { 
-                box-shadow:
-                    inset 0 0 30px rgba(255, 30, 30, 0.15),
-                    inset 0 0 2px rgba(255, 30, 30, 0.6);
-            }
-            50% { 
-                box-shadow:
-                    inset 0 0 50px rgba(255, 30, 30, 0.25),
-                    inset 0 0 3px rgba(255, 30, 30, 0.9);
-            }
+            0%, 100% { box-shadow: inset 0 0 30px rgba(255, 30, 30, 0.15), inset 0 0 2px rgba(255, 30, 30, 0.6); }
+            50% { box-shadow: inset 0 0 50px rgba(255, 30, 30, 0.25), inset 0 0 3px rgba(255, 30, 30, 0.9); }
         }
 
         @keyframes border-speak {
-            0%, 100% { 
-                box-shadow:
-                    inset 0 0 50px rgba(255, 30, 30, 0.2),
-                    inset 0 0 3px rgba(255, 30, 30, 0.8);
-                filter: none;
-            }
-            50% { 
-                box-shadow:
-                    inset 0 0 80px rgba(255, 30, 30, 0.35),
-                    inset 0 0 4px rgba(255, 30, 30, 1.0);
-                filter: drop-shadow(0 0 8px rgba(255,30,30,0.3));
-            }
+            0%, 100% { box-shadow: inset 0 0 50px rgba(255, 30, 30, 0.2), inset 0 0 3px rgba(255, 30, 30, 0.8); }
+            50% { box-shadow: inset 0 0 80px rgba(255, 30, 30, 0.35), inset 0 0 4px rgba(255, 30, 30, 1.0); }
         }
 
         @keyframes border-scan {
-            0% { 
-                box-shadow:
-                    inset 0 2px 0 rgba(255,30,30,0.6),
-                    inset 0 0 40px rgba(255,30,30,0.05);
-            }
-            25% {
-                box-shadow:
-                    inset -2px 0 0 rgba(255,30,30,0.6),
-                    inset 0 0 40px rgba(255,30,30,0.05);
-            }
-            50% {
-                box-shadow:
-                    inset 0 -2px 0 rgba(255,30,30,0.6),
-                    inset 0 0 40px rgba(255,30,30,0.05);
-            }
-            75% {
-                box-shadow:
-                    inset 2px 0 0 rgba(255,30,30,0.6),
-                    inset 0 0 40px rgba(255,30,30,0.05);
-            }
-            100% {
-                box-shadow:
-                    inset 0 2px 0 rgba(255,30,30,0.6),
-                    inset 0 0 40px rgba(255,30,30,0.05);
-            }
+            0% { box-shadow: inset 0 2px 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+            25% { box-shadow: inset -2px 0 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+            50% { box-shadow: inset 0 -2px 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+            75% { box-shadow: inset 2px 0 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+            100% { box-shadow: inset 0 2px 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
         }
 
         #screen-corners {
@@ -832,9 +953,7 @@
         }
 
         body.listening #screen-corners,
-        body.speaking #screen-corners {
-            opacity: 1;
-        }
+        body.speaking #screen-corners { opacity: 1; }
 
         .corner {
             position: absolute;
@@ -843,14 +962,10 @@
             border-style: solid;
             transition: all 0.3s ease;
         }
-        .corner.tl { top: 20px; left: 20px; 
-                     border-width: 2px 0 0 2px; }
-        .corner.tr { top: 20px; right: 20px; 
-                     border-width: 2px 2px 0 0; }
-        .corner.bl { bottom: 20px; left: 20px; 
-                     border-width: 0 0 2px 2px; }
-        .corner.br { bottom: 20px; right: 20px; 
-                     border-width: 0 2px 2px 0; }
+        .corner.tl { top: 20px; left: 20px; border-width: 2px 0 0 2px; }
+        .corner.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; }
+        .corner.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; }
+        .corner.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; }
 
         body.speaking .corner {
             border-color: rgba(255, 30, 30, 0.9);
@@ -858,12 +973,14 @@
             filter: drop-shadow(0 0 6px rgba(255,30,30,0.5));
         }
 
-        /* --- DEBUG CONTROLS --- */
+        /* =============================================
+           DEBUG CONTROLS
+           ============================================= */
         #debug-controls {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            display: none; /* Nascosto di default, mostrato via JS se reset_storage è true */
+            display: none;
             gap: 10px;
             z-index: 1000;
             background: rgba(0, 0, 0, 0.5);
@@ -884,13 +1001,12 @@
             border-radius: 6px;
             cursor: pointer;
             text-transform: uppercase;
-            font-family: 'JetBrains Mono', monospace;
         }
         .debug-btn:hover { background: rgba(255, 30, 30, 0.2); border-color: var(--accent); }
 
-        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
-        .device-btn { padding: 15px; border: var(--glass-border); border-radius: 12px; background: rgba(255,255,255,0.05); text-align: center; font-weight: 600; }
-        .device-btn.on { border-color: #4CAF50; color: #4CAF50; box-shadow: 0 0 10px rgba(76,175,80,0.2); }
+        #panel-map { height: 100%; width: 100%; border-radius: 12px; overflow: hidden; }
+        #map-container { height: 100%; width: 100%; }
+        #panel-browser iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: white; }
     </style>
 </head>
 <body>
@@ -902,17 +1018,12 @@
         <span class="corner br"></span>
     </div>
     <img src="/static/maya_logo_no_sfondo.png" id="top-logo" alt="MAYA Logo">
-    <canvas id="bg-canvas"></canvas>
-    
+
+    <!-- Fixed elements (above slider) -->
     <div id="maya-orb-container" onclick="handleOrbClick()">
         <canvas id="orb-canvas"></canvas>
     </div>
     <div id="orb-branding">MAYA</div>
-
-    <div id="idle-clock">
-        <div class="time" id="clock-time">00:00</div>
-        <div class="date" id="clock-date">LUNEDÌ, 1 GENNAIO</div>
-    </div>
 
     <div id="spotify-widget">
         <div class="widget-close" onclick="closeSpotifyWidget()">✕</div>
@@ -934,314 +1045,343 @@
         <input type="text" id="cmd-input" placeholder="Comando neurale..." onkeydown="if(event.key==='Enter') sendCmd()">
     </div>
 
-    <div id="content-area">
-        <div style="height:0"></div>
-        <div id="panel-weather" class="panel">
-            <div class="weather-main-card">
-                <div>
-                    <h2 class="city" id="weather-city">--</h2>
-                    <p class="condition" id="weather-desc">--</p>
-                </div>
-                <div class="temp-large"><span id="weather-temp">--</span>°</div>
-                <div class="forecast-strip" id="weather-forecast-mini">
-                    <!-- Injected via JS -->
-                </div>
-            </div>
+    <!-- ========== SCREEN SLIDER ========== -->
+    <div id="screen-slider">
 
-            <div class="weather-map-area">
-                <div id="weather-mini-map"></div>
-                <div class="map-overlay-hud"></div>
-            </div>
-
-            <div class="weather-bottom-grid">
-                <div class="weather-stat-card">
-                    <div class="label">Velocità Vento</div>
-                    <div class="value" id="weather-wind">-- km/h</div>
-                    <div class="mini-graph" id="graph-wind"></div>
-                </div>
-                <div class="weather-stat-card">
-                    <div class="label">Umidità</div>
-                    <div class="value" id="weather-humidity">--%</div>
-                    <div class="mini-graph" id="graph-humidity"></div>
-                </div>
-                <div class="weather-stat-card">
-                    <div class="label">Pressione</div>
-                    <div class="value" id="weather-pressure">-- hPa</div>
-                    <div class="mini-graph" id="graph-pressure"></div>
-                </div>
-                <div class="weather-stat-card">
-                    <div class="label">Visibilità</div>
-                    <div class="value" id="weather-vis">-- km</div>
-                    <div class="mini-graph" id="graph-vis"></div>
-                </div>
+        <!-- SCREEN 1: Idle — sfondo nero, orb centrato, clock -->
+        <div id="screen-idle">
+            <canvas id="bg-canvas" style="position:absolute;inset:0;z-index:0;pointer-events:none;"></canvas>
+            <div id="idle-clock">
+                <div class="time" id="clock-time">00:00</div>
+                <div class="date" id="clock-date">LUNEDÌ, 1 GENNAIO</div>
             </div>
         </div>
 
-        <div id="panel-map" class="panel">
-            <div id="map-container"></div>
-        </div>
+        <!-- SCREEN 2: Work — sfondo-maya.png, content panels -->
+        <div id="screen-work">
+            <div id="content-area">
+                <div style="height:0"></div>
 
-        <div id="panel-browser" class="panel">
-            <iframe id="browser-iframe" src="about:blank"></iframe>
-        </div>
-
-        <div id="panel-news" class="panel">
-            <div style="font-size:10px; letter-spacing:0.4em; opacity:0.2; 
-            text-transform:uppercase; margin-bottom:32px; 
-            padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.05)">
-              FEED NOTIZIE — AGGIORNAMENTO IN TEMPO REALE
-            </div>
-            <h2>Ultime Notizie</h2>
-            <div class="news-list" id="news-list"></div>
-        </div>
-
-        <div id="panel-dashboard" class="panel">
-            <h2>Sistema & Domotica</h2>
-            <div class="dash-grid">
-                <div class="stat-card">
-                    <h3>Neural Load (CPU)</h3>
-                    <div class="val" id="dash-cpu">--%</div>
+                <!-- WEATHER PANEL -->
+                <div id="panel-weather" class="panel">
+                    <div class="wx-left">
+                        <div class="wx-topbar">
+                            <div>
+                                <div class="wx-tag">ATMOSPHERIC_FEED // LIVE</div>
+                                <div class="wx-city" id="weather-city">--</div>
+                                <div class="wx-cond" id="weather-desc">--</div>
+                            </div>
+                            <div class="wx-temp-block">
+                                <span class="wx-temp" id="weather-temp">--</span>
+                                <span class="wx-unit">°C</span>
+                            </div>
+                            <div class="wx-wind">
+                                <div class="wx-wind-val"><span id="weather-wind">--</span> <span>km/h</span></div>
+                                <div class="wx-wind-label">VENTO</div>
+                            </div>
+                            <div class="wx-feels">
+                                <div class="wx-feels-val"><span id="weather-feels">--</span>°</div>
+                                <div class="wx-feels-label">PERCEPITA</div>
+                            </div>
+                        </div>
+                        <div class="wx-radar">
+                            <div id="weather-mini-map"></div>
+                        </div>
+                    </div>
+                    <div class="wx-forecast">
+                        <div class="wx-fc-hdr">FORECAST // 5 GIORNI</div>
+                        <div id="weather-forecast-col"></div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <h3>Memory Unit (RAM)</h3>
-                    <div class="val" id="dash-ram">--%</div>
+
+                <div id="panel-map" class="panel">
+                    <div id="map-container"></div>
                 </div>
-            </div>
-            <div class="device-grid" style="margin-top: 20px;">
-                <div id="dash-led" class="device-btn">LUCI</div>
-                <div id="dash-relay" class="device-btn">RELAIS</div>
-                <div id="dash-servo" class="device-btn">SERVO</div>
-            </div>
-        </div>
 
-        <div id="panel-calendar" class="panel">
-            <h2>Calendario</h2>
-            <div id="calendar-list" class="news-list"></div>
-        </div>
-
-        <div id="panel-trading" class="panel">
-            <div class="trading-main-chart">
-                <div id="main-trading-graph">
-                    <!-- Injected via JS -->
+                <div id="panel-browser" class="panel">
+                    <iframe id="browser-iframe" src="about:blank"></iframe>
                 </div>
-            </div>
 
-            <div class="trading-sidebar" id="trading-list">
-                <!-- Trading cards injected via JS -->
-            </div>
-
-            <div class="trading-info-bottom">
-                <div>
-                    <div class="label">Sentiment di Mercato</div>
-                    <div class="big-val" id="market-sentiment">NEUTRALE</div>
+                <div id="panel-news" class="panel">
+                    <div class="news-ticker-bar">
+                        <div class="news-ticker-track" id="news-ticker-track">
+                            <span class="ntk-label">NEURAL_FEED</span>
+                            <span class="ntk-sep">//</span>
+                            <span class="ntk-item">In attesa di notizie — chiedi a Maya le ultime news</span>
+                        </div>
+                    </div>
+                    <div class="news-main-area">
+                        <div class="news-live-grid" id="news-live-grid"></div>
+                        <div class="news-sidebar">
+                            <div class="news-sidebar-header">PRIORITÀ // NEURAL FEED</div>
+                            <div class="news-sidebar-list" id="news-sidebar-list">
+                                <div style="padding:24px 18px;opacity:0.15;font-family:'Syncopate',sans-serif;font-size:7px;letter-spacing:2px;">IN ATTESA FEED...</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <div class="label">Volume 24h</div>
-                    <div class="big-val" id="market-volume">--</div>
+
+                <div id="panel-dashboard" class="panel">
+                    <h2>Sistema & Domotica</h2>
+                    <div class="dash-grid">
+                        <div class="stat-card">
+                            <h3>Neural Load (CPU)</h3>
+                            <div class="val" id="dash-cpu">--%</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Memory Unit (RAM)</h3>
+                            <div class="val" id="dash-ram">--%</div>
+                        </div>
+                    </div>
+                    <div class="device-grid" style="margin-top:20px;">
+                        <div id="dash-led" class="device-btn">LUCI</div>
+                        <div id="dash-relay" class="device-btn">RELAIS</div>
+                        <div id="dash-servo" class="device-btn">SERVO</div>
+                    </div>
+                </div>
+
+                <div id="panel-calendar" class="panel">
+                    <h2>Calendario</h2>
+                    <div id="calendar-list" class="news-list"></div>
+                </div>
+
+                <!-- TRADING PANEL — Redesigned -->
+                <div id="panel-trading" class="panel">
+                    <div class="trading-ticker-strip" id="ticker-strip">
+                        <div class="ticker-track" id="ticker-track">
+                            <div class="ticker-item"><span class="tk-symbol">BTC</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+                            <div class="ticker-item"><span class="tk-symbol">ETH</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+                            <div class="ticker-item"><span class="tk-symbol">SPY</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+                            <div class="ticker-item"><span class="tk-symbol">AAPL</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+                            <div class="ticker-item"><span class="tk-symbol">NVDA</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+                            <div class="ticker-item"><span class="tk-symbol">TSLA</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+                        </div>
+                    </div>
+                    <div class="trading-body">
+                        <div class="trading-news-feed">
+                            <div class="trading-news-header">
+                                <span class="trading-tag">LIVE_FEED</span>
+                                <span class="trading-news-title">Financial News</span>
+                            </div>
+                            <div class="trading-news-list" id="trading-news-list">
+                                <div style="padding:32px 20px;opacity:0.2;font-family:'Syncopate',sans-serif;font-size:8px;letter-spacing:3px;">NEURAL_FEED IN ATTESA<br><br>Chiedi a Maya il prezzo<br>di un asset per attivare<br>il feed in tempo reale.</div>
+                            </div>
+                        </div>
+                        <div class="trading-right-col">
+                            <div class="trading-chart-area">
+                                <div id="main-trading-graph"></div>
+                            </div>
+                            <div class="trading-info-bottom">
+                                <div>
+                                    <div class="label">Sentiment</div>
+                                    <div class="big-val" id="market-sentiment">NEUTRALE</div>
+                                </div>
+                                <div>
+                                    <div class="label">Volume 24h</div>
+                                    <div class="big-val" id="market-volume">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="debug-controls">
-        <button class="debug-btn" onclick="setLayout('orb')">ORB</button>
-        <button class="debug-btn" onclick="setLayout('weather')">WEATHER</button>
-        <button class="debug-btn" onclick="setLayout('news')">NEWS</button>
-        <button class="debug-btn" onclick="setLayout('dashboard')">DASH</button>
-        <button class="debug-btn" onclick="setLayout('spotify')">SPOTIFY</button>
-        <button class="debug-btn" onclick="setLayout('calendar')">CAL</button>
-        <button class="debug-btn" onclick="setLayout('trading')">TRADE</button>
+        <button class="debug-btn" onclick="exitWorkMode(); setLayout('orb')">IDLE</button>
+        <button class="debug-btn" onclick="enterWorkMode(); setLayout('weather')">WEATHER</button>
+        <button class="debug-btn" onclick="enterWorkMode(); setLayout('news')">NEWS</button>
+        <button class="debug-btn" onclick="enterWorkMode(); setLayout('dashboard')">DASH</button>
+        <button class="debug-btn" onclick="enterWorkMode(); setLayout('spotify')">SPOTIFY</button>
+        <button class="debug-btn" onclick="enterWorkMode(); setLayout('calendar')">CAL</button>
+        <button class="debug-btn" onclick="enterWorkMode(); setLayout('trading')">TRADE</button>
         <button class="debug-btn" onclick="setOrbState('listening')">LISTEN</button>
         <button class="debug-btn" onclick="setOrbState('speaking')">SPEAK</button>
-        <button class="debug-btn" onclick="setOrbState('idle')">IDLE</button>
+        <button class="debug-btn" onclick="setOrbState('idle')">ORB_IDLE</button>
     </div>
-    <div id="log-strip" id="log-text">MAYA System Online...</div>
+
+    <div id="log-strip">MAYA System Online...</div>
 
     <script>
         let ws;
         let map;
         let audioContext, analyser, dataArray;
         let orbState = 'idle';
+        let tradingAccum = [];
         
-        // --- THREE.JS GLOBALS ---
+        // Three.js globals
         let scene, camera, renderer, mainOrb, originalPositions;
 
-        // --- CLOCK ---
+        // =============================================
+        // SCREEN STATE MACHINE
+        // Screen 1: idle  → sfondo nero, orb centrato, clock
+        // Screen 2: work-mode → sfondo-maya.png, panel content
+        // =============================================
+
+        let inactivityTimer = null;
+        let isWorkMode = false;
+
+        function enterWorkMode() {
+            if (isWorkMode) return;
+            isWorkMode = true;
+            document.body.classList.add('work-mode');
+            clearInactivityTimer();
+        }
+
+        function exitWorkMode() {
+            if (!isWorkMode) return;
+            isWorkMode = false;
+            document.body.classList.remove('work-mode', 'content-open');
+            
+            // Ripristina orb al centro
+            const orb = document.getElementById('maya-orb-container');
+            const content = document.getElementById('content-area');
+            const cmd = document.getElementById('cmd-container');
+            const cmdInput = document.getElementById('cmd-input');
+            
+            orb.classList.remove('corner');
+            content.classList.remove('open');
+            cmd.classList.remove('corner');
+            cmdInput.placeholder = "Comando neurale...";
+            
+            // Nasconde tutti i panel
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            
+            setTimeout(handleResize, 600);
+        }
+
+        function startInactivityTimer(ms) {
+            clearInactivityTimer();
+            inactivityTimer = setTimeout(() => {
+                exitWorkMode();
+                setOrbState('idle');
+            }, ms);
+        }
+
+        function clearInactivityTimer() {
+            if (inactivityTimer) {
+                clearTimeout(inactivityTimer);
+                inactivityTimer = null;
+            }
+        }
+
+        // Reset timer su qualsiasi interazione utente in work-mode
+        ['keydown', 'mousemove', 'click', 'touchstart'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                if (isWorkMode) startInactivityTimer(600000);
+            }, { passive: true });
+        });
+
+        // =============================================
+        // CLOCK
+        // =============================================
         function initClock() {
             const timeEl = document.getElementById('clock-time');
             const dateEl = document.getElementById('clock-date');
-            
             function update() {
                 const now = new Date();
-                if (timeEl) {
-                    timeEl.textContent = now.toLocaleTimeString('it-IT', {
-                        hour: '2-digit', 
-                        minute: '2-digit'
-                    });
-                }
-                if (dateEl) {
-                    dateEl.textContent = now.toLocaleDateString('it-IT', {
-                        weekday: 'long', 
-                        day: 'numeric', 
-                        month: 'long'
-                    }).toUpperCase();
-                }
+                timeEl.textContent = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                dateEl.textContent = now.toLocaleDateString('it-IT', {
+                    weekday: 'long', day: 'numeric', month: 'long'
+                }).toUpperCase();
             }
             setInterval(update, 1000);
             update();
         }
 
-        // --- BACKGROUND PARTICLES ---
+        // =============================================
+        // BACKGROUND PARTICLES
+        // =============================================
         function initBackground() {
             const canvas = document.getElementById('bg-canvas');
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             let pts = [];
-            
-            const resize = () => {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            };
+            const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
             window.addEventListener('resize', resize);
             resize();
-
-            for(let i=0; i<150; i++) {
-                pts.push({
-                    x: Math.random()*canvas.width,
-                    y: Math.random()*canvas.height,
-                    vx: (Math.random()-0.5)*0.5,
-                    vy: (Math.random()-0.5)*0.5,
-                    r: Math.random()*0.8
-                });
+            for (let i = 0; i < 150; i++) {
+                pts.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5, r: Math.random() * 0.8 });
             }
-
             function anim() {
-                ctx.clearRect(0,0,canvas.width, canvas.height);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = 'rgba(255,255,255,0.15)';
                 pts.forEach(p => {
                     p.x += p.vx; p.y += p.vy;
-                    if(p.x<0) p.x=canvas.width; if(p.x>canvas.width) p.x=0;
-                    if(p.y<0) p.y=canvas.height; if(p.y>canvas.height) p.y=0;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-                    ctx.fill();
+                    if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
+                    if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
                 });
                 requestAnimationFrame(anim);
             }
             anim();
         }
 
-        // --- THREE.JS ORB ---
+        // =============================================
+        // THREE.JS ORB
+        // =============================================
         function initThree() {
             const container = document.getElementById('maya-orb-container');
             const canvas = document.getElementById('orb-canvas');
             if (!container || !canvas) return;
-
-            const w = container.clientWidth;
-            const h = container.clientHeight;
-            canvas.width = w;
-            canvas.height = h;
-
+            const w = container.clientWidth, h = container.clientHeight;
+            canvas.width = w; canvas.height = h;
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
             camera.position.z = 3.5;
-
-            renderer = new THREE.WebGLRenderer({ 
-                canvas: canvas,
-                alpha: true, 
-                antialias: true 
-            });
+            renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
             renderer.setSize(w, h);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setClearColor(0x000000, 0);
 
-            // 1. CORE SOLIDO
             const coreGeom = new THREE.SphereGeometry(0.65, 64, 64);
-            const coreMat = new THREE.MeshBasicMaterial({
-                color: 0xff1e1e, // Rosso (255, 30, 30)
-                transparent: true,
-                opacity: 0.08,
-                blending: THREE.AdditiveBlending
-            });
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xff1e1e, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending });
             mainOrb = new THREE.Mesh(coreGeom, coreMat);
             originalPositions = coreGeom.attributes.position.array.slice();
             scene.add(mainOrb);
 
-            // 2. TRE SFERE GLOW CONCENTRICHE
             window.glowSpheres = [];
-            const glowLayers = [
-                { r: 0.68, op: 0.20 },
-                { r: 0.78, op: 0.10 },
-                { r: 0.95, op: 0.04 }
-            ];
-            glowLayers.forEach(layer => {
+            [{ r: 0.68, op: 0.20 }, { r: 0.78, op: 0.10 }, { r: 0.95, op: 0.04 }].forEach(layer => {
                 const gGeom = new THREE.SphereGeometry(layer.r, 32, 32);
-                const gMat = new THREE.MeshBasicMaterial({
-                    color: 0xff1e1e,
-                    transparent: true,
-                    opacity: layer.op,
-                    blending: THREE.AdditiveBlending
-                });
+                const gMat = new THREE.MeshBasicMaterial({ color: 0xff1e1e, transparent: true, opacity: layer.op, blending: THREE.AdditiveBlending });
                 const gMesh = new THREE.Mesh(gGeom, gMat);
                 scene.add(gMesh);
-                window.glowSpheres.push({ mesh: gMesh, baseOpacity: layer.op, baseRadius: layer.r });
+                window.glowSpheres.push({ mesh: gMesh, baseOpacity: layer.op });
             });
 
-            // 3. PARTICELLE NEBULA
             const nebulaGeom = new THREE.BufferGeometry();
-            const nebulaCount = 4000;
-            const nebulaPos = new Float32Array(nebulaCount * 3);
-            for(let i=0; i<nebulaCount; i++) {
-                const r = 0.90 + Math.random() * 0.15; // Banda stretta 0.90-1.05
-                const phi = Math.random() * Math.PI * 2;
-                const theta = Math.random() * Math.PI;
-                nebulaPos[i*3] = r * Math.sin(theta) * Math.cos(phi);
-                nebulaPos[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
-                nebulaPos[i*3+2] = r * Math.cos(theta);
+            const nebulaPos = new Float32Array(4000 * 3);
+            for (let i = 0; i < 4000; i++) {
+                const r = 0.90 + Math.random() * 0.15;
+                const phi = Math.random() * Math.PI * 2, theta = Math.random() * Math.PI;
+                nebulaPos[i * 3] = r * Math.sin(theta) * Math.cos(phi);
+                nebulaPos[i * 3 + 1] = r * Math.sin(theta) * Math.sin(phi);
+                nebulaPos[i * 3 + 2] = r * Math.cos(theta);
             }
             nebulaGeom.setAttribute('position', new THREE.BufferAttribute(nebulaPos, 3));
-            const nebulaMat = new THREE.PointsMaterial({ 
-                color: 0xff1e1e, 
-                size: 0.006, 
-                transparent: true, 
-                opacity: 0.5,
-                blending: THREE.AdditiveBlending 
-            });
-            window.nebulaParticles = new THREE.Points(nebulaGeom, nebulaMat);
+            window.nebulaParticles = new THREE.Points(nebulaGeom, new THREE.PointsMaterial({ color: 0xff1e1e, size: 0.006, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
             scene.add(window.nebulaParticles);
 
-            // 4. OUTER RING PUNTI
-            const ringPointCount = 80;
-            const ringPos = new Float32Array(ringPointCount * 3);
-            for(let i=0; i<ringPointCount; i++) {
-                const angle = (i / ringPointCount) * Math.PI * 2;
-                const r = 1.1;
-                ringPos[i*3] = r * Math.cos(angle);
-                ringPos[i*3+1] = r * Math.sin(angle);
-                ringPos[i*3+2] = 0;
+            const ringPos = new Float32Array(80 * 3);
+            for (let i = 0; i < 80; i++) {
+                const angle = (i / 80) * Math.PI * 2;
+                ringPos[i * 3] = 1.1 * Math.cos(angle);
+                ringPos[i * 3 + 1] = 1.1 * Math.sin(angle);
+                ringPos[i * 3 + 2] = 0;
             }
             const ringGeom = new THREE.BufferGeometry();
             ringGeom.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
-            const ringMat = new THREE.PointsMaterial({
-                color: 0xff1e1e,
-                size: 0.015,
-                transparent: true,
-                opacity: 0.6,
-                blending: THREE.AdditiveBlending
-            });
-            window.outerRingPoints = new THREE.Points(ringGeom, ringMat);
+            window.outerRingPoints = new THREE.Points(ringGeom, new THREE.PointsMaterial({ color: 0xff1e1e, size: 0.015, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }));
             scene.add(window.outerRingPoints);
         }
 
         function animate(time) {
             requestAnimationFrame(animate);
             if (!renderer || !mainOrb) return;
-
             const t = time * 0.001;
             const rgb = getComputedStyle(document.documentElement).getPropertyValue('--orb-color').trim() || "255, 30, 30";
             const color = new THREE.Color(`rgb(${rgb})`);
-
-            // Audio Analysis Ultra-Sensitive
             let audioLevel = 0;
             if (dataArray) {
                 analyser.getByteFrequencyData(dataArray);
@@ -1249,97 +1389,54 @@
                 for (let i = 0; i < 64; i++) sum += dataArray[i];
                 audioLevel = (sum / (64 * 255)) * 1.5;
             }
-
-            // --- ANIMAZIONE REATTIVA ---
-            // Se audioLevel è molto basso, l'orb è quasi immobile (idle cinematico)
             const isSpeaking = audioLevel > 0.05;
-            const moveFactor = isSpeaking ? audioLevel * 2.0 : 0.02; // Quasi fermo se non si parla
-            const speedFactor = isSpeaking ? 4.0 : 0.5; // Molto lento se non si parla
-            
-            // 1. Deformazione Core (Triple Sin Organico)
             const pos = mainOrb.geometry.attributes.position;
             for (let i = 0; i < pos.count; i++) {
                 const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
                 const ox = originalPositions[ix], oy = originalPositions[iy], oz = originalPositions[iz];
                 const vec = new THREE.Vector3(ox, oy, oz).normalize();
-                
-                // Triple sin deformation
                 const deform = (Math.sin(t * 1.3 + ox * 2.1) + Math.sin(t * 0.7 + oy * 1.8) + Math.sin(t * 1.9 + oz * 2.4)) / 3.0;
                 const d = 0.65 + deform * 0.06;
-                
-                pos.array[ix] = vec.x * d;
-                pos.array[iy] = vec.y * d;
-                pos.array[iz] = vec.z * d;
+                pos.array[ix] = vec.x * d; pos.array[iy] = vec.y * d; pos.array[iz] = vec.z * d;
             }
             pos.needsUpdate = true;
-
-            // 2. Glow Spheres (Scaling reattivo, NO deformazione)
-            if (window.glowSpheres) {
-                window.glowSpheres.forEach(layer => {
-                    const scale = 1.0 + audioLevel * 0.15;
-                    layer.mesh.scale.setScalar(scale);
-                    layer.mesh.material.color = color;
-                });
-            }
-
-            // 3. Nebula Particles
+            if (window.glowSpheres) window.glowSpheres.forEach(l => { l.mesh.scale.setScalar(1.0 + audioLevel * 0.15); l.mesh.material.color = color; });
             if (window.nebulaParticles) {
                 window.nebulaParticles.rotation.y += 0.002 + (isSpeaking ? audioLevel * 0.03 : 0);
                 window.nebulaParticles.rotation.z += 0.001;
                 window.nebulaParticles.material.opacity = isSpeaking ? (0.3 + audioLevel * 0.4) : 0.25;
                 window.nebulaParticles.material.color = color;
             }
-
-            // 4. Outer Ring Points
-            if (window.outerRingPoints) {
-                window.outerRingPoints.rotation.z -= 0.005;
-                window.outerRingPoints.material.color = color;
-            }
-            
+            if (window.outerRingPoints) { window.outerRingPoints.rotation.z -= 0.005; window.outerRingPoints.material.color = color; }
             mainOrb.material.color = color;
-            
-            // Scaling globale "battito"
             const pulse = isSpeaking ? (Math.sin(t * 10) * 0.01 + audioLevel * 0.05) : (Math.sin(t * 2) * 0.005);
-            const scale = 1.0 + pulse;
-            scene.scale.setScalar(scale);
-
+            scene.scale.setScalar(1.0 + pulse);
             renderer.render(scene, camera);
         }
 
-        // --- MAIN ENTRY POINT ---
         window.addEventListener('load', async () => {
             initBackground();
             initClock();
             initThree();
-            animate();
+            animate(0);
             initWS();
         });
 
-
         function handleResize() {
             const container = document.getElementById('maya-orb-container');
-            const w = container.clientWidth;
-            const h = container.clientHeight;
-            
-            if (renderer) {
-                renderer.setSize(w, h);
-                camera.aspect = w / h;
-                camera.updateProjectionMatrix();
-            }
+            const w = container.clientWidth, h = container.clientHeight;
+            if (renderer) { renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
         }
-        
-        // Sostituiamo il vecchio onresize
+
         window.addEventListener('resize', () => {
-            // Background canvas resize logic
             const bgCanvas = document.getElementById('bg-canvas');
             bgCanvas.width = window.innerWidth;
             bgCanvas.height = window.innerHeight;
             handleResize();
         });
 
-
         async function initAudio() {
-            if(audioContext) return;
+            if (audioContext) return;
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1348,138 +1445,161 @@
                 analyser.fftSize = 256;
                 source.connect(analyser);
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
-            } catch(e) { 
-                console.log("Audio Init Failed (Permission Denied?):", e); 
+            } catch (e) {
+                console.log("Audio Init Failed:", e);
                 dataArray = new Uint8Array(128).fill(0);
             }
         }
 
-        // --- WEBSOCKET & LOGIC ---
+        // =============================================
+        // WEBSOCKET
+        // =============================================
         function initWS() {
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${proto}//${location.host}/ws`);
-            
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
-                
-                if (d.type === 'layout') setLayout(d.layout, d.params);
+                if (d.type === 'layout') { enterWorkMode(); setLayout(d.layout, d.params); }
                 if (d.type === 'voice_status') setOrbState(d.status.toLowerCase());
                 if (d.type === 'news' && d.articles) updateNews(d.articles);
-                if (d.type === 'weather' && d.data) updateWeather(d.data);
+                if (d.type === 'weather') {
+                    const wData = d.data || d; // support both flat and nested
+                    if (wData.location) updateWeather(wData);
+                }
                 if (d.type === 'calendar' && d.events) updateCalendar(d.events);
-                if (d.type === 'trading' && d.data) updateTrading(d.data);
+                if (d.type === 'trading') {
+                    if (d.data && Array.isArray(d.data)) {
+                        updateTrading(d.data);
+                    } else if (d.symbol) {
+                        // Single item from backend — accumulate
+                        const exists = tradingAccum.findIndex(x => x.symbol === d.symbol);
+                        if (exists >= 0) tradingAccum[exists] = d;
+                        else tradingAccum.push(d);
+                        updateTrading(tradingAccum);
+                    }
+                }
                 if (d.type === 'state') updateArduino(d);
                 if (d.type === 'stats') {
-                    if(d.cpu !== undefined) document.getElementById('dash-cpu').innerText = `${d.cpu}%`;
-                    if(d.ram !== undefined) document.getElementById('dash-ram').innerText = `${d.ram}%`;
+                    if (d.cpu !== undefined) document.getElementById('dash-cpu').innerText = `${d.cpu}%`;
+                    if (d.ram !== undefined) document.getElementById('dash-ram').innerText = `${d.ram}%`;
                 }
-                if (d.type === 'spotify') {
-                    updateSpotify(d);
-                }
+                if (d.type === 'spotify') updateSpotify(d);
                 if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
             };
-
-            ws.onopen = () => {
-                document.getElementById('log-strip').innerText = "MAYA Neural Link Established.";
-                initAudio();
-            };
+            ws.onopen = () => { document.getElementById('log-strip').innerText = "MAYA Neural Link Established."; initAudio(); };
+            ws.onclose = () => setTimeout(initWS, 3000);
         }
 
+        // =============================================
+        // ORB STATE — integrato con screen state machine
+        // =============================================
         function setOrbState(status) {
             orbState = status || 'idle';
             const voiceClasses = ['idle', 'listening', 'processing', 'speaking', 'calibrating'];
-            
-            // Rimuovi solo le classi voice, NON toccare content-open
             voiceClasses.forEach(c => document.body.classList.remove(c));
-            
-            // Aggiungi solo la nuova classe voice
-            if(status) document.body.classList.add(status.toLowerCase());
-            
+            if (status) document.body.classList.add(status.toLowerCase());
             document.getElementById('log-strip').innerText = `MAYA | ${orbState.toUpperCase()}`;
+
+            if (status === 'listening' || status === 'processing' || status === 'speaking') {
+                // Qualsiasi attività vocale → entra in work-mode (prima attivazione)
+                enterWorkMode();
+                clearInactivityTimer();
+            } else if (status === 'idle') {
+                // Avvia il countdown per tornare alla schermata 1
+                startInactivityTimer(600000); // 10 minuti
+            }
         }
 
+        // =============================================
+        // LAYOUT — gestione panel
+        // =============================================
         function setLayout(layout, params = {}) {
             const orb = document.getElementById('maya-orb-container');
             const content = document.getElementById('content-area');
             const cmd = document.getElementById('cmd-container');
             const cmdInput = document.getElementById('cmd-input');
-            
-            if(layout === 'orb') {
+
+            if (layout === 'orb') {
+                // Chiude i panel ma NON esce da work-mode (lo fa solo il timer)
                 orb.classList.remove('corner');
                 content.classList.remove('open');
                 cmd.classList.remove('corner');
                 document.body.classList.remove('content-open');
                 cmdInput.placeholder = "Comando neurale...";
-                // Update Three.js size after CSS transition
                 setTimeout(handleResize, 600);
                 return;
             }
+
+            // Apre work-mode se non già attivo
+            enterWorkMode();
 
             orb.classList.add('corner');
             content.classList.add('open');
             cmd.classList.add('corner');
             document.body.classList.add('content-open');
             cmdInput.placeholder = "comando...";
-            // Update Three.js size after CSS transition
             setTimeout(handleResize, 600);
 
-            // Switch Panel
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             const target = document.getElementById(`panel-${layout}`);
-            if(target) target.classList.add('active');
+            if (target) target.classList.add('active');
 
-            if(layout === 'map' && params.location) updateMap(params.location);
-            if(layout === 'browser' && params.url) document.getElementById('browser-iframe').src = params.url;
+            if (layout === 'map' && params.location) updateMap(params.location);
+            if (layout === 'browser' && params.url) document.getElementById('browser-iframe').src = params.url;
+            if (layout === 'news') {
+                if (newsStreamsInitialized && Date.now() - newsStreamsInitTime > 20 * 60 * 1000)
+                    newsStreamsInitialized = false;
+                initNewsStreams();
+            }
+            if (layout === 'weather') setTimeout(() => {
+                if (lastWeatherLatLon) initWeatherMap(lastWeatherLatLon.lat, lastWeatherLatLon.lon);
+                else if (weatherMiniMap) weatherMiniMap.invalidateSize();
+            }, 700);
+            if (layout === 'trading') {
+                if (tradingAccum.length > 0) updateTrading(tradingAccum);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    tradingAccum = [];
+                    ws.send(JSON.stringify({type: 'tool', action: {tool: 'trading', operation: 'overview'}}));
+                }
+            }
         }
 
         function handleOrbClick() {
-            if(document.getElementById('maya-orb-container').classList.contains('corner')) {
+            if (document.getElementById('maya-orb-container').classList.contains('corner')) {
                 setLayout('orb');
             }
         }
 
         function sendCmd() {
             const input = document.getElementById('cmd-input');
-            if(!input.value.trim()) return;
+            if (!input.value.trim()) return;
             ws.send(JSON.stringify({ type: 'command', text: input.value }));
             input.value = '';
         }
 
-        // --- PANEL UPDATES ---
         function sendCmdToWS(text) {
-            if(ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'command', text: text }));
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'command', text }));
             }
         }
 
+        // =============================================
+        // SPOTIFY
+        // =============================================
         let spotifyTimeout;
-
         function updateSpotify(d) {
-            const trackEl = document.getElementById('spotify-track');
-            const artistEl = document.getElementById('spotify-artist');
-            const artEl = document.getElementById('spotify-art');
-            const playBtn = document.getElementById('spotify-play-btn');
             const widget = document.getElementById('spotify-widget');
-
-            // Aggiorna dati sempre
-            if(d.track) {
-                trackEl.innerText = d.track;
-                artistEl.innerText = d.artist;
-                artEl.src = d.album_art || '';
-                playBtn.innerText = d.is_playing ? '⏸' : '▶';
-                
-                // Mostra il widget SOLO se sta suonando e NON è già attivo
-                // o se arriva un aggiornamento esplicito di riproduzione.
-                // Evitiamo che si apra da solo al refresh se non sta suonando nulla di nuovo.
-                if(d.is_playing && !widget.classList.contains('active')) {
+            if (d.track) {
+                document.getElementById('spotify-track').innerText = d.track;
+                document.getElementById('spotify-artist').innerText = d.artist;
+                document.getElementById('spotify-art').src = d.album_art || '';
+                document.getElementById('spotify-play-btn').innerText = d.is_playing ? '⏸' : '▶';
+                if (d.is_playing && !widget.classList.contains('active')) {
                     widget.style.display = 'block';
                     setTimeout(() => widget.classList.add('active'), 10);
-                    
-                    // Reset auto-close timer (1 minuto)
-                    if(spotifyTimeout) clearTimeout(spotifyTimeout);
+                    if (spotifyTimeout) clearTimeout(spotifyTimeout);
                     spotifyTimeout = setTimeout(closeSpotifyWidget, 60000);
                 }
-
                 document.getElementById('log-strip').innerText = `♫ SPOTIFY: ${d.track} - ${d.artist}`;
             }
         }
@@ -1487,206 +1607,317 @@
         function closeSpotifyWidget() {
             const widget = document.getElementById('spotify-widget');
             widget.classList.remove('active');
-            if(spotifyTimeout) clearTimeout(spotifyTimeout);
-            setTimeout(() => {
-                if(!widget.classList.contains('active')) widget.style.display = 'none';
-            }, 500);
+            if (spotifyTimeout) clearTimeout(spotifyTimeout);
+            setTimeout(() => { if (!widget.classList.contains('active')) widget.style.display = 'none'; }, 500);
         }
 
+        // =============================================
+        // PANEL UPDATES
+        // =============================================
         function updateCalendar(events) {
-            const list = document.getElementById('calendar-list');
-            list.innerHTML = events.map(e => `
+            document.getElementById('calendar-list').innerHTML = events.map(e => `
                 <div class="event-item">
-                    <div>
-                        <div style="font-weight:bold">${e.title}</div>
-                        <div style="font-size:12px; opacity:0.5">${e.source || 'MAYA'}</div>
-                    </div>
+                    <div><div style="font-weight:bold">${e.title}</div><div style="font-size:12px;opacity:0.5">${e.source || 'MAYA'}</div></div>
                     <div class="event-time">${e.time}</div>
-                </div>
-            `).join('');
+                </div>`).join('');
         }
 
+        let tickerData = [];
         function updateTrading(data) {
-            const list = document.getElementById('trading-list');
-            const mainGraph = document.getElementById('main-trading-graph');
-            
-            list.innerHTML = data.map(item => {
-                const isUp = !item.price_str.includes('-');
-                return `
-                <div class="trading-card" onclick="drawMainTradingGraph('${item.symbol}', '${isUp ? '#4CAF50' : '#f44336'}')">
-                    <div>
-                        <div class="symbol">${item.symbol.toUpperCase()}</div>
-                        <div style="font-size:9px; opacity:0.3; margin-top:5px;">${item.asset_type || 'ASSET'}</div>
-                    </div>
-                    <div style="text-align:right">
-                        <div class="price">${item.price_str}</div>
-                        <div class="change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} LIVE_FEED</div>
-                    </div>
-                </div>
-            `}).join('');
+            tickerData = data;
 
-            // Disegna grafico principale se non esiste
-            if (data.length > 0 && mainGraph.innerHTML.trim() === "") {
-                drawMainTradingGraph(data[0].symbol, '#4CAF50');
-            }
-            
-            // Aggiorna volume simulato
+            // Populate ticker strip (duplicate items for seamless loop)
+            const tickerTrack = document.getElementById('ticker-track');
+            const tickerHTML = data.map(item => {
+                const chg = item.change_pct !== undefined ? item.change_pct : 0;
+                const isUp = chg >= 0;
+                const chgStr = `${isUp ? '+' : ''}${chg.toFixed(2)}%`;
+                return `<div class="ticker-item">
+                    <span class="tk-symbol">${item.symbol.toUpperCase()}</span>
+                    <span class="tk-price">${item.price_str}</span>
+                    <span class="tk-change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${chgStr}</span>
+                    <span class="tk-sep"></span>
+                </div>`;
+            }).join('');
+            tickerTrack.innerHTML = tickerHTML + tickerHTML;
+
+            // Populate news feed / asset list
+            const newsList = document.getElementById('trading-news-list');
+            const newsItems = data.map(item => {
+                const chg = item.change_pct !== undefined ? item.change_pct : 0;
+                const isUp = chg >= 0;
+                const chgStr = `${isUp ? '+' : ''}${chg.toFixed(2)}%`;
+                const sym = item.symbol.toLowerCase();
+                const logoUrl = ASSET_LOGOS[sym];
+                const badge = `<div class="tn-logo-badge">${item.symbol.slice(0,3).toUpperCase()}</div>`;
+                const logoHtml = logoUrl
+                    ? `<div class="tn-logo-wrap"><img class="tn-logo" src="${logoUrl}" alt="${sym}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${badge.replace('class="tn-logo-badge"', 'class="tn-logo-badge" style="display:none"')}</div>`
+                    : badge;
+                return `<div class="trading-news-item" onclick="drawMainTradingGraph('${item.symbol}')">
+                    ${logoHtml}
+                    <div class="tn-body">
+                        <div class="tn-title">${item.symbol.toUpperCase()} &nbsp;<span style="opacity:0.4;font-size:11px">${item.price_str}</span></div>
+                        <div class="tn-meta"><span class="${isUp ? 'up' : 'down'}" style="font-size:13px;font-weight:300">${chgStr}</span><span>${item.asset_type?.toUpperCase() || 'ASSET'}</span></div>
+                    </div>
+                </div>`;
+            }).join('');
+            newsList.innerHTML = newsItems || '<div style="padding:20px;opacity:0.2;font-size:11px">Caricamento dati...</div>';
+
+            // Draw chart for first item
+            const mainGraph = document.getElementById('main-trading-graph');
+            if (data.length > 0 && !mainGraph.innerHTML.trim()) drawMainTradingGraph(data[0].symbol);
             document.getElementById('market-volume').innerText = (Math.random() * 100 + 50).toFixed(2) + "B";
         }
 
-        function drawMainTradingGraph(symbol, color) {
+        const ASSET_LOGOS = {
+            'btc':   'https://s3-symbol-logo.tradingview.com/crypto/XTVCBTC--big.svg',
+            'xrp':   'https://s3-symbol-logo.tradingview.com/crypto/XTVCXRP--big.svg',
+            'aapl':  'https://s3-symbol-logo.tradingview.com/apple--big.svg',
+            'nvda':  'https://s3-symbol-logo.tradingview.com/nvidia--big.svg',
+            'tsla':  'https://s3-symbol-logo.tradingview.com/tesla--big.svg',
+            'msft':  'https://s3-symbol-logo.tradingview.com/microsoft--big.svg',
+            'meta':  'https://s3-symbol-logo.tradingview.com/meta-platforms--big.svg',
+            'amzn':  'https://s3-symbol-logo.tradingview.com/amazon--big.svg',
+            'googl': 'https://s3-symbol-logo.tradingview.com/alphabet--big.svg',
+            'jpm':   'https://s3-symbol-logo.tradingview.com/jpmorgan-chase--big.svg',
+            'v':     'https://s3-symbol-logo.tradingview.com/visa--big.svg',
+            'ma':    'https://s3-symbol-logo.tradingview.com/mastercard--big.svg',
+            'nflx':  'https://s3-symbol-logo.tradingview.com/netflix--big.svg',
+            'amd':   'https://s3-symbol-logo.tradingview.com/advanced-micro-devices--big.svg',
+            'dis':   'https://s3-symbol-logo.tradingview.com/walt-disney--big.svg',
+            'ba':    'https://s3-symbol-logo.tradingview.com/boeing--big.svg',
+            'gs':    'https://s3-symbol-logo.tradingview.com/goldman-sachs--big.svg',
+            'intc':  'https://s3-symbol-logo.tradingview.com/intel--big.svg',
+            'uber':  'https://s3-symbol-logo.tradingview.com/uber--big.svg',
+            'baba':  'https://s3-symbol-logo.tradingview.com/alibaba--big.svg',
+            'spy':   'https://s3-symbol-logo.tradingview.com/amex/spy--big.svg',
+            'qqq':   'https://s3-symbol-logo.tradingview.com/invesco--big.svg',
+        };
+
+        const TV_SYMBOLS = {
+            'btc': 'BINANCE:BTCUSDT', 'bitcoin': 'BINANCE:BTCUSDT',
+            'eth': 'BINANCE:ETHUSDT', 'ethereum': 'BINANCE:ETHUSDT',
+            'sol': 'BINANCE:SOLUSDT', 'solana': 'BINANCE:SOLUSDT',
+            'bnb': 'BINANCE:BNBUSDT', 'binancecoin': 'BINANCE:BNBUSDT',
+            'xrp': 'BINANCE:XRPUSDT', 'ripple': 'BINANCE:XRPUSDT',
+            'doge': 'BINANCE:DOGEUSDT', 'dogecoin': 'BINANCE:DOGEUSDT',
+            'spy': 'AMEX:SPY', 'qqq': 'NASDAQ:QQQ',
+            'aapl': 'NASDAQ:AAPL', 'nvda': 'NASDAQ:NVDA',
+            'tsla': 'NASDAQ:TSLA', 'msft': 'NASDAQ:MSFT',
+            'meta': 'NASDAQ:META', 'amzn': 'NASDAQ:AMZN',
+            'googl': 'NASDAQ:GOOGL', 'goog': 'NASDAQ:GOOGL',
+            'jpm': 'NYSE:JPM', 'v': 'NYSE:V', 'ma': 'NYSE:MA',
+            'nflx': 'NASDAQ:NFLX', 'amd': 'NASDAQ:AMD',
+            'dis': 'NYSE:DIS', 'ba': 'NYSE:BA', 'gs': 'NYSE:GS',
+            'intc': 'NASDAQ:INTC', 'uber': 'NYSE:UBER', 'baba': 'NYSE:BABA',
+            'brk-b': 'NYSE:BRK.B',
+        };
+
+        function drawMainTradingGraph(symbol) {
+            const tvSym = TV_SYMBOLS[symbol.toLowerCase()] || symbol.toUpperCase();
             const el = document.getElementById('main-trading-graph');
-            const width = el.offsetWidth || 800;
-            const height = 400;
-            const points = [];
-            for(let i=0; i<30; i++) {
-                const x = (i / 29) * width;
-                const y = height - (Math.random() * (height * 0.7) + 50);
-                points.push(`${x},${y}`);
-            }
-            
-            el.innerHTML = `
-                <div style="font-family: 'Syncopate'; font-size: 18px; margin-bottom: 20px; letter-spacing: 4px;">${symbol.toUpperCase()} // PERFORMANCE</div>
-                <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-                    <defs>
-                        <linearGradient id="gradTrading" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" style="stop-color:${color};stop-opacity:0.2" />
-                            <stop offset="100%" style="stop-color:${color};stop-opacity:0" />
-                        </linearGradient>
-                    </defs>
-                    <path d="M 0 ${height} ${points.map(p => 'L ' + p).join(' ')} L ${width} ${height} Z" fill="url(#gradTrading)" />
-                    <polyline points="${points.join(' ')}" 
-                              stroke="${color}" stroke-width="3" fill="none" 
-                              stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            `;
+            const params = new URLSearchParams({
+                symbol: tvSym, interval: '60', theme: 'dark', style: '3',
+                locale: 'it', hide_side_toolbar: '1', allow_symbol_change: '0',
+                hideideas: '1', saveimage: '0', calendar: '0',
+                withdateranges: '0', hidetoptoolbar: '1',
+            });
+            el.innerHTML = `<iframe src="https://www.tradingview.com/widgetembed/?${params}" allowtransparency="true" scrolling="no"></iframe>`;
         }
+
+        const WEATHER_ICONS = {
+            'sun': '☀️', 'cloud-sun': '⛅', 'cloud': '☁️', 'cloud-fog': '🌫️',
+            'cloud-drizzle': '🌦️', 'cloud-rain': '🌧️', 'cloud-snow': '🌨️', 'cloud-lightning': '⛈️'
+        };
 
         let weatherMiniMap;
+        let lastWeatherLatLon = null;
+        let rainViewerLoaded = false;
+
+        function initWeatherMap(lat, lon) {
+            if (!weatherMiniMap) {
+                weatherMiniMap = L.map('weather-mini-map', {
+                    zoomControl: false, attributionControl: false,
+                    dragging: true, touchZoom: false,
+                    scrollWheelZoom: true, doubleClickZoom: false
+                }).setView([lat, lon], 6);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(weatherMiniMap);
+                L.circleMarker([lat, lon], {
+                    radius: 5, color: 'rgba(255,30,30,0.9)',
+                    fillColor: 'rgba(255,30,30,0.9)', fillOpacity: 1, weight: 2
+                }).addTo(weatherMiniMap);
+                if (!rainViewerLoaded) { rainViewerLoaded = true; loadRainViewer(weatherMiniMap); }
+            } else {
+                weatherMiniMap.setView([lat, lon], 6);
+                weatherMiniMap.invalidateSize();
+            }
+        }
+
+        async function loadRainViewer(map) {
+            try {
+                const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+                const data = await res.json();
+                const frames = [...(data.radar.past || []), ...(data.radar.nowcast || [])];
+                if (!frames.length) return;
+                const layers = frames.map(f =>
+                    L.tileLayer(`https://tilecache.rainviewer.com${f.path}/256/{z}/{x}/{y}/4/1_1.png`,
+                        { opacity: 0, tileSize: 256, zIndex: 10 }).addTo(map)
+                );
+                let idx = layers.length - 1;
+                const show = i => layers.forEach((l, j) => l.setOpacity(j === i ? 0.6 : 0));
+                show(idx);
+                setInterval(() => { idx = (idx + 1) % layers.length; show(idx); }, 600);
+            } catch(e) {}
+        }
 
         function updateWeather(data) {
-            const iconMap = {
-                "sun": "☀️", "cloud-sun": "⛅", "cloud": "☁️",
-                "cloud-fog": "🌫️", "cloud-drizzle": "🌦️",
-                "cloud-rain": "🌧️", "cloud-snow": "❄️", "cloud-lightning": "⛈️"
-            };
-
-            document.getElementById('weather-city').innerText = data.location;
-            document.getElementById('weather-temp').innerText = Math.round(data.temp);
-            document.getElementById('weather-desc').innerText = data.condition;
-            document.getElementById('weather-wind').innerText = `${data.wind} km/h`;
-            document.getElementById('weather-humidity').innerText = (data.humidity || 45) + '%';
-            document.getElementById('weather-pressure').innerText = (data.pressure || 1013) + ' hPa';
-            document.getElementById('weather-vis').innerText = (data.visibility || 10) + ' km';
-            
-            // Inietta mini forecast
-            const miniGrid = document.getElementById('weather-forecast-mini');
-            if(miniGrid) {
-                miniGrid.innerHTML = data.daily.slice(0, 5).map(day => `
-                    <div class="forecast-item-mini">
-                        <div class="day">${new Date(day.date).toLocaleDateString('it-IT', {weekday:'short'})}</div>
-                        <div class="temp">${Math.round(day.max)}°</div>
-                    </div>
-                `).join('');
+            document.getElementById('weather-city').innerText = data.location || '--';
+            document.getElementById('weather-desc').innerText = (data.condition || '--').toUpperCase();
+            document.getElementById('weather-wind').innerText = data.wind ? Math.round(data.wind) : '--';
+            document.getElementById('weather-feels').innerText = data.feels_like ? Math.round(data.feels_like) : (data.temp ? Math.round(data.temp) : '--');
+            const t = data.temp ? Math.round(data.temp) : null;
+            const tempEl = document.getElementById('weather-temp');
+            tempEl.innerText = t !== null ? t : '--';
+            if (t !== null) {
+                tempEl.style.color = t > 28 ? '#ff8c42' : t > 18 ? '#ffe87c' : t > 8 ? '#ffffff' : '#7ee8ff';
+                const g = t > 28 ? 'rgba(255,140,66,0.25)' : t > 18 ? 'rgba(255,232,124,0.2)' : t > 8 ? 'rgba(255,255,255,0.08)' : 'rgba(126,232,255,0.25)';
+                tempEl.style.textShadow = `0 0 100px ${g}`;
             }
 
-            // Disegna grafici SVG reali basati sui dati (se disponibili o simulati su trend reale)
-            const drawGraph = (id, color, baseValue) => {
-                const el = document.getElementById(id);
-                if(!el) return;
-                const width = 280;
-                const height = 60;
-                const points = [];
-                for(let i=0; i<12; i++) {
-                    const x = (i / 11) * width;
-                    // Variazione naturale attorno al valore base
-                    const variation = (Math.sin(i * 0.5) * 10) + (Math.random() * 5);
-                    const y = height - (30 + variation);
-                    points.push(`${x},${y}`);
-                }
-                el.innerHTML = `
-                    <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-                        <polyline points="${points.join(' ')}" 
-                                  stroke="${color}" stroke-width="2" fill="none" 
-                                  stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                `;
-            };
-            drawGraph('graph-wind', 'rgba(255,30,30,0.5)', data.wind);
-            drawGraph('graph-humidity', 'rgba(30,150,255,0.5)', data.humidity || 45);
-            drawGraph('graph-pressure', 'rgba(30,255,100,0.5)', data.pressure || 1013);
-            drawGraph('graph-vis', 'rgba(255,200,30,0.5)', data.visibility || 10);
+            const fc = document.getElementById('weather-forecast-col');
+            if (fc && data.daily) {
+                fc.innerHTML = data.daily.slice(0, 5).map(day => {
+                    const d = new Date(day.date).toLocaleDateString('it-IT', { weekday: 'short' }).toUpperCase();
+                    const desc = (day.condition || day.description || '').toLowerCase();
+                    return `<div class="wx-fc-row">
+                        <span class="wx-fc-day">${d}</span>
+                        <span class="wx-fc-desc">${desc}</span>
+                        <span class="wx-fc-temps">${Math.round(day.max)}°<span class="wx-fc-min">${Math.round(day.min)}°</span></span>
+                    </div>`;
+                }).join('');
+            }
 
-            // Inizializza/Aggiorna mini mappa
-            if(data.lat && data.lon) {
-                if(!weatherMiniMap) {
-                    weatherMiniMap = L.map('weather-mini-map', {
-                        zoomControl: false,
-                        attributionControl: false,
-                        dragging: false,
-                        touchZoom: false,
-                        scrollWheelZoom: false,
-                        doubleClickZoom: false
-                    }).setView([data.lat, data.lon], 9);
-                    
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(weatherMiniMap);
-                } else {
-                    weatherMiniMap.setView([data.lat, data.lon], 9);
+            if (data.lat && data.lon) {
+                lastWeatherLatLon = { lat: data.lat, lon: data.lon };
+                if (document.getElementById('panel-weather').classList.contains('active')) {
+                    initWeatherMap(data.lat, data.lon);
                 }
             }
         }
 
+        // kind:'video'   → embed by video ID, oEmbed-checked for availability
+        // kind:'channel' → embed via live_stream?channel=, no check needed
+        const NEWS_STREAM_CONFIG = [
+            { primary:  { src: 'lzRMElMrvC0',              label: 'BBC NEWS',  kind: 'video' },
+              fallback: { src: 'YBRbxDWLcl4',              label: 'CNBC',      kind: 'video' } },
+            { primary:  { src: '_SZdAteqF6s',              label: 'REUTERS',   kind: 'video' },
+              fallback: { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA',kind: 'channel' } },
+            { primary:  { src: 'iEpJwprxDdk',              label: 'BLOOMBERG', kind: 'video' },
+              fallback: { src: 'bFO_VVRAmCM',              label: 'SKY NEWS',  kind: 'video' } },
+            { primary:  { src: 'UCupvZG-5ko_eiXAupbDfxWw', label: 'CNN',      kind: 'channel' },
+              fallback: { src: 'pykpO5kQJ98',              label: 'EURONEWS',  kind: 'video' } },
+        ];
+
+        function streamEmbedUrl(s) {
+            const p = 'autoplay=1&mute=1&controls=1&modestbranding=1&rel=0';
+            return s.kind === 'video'
+                ? `https://www.youtube.com/embed/${s.src}?${p}`
+                : `https://www.youtube.com/embed/live_stream?channel=${s.src}&${p}`;
+        }
+
+        let newsStreamsInitialized = false;
+        let newsStreamsInitTime = 0;
+
+        async function initNewsStreams() {
+            if (newsStreamsInitialized) return;
+            newsStreamsInitialized = true;
+            newsStreamsInitTime = Date.now();
+            const grid = document.getElementById('news-live-grid');
+
+            grid.innerHTML = NEWS_STREAM_CONFIG.map((_, i) => `
+                <div class="news-stream-tile" id="stream-tile-${i}">
+                    <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>···</div>
+                    <iframe id="stream-iframe-${i}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                </div>`).join('');
+
+            for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
+                const { primary, fallback } = NEWS_STREAM_CONFIG[i];
+                let stream = primary;
+                // oEmbed check for both types:
+                // video   → /watch?v=ID  returns 404 if video unavailable
+                // channel → /channel/ID/live  returns 404 if NOT currently live
+                const oembedUrl = primary.kind === 'video'
+                    ? `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${primary.src}&format=json`
+                    : `https://www.youtube.com/oembed?url=https://www.youtube.com/channel/${primary.src}/live&format=json`;
+                try {
+                    const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(4000) });
+                    if (!res.ok) stream = fallback;
+                } catch { stream = fallback; }
+                document.getElementById(`stream-iframe-${i}`).src = streamEmbedUrl(stream);
+                document.getElementById(`stream-label-${i}`).innerHTML =
+                    `<span class="ns-live-dot"></span>${stream.label}`;
+            }
+        }
+
+        // Refresh streams every 20 min to prevent black screen
+        setInterval(() => {
+            if (!newsStreamsInitialized) return;
+            if (!document.getElementById('panel-news').classList.contains('active')) return;
+            for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
+                const iframe = document.getElementById(`stream-iframe-${i}`);
+                if (iframe && iframe.src) {
+                    const src = iframe.src;
+                    iframe.src = '';
+                    setTimeout(() => { iframe.src = src; }, 300 * i);
+                }
+            }
+        }, 20 * 60 * 1000);
+
         function updateNews(articles) {
-            const list = document.getElementById('news-list');
-            list.innerHTML = articles.map(a => `
-                <div class="news-item" onclick="setLayout('browser', {url: '${a.link}'})">
-                    <div class="news-meta">
-                        <span class="news-source">${a.source || 'MAYA FEED'}</span>
-                        <span class="news-date">${new Date().toLocaleDateString('it-IT')}</span>
+            if (!articles || articles.length === 0) return;
+
+            // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
+            document.getElementById('news-sidebar-list').innerHTML = articles.map((a, i) => `
+                <div class="ns-item" onclick="setLayout('browser',{url:'${a.link}'})">
+                    <div class="ns-rank">${String(i + 1).padStart(2, '0')}</div>
+                    <div class="ns-content">
+                        <div class="ns-source">${a.source || 'MAYA FEED'}</div>
+                        <div class="ns-title">${a.title}</div>
                     </div>
-                    <div class="news-title">${a.title}</div>
-                    <div class="news-summary">${a.summary}</div>
-                    <div class="news-more">Leggi →</div>
-                </div>
-            `).join('');
+                </div>`).join('');
+
+            // Ticker — all headlines scrolling
+            const tickerItems = articles.map(a =>
+                `<span class="ntk-label">${a.source || 'NEWS'}</span><span class="ntk-sep">//</span><span class="ntk-item">${a.title}</span><span class="ntk-sep">///</span>`
+            ).join('');
+            const track = document.getElementById('news-ticker-track');
+            track.innerHTML = tickerItems + tickerItems;
         }
 
         function updateArduino(d) {
             const setBtn = (id, val) => {
                 const el = document.getElementById(id);
-                if(val === 'on' || val === 'open' || val === true) el.classList.add('on');
-                else el.classList.remove('on');
+                if (!el) return;
+                (val === 'on' || val === 'open' || val === true) ? el.classList.add('on') : el.classList.remove('on');
             };
-            
-            // Gestione Debug Controls basata su reset_storage (MAYA_DEBUG_RESET_CLIENT)
             if (d.system && d.system.reset_storage) {
                 document.getElementById('debug-controls').style.display = 'flex';
-            } else {
-                document.getElementById('debug-controls').style.display = 'none';
             }
-
-            if(d.led) setBtn('dash-led', d.led);
-            if(d.relay) setBtn('dash-relay', d.relay);
-            if(d.servo) setBtn('dash-servo', d.servo);
+            if (d.led) setBtn('dash-led', d.led);
+            if (d.relay) setBtn('dash-relay', d.relay);
+            if (d.servo) setBtn('dash-servo', d.servo);
         }
 
         async function updateMap(query) {
-            if(!map) {
+            if (!map) {
                 map = L.map('map-container', { zoomControl: false }).setView([41.9, 12.5], 10);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    attribution: '&copy; CartoDB'
-                }).addTo(map);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' }).addTo(map);
             }
-            
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
                 const data = await res.json();
-                if(data[0]) {
-                    const { lat, lon } = data[0];
-                    map.setView([lat, lon], 13);
-                    L.marker([lat, lon]).addTo(map);
-                }
-            } catch(e) { console.error("Map Geocode Error:", e); }
+                if (data[0]) { map.setView([data[0].lat, data[0].lon], 13); L.marker([data[0].lat, data[0].lon]).addTo(map); }
+            } catch (e) { console.error("Map error:", e); }
         }
     </script>
 </body>
