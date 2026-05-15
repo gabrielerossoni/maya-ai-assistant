@@ -194,7 +194,8 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 - **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; pannelli live per Meteo, Notizie, Trading, Stato Casa, Calendario, Spotify
 - **Stato Casa Live** — pannello "STATO CASA // LIVE" aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
 - **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` pubblica ai client ogni 30 s
-- **Graceful Degradation** — senza Arduino → simulazione automatica; senza Ollama → fallback a parser keyword
+- **Graceful Degradation** — senza Arduino → simulazione automatica; `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline
+- **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente i card della dashboard via WebSocket
 
 ---
 
@@ -260,7 +261,8 @@ maya/
 │   └── code_generator_tool.py # Generazione tool a runtime
 │
 ├── arduino/
-│   └── maya_controller.ino    # Firmware: LED, relay, servo, RGB, buzzer, DHT11
+│   └── maya_controller/
+│       └── maya_controller.ino  # Firmware: LED, relay, servo, RGB, buzzer, DHT11
 │
 ├── static/
 │   ├── jarvis_dashboard.html  # SPA dashboard HUD — slider, Three.js orb, pannelli live
@@ -313,8 +315,9 @@ cp .env.example .env
 Variabili **essenziali**:
 
 ```env
+OLLAMA_ENABLED=true         # false per disabilitare Ollama (usa solo Groq/keyword fallback)
 OLLAMA_HOST=127.0.0.1
-ARDUINO_PORT=AUTO          # oppure COM3, /dev/ttyACM0, ecc.
+ARDUINO_PORT=AUTO          # oppure COM3, COM4, /dev/ttyACM0, ecc.
 ASSISTANT_NAME=MAYA
 DEFAULT_WEATHER_LOCATION=Roma
 NEWS_FEED_URL=https://www.ansa.it/sito/ansait_rss.xml
@@ -324,7 +327,9 @@ Variabili **opzionali**:
 
 ```env
 SPOTIFY_ENABLED=false       # true solo se hai credenziali Spotify
-GROQ_API_KEY=               # fallback cloud LLM
+GROQ_API_KEY=               # LLM cloud: primario se OLLAMA_ENABLED=false, altrimenti fallback
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_ROUTER_MODEL=llama-3.1-8b-instant
 ```
 
 ### 3. Download modelli Ollama
@@ -338,7 +343,7 @@ ollama pull nomic-embed-text   # per memoria semantica
 
 ### 4. Firmware Arduino *(opzionale)*
 
-1. Aprire `arduino/maya_controller.ino` con Arduino IDE
+1. Aprire `arduino/maya_controller/maya_controller.ino` con Arduino IDE
 2. Installare librerie: **ArduinoJson 6.x**, **DHT sensor library** (Adafruit), **Servo** (built-in)
 3. Caricare su Arduino Uno/Nano
 4. Impostare `ARDUINO_PORT=AUTO` nel `.env` (auto-discovery via USB)
@@ -478,11 +483,14 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] 7 scene configurate con controllo RGB e buzzer
 - [x] `sensor_broadcaster` — aggiornamento temperatura/umidità ogni 30 s
 - [x] `SPOTIFY_ENABLED` flag — Spotify disattivabile via `.env`
+- [x] `OLLAMA_ENABLED` flag — Ollama disabilitabile; sistema usa Groq o parser keyword
+- [x] Broadcast stato Arduino da comandi vocali — dashboard aggiorna i card in tempo reale
+- [x] Coroutine broadcast thread-safe — `call_soon_threadsafe` + `create_task` per zero RuntimeWarning
+- [x] Log cleanup — output console ridotto, errori Ollama soppressi dopo primo fallimento
 
 ### 🔲 In corso / Prossimi
 
-- [ ] Verifica demo completa con pubblico interno (30/05/2026)
-- [ ] Allineamento firmware → test su hardware reale
+- [ ] Verifica MVP in classe, 1° MILESTONE (15/05/2026)
 - [ ] Streaming LLM token-by-token via WebSocket
 - [ ] Multi-room Arduino con broker MQTT
 - [ ] Google Calendar sync (OAuth2)
