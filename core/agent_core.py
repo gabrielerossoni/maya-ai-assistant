@@ -218,6 +218,7 @@ class AgentCore:
         self.memory = MemoryManager()
         self.conversation_history = []
         self._last_layout = {"type": "orb", "params": {}}
+        self.socket_manager = None
 
     async def initialize(self):
         """Inizializza tutti i componenti."""

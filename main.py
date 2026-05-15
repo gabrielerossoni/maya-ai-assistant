@@ -406,6 +406,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 agent = AgentCore()
+agent.socket_manager = manager
 display = DisplayTool()
 voice_manager = VoiceManager(agent, manager)
 
