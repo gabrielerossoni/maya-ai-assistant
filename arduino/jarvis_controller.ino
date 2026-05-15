@@ -1,7 +1,7 @@
 /*
  * JARVIS Arduino Controller
  * ─────────────────────────────────────────────
- * Riceve comandi via seriale (9600 baud) e controlla:
+ * Riceve comandi via seriale (9600 baud) e controlla: (prova)
  *   - LED (pin 13)
  *   - Relè (pin 7)
  *   - Servo (pin 9)
