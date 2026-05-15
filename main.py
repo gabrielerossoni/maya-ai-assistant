@@ -28,6 +28,7 @@ _log_filter_applied = False
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "127.0.0.1")
 OLLAMA_PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
+SPOTIFY_ENABLED = os.environ.get("SPOTIFY_ENABLED", "true").strip().lower() not in ("0", "false", "no")
 
 
 def _ollama_addr() -> tuple[str, int]:
@@ -81,6 +82,14 @@ def ensure_ollama_running(max_wait_sec: int = 45) -> None:
     Se l'API Ollama non risponde, prova ad avviare `ollama serve` in background.
     Disabilita con MAYA_SKIP_OLLAMA_AUTOSTART=1 oppure se OLLAMA_HOST punta a un host remoto.
     """
+    if os.environ.get("OLLAMA_ENABLED", "true").strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+    ):
+        print("[OLLAMA] Disabilitato tramite OLLAMA_ENABLED=false")
+        return
+
     if os.environ.get("MAYA_SKIP_OLLAMA_AUTOSTART", "").strip().lower() in (
         "1",
         "true",
@@ -338,6 +347,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(spotify_broadcaster()),
         asyncio.create_task(news_broadcaster()),
         asyncio.create_task(weather_broadcaster()),
+        asyncio.create_task(sensor_broadcaster()),
     ]
 
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
@@ -362,8 +372,16 @@ async def lifespan(app: FastAPI):
     if arduino_tool:
 
         def arduino_event_handler(event: dict):
+            evt_type = event.get("type", "")
+            if evt_type == "telemetry":
+                payload = {
+                    "type": "arduino_event",
+                    "telemetry": {k: v for k, v in event.items() if k != "type"},
+                }
+            else:
+                payload = {"type": "arduino_event", **event}
             asyncio.run_coroutine_threadsafe(
-                manager.broadcast({"type": "arduino_event", **event}),
+                manager.broadcast(payload),
                 asyncio.get_event_loop(),
             )
 
@@ -596,6 +614,8 @@ async def broadcast_state():
             if isinstance(arduino_tool.sim_state.get("servo"), str)
             else str(arduino_tool.sim_state.get("servo"))
         ).lower(),
+        "rgb":    list(arduino_tool.sim_state.get("rgb", [0, 0, 0])),
+        "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)),
         "system": {
             "model": MODELS.get("router", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),
@@ -633,7 +653,25 @@ async def stats_broadcaster():
         await asyncio.sleep(0.33)
 
 
+async def sensor_broadcaster():
+    while True:
+        try:
+            arduino_tool = agent.tool_manager.tools.get("arduino")
+            if arduino_tool:
+                result = await asyncio.to_thread(arduino_tool.get_sensor_data)
+                if result is not None:
+                    await manager.broadcast({
+                        "type": "arduino_event",
+                        "telemetry": result,
+                    })
+        except Exception:
+            pass
+        await asyncio.sleep(30)
+
+
 async def spotify_broadcaster():
+    if not SPOTIFY_ENABLED:
+        return
     while True:
         try:
             spotify_tool = agent.tool_manager.tools.get("spotify")

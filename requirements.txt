@@ -23,5 +23,13 @@ yfinance
 psutil
 keyboard
 python-dotenv
+spotipy
+paho-mqtt
+watchdog
 chromadb>=0.4.0     # Vector database per memoria semantica
 # nomic-embed-text viene usato via Ollama (non serve package Python separato)
+
+# Voice (voice_manager.py)
+numpy>=1.24.0
+PyAudio>=0.2.14
+faster-whisper>=1.0.0
