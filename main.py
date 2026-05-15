@@ -380,10 +380,11 @@ async def lifespan(app: FastAPI):
                 }
             else:
                 payload = {"type": "arduino_event", **event}
-            asyncio.run_coroutine_threadsafe(
-                manager.broadcast(payload),
-                asyncio.get_event_loop(),
-            )
+            loop = getattr(manager, 'loop', None) or getattr(agent, 'loop', None)
+            if loop and loop.is_running():
+                loop.call_soon_threadsafe(
+                    lambda p=payload: loop.create_task(manager.broadcast(p))
+                )
 
         arduino_tool.register_event_hook(arduino_event_handler)
 
@@ -406,6 +407,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 agent = AgentCore()
+agent.socket_manager = manager
 display = DisplayTool()
 voice_manager = VoiceManager(agent, manager)
 

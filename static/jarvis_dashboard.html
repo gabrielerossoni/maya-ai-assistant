@@ -11,6 +11,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap');
+
         :root {
             --orb-color: 255, 30, 30;
             --bg-dark: #000000;
@@ -22,8 +24,6 @@
             --transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             --hud-color: rgba(255, 0, 0, 0.4);
         }
-
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap');
 
         /* =============================================
            SCREEN SLIDER SYSTEM
@@ -57,6 +57,14 @@
             height: 100vh;
             position: relative;
             background: #000000;
+        }
+
+        #bg-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            display: block;
         }
 
         #screen-work {
@@ -1222,8 +1230,8 @@
            ============================================= */
         .dom-main {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 3px;
+            grid-template-columns: 210px 1fr;
+            gap: 0;
             overflow: hidden;
         }
         .dom-scenes-panel {
@@ -1235,12 +1243,18 @@
             border-right: 1px solid rgba(255,255,255,0.04);
         }
         .dom-state-panel {
-            padding: 20px;
+            padding: 16px 20px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 0;
             overflow-y: auto;
             background: rgba(255,255,255,0.01);
+        }
+        .dom-devices-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 4px;
         }
         .dom-state-row {
             display: flex;
@@ -1320,7 +1334,7 @@
 
         <!-- SCREEN 1: Idle — sfondo nero, orb centrato, clock -->
         <div id="screen-idle">
-            <canvas id="bg-canvas" style="position:absolute;inset:0;z-index:0;pointer-events:none;"></canvas>
+            <canvas id="bg-canvas"></canvas>
             <div id="idle-clock">
                 <div class="time" id="clock-time">00:00</div>
                 <div class="date" id="clock-date">LUNEDÌ, 1 GENNAIO</div>
@@ -1405,76 +1419,80 @@
                     </div>
 
                     <div class="dom-body">
-                        <!-- Main content: Scene Rapide + Stato Casa -->
+                        <!-- Main content: Scene Rapide + Dispositivi -->
                         <div class="dom-main">
                             <div class="dom-scenes-panel">
-                                <div class="dom-sidebar-hdr" style="padding:0 0 12px 0">SCENE // ATTIVAZIONE RAPIDA</div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità notte')">
-                                    <span class="scene-icon">🌙</span>
-                                    <span class="scene-label">Notte</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità studio')">
-                                    <span class="scene-icon">📚</span>
-                                    <span class="scene-label">Studio</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità film')">
-                                    <span class="scene-icon">🎬</span>
-                                    <span class="scene-label">Film</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità relax')">
-                                    <span class="scene-icon">🛋️</span>
-                                    <span class="scene-label">Relax</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità uscita')">
-                                    <span class="scene-icon">🚪</span>
-                                    <span class="scene-label">Uscita</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità ospite')">
-                                    <span class="scene-icon">👥</span>
-                                    <span class="scene-label">Ospite</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('allarme')">
-                                    <span class="scene-icon">🚨</span>
-                                    <span class="scene-label">Allarme</span>
-                                </div>
+                                <div class="dom-sidebar-hdr" style="padding:0 0 12px 0">SCENE RAPIDE</div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità notte')"><span class="scene-icon">🌙</span><span class="scene-label">Notte</span></div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità studio')"><span class="scene-icon">📚</span><span class="scene-label">Studio</span></div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità film')"><span class="scene-icon">🎬</span><span class="scene-label">Film</span></div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità relax')"><span class="scene-icon">🛋️</span><span class="scene-label">Relax</span></div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità uscita')"><span class="scene-icon">🚪</span><span class="scene-label">Uscita</span></div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità ospite')"><span class="scene-icon">👥</span><span class="scene-label">Ospite</span></div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('allarme')"><span class="scene-icon">🚨</span><span class="scene-label">Allarme</span></div>
                             </div>
                             <div class="dom-state-panel">
-                                <div class="dom-sidebar-hdr" style="padding:0 0 16px 0">STATO CASA // LIVE</div>
-                                <div class="dom-state-row">
-                                    <span class="dom-stat-label">Luci</span>
-                                    <span class="dom-state-right"><span class="casa-dot" id="casa-light-dot"></span><span class="dom-dev-state" id="casa-light-val">OFF</span></span>
-                                </div>
-                                <div class="dom-state-row">
-                                    <span class="dom-stat-label">Relay</span>
-                                    <span class="dom-state-right"><span class="casa-dot" id="casa-relay-dot"></span><span class="dom-dev-state" id="casa-relay-val">OFF</span></span>
-                                </div>
-                                <div class="dom-state-row">
-                                    <span class="dom-stat-label">Servo</span>
-                                    <span class="dom-stat-val" id="casa-servo-val">0°</span>
-                                </div>
-                                <div class="dom-state-row">
-                                    <span class="dom-stat-label">RGB</span>
-                                    <span class="dom-state-right"><span class="casa-rgb-swatch" id="casa-rgb-swatch"></span></span>
-                                </div>
-                                <div class="dom-state-row">
-                                    <span class="dom-stat-label">Buzzer</span>
-                                    <span class="dom-state-right"><span class="casa-dot" id="casa-buzzer-dot"></span><span class="dom-dev-state" id="casa-buzzer-val">OFF</span></span>
-                                </div>
-                                <div class="dom-state-row" style="margin-top:16px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
-                                    <span class="dom-stat-label">Temperatura</span>
-                                    <span class="dom-stat-val" id="casa-temp-val">--</span>
-                                </div>
-                                <div class="dom-state-row">
-                                    <span class="dom-stat-label">Umidità</span>
-                                    <span class="dom-stat-val" id="casa-humidity-val">--</span>
+                                <div class="dom-sidebar-hdr" style="padding:0 0 14px 0">DISPOSITIVI // CONTROLLO LIVE</div>
+                                <div class="dom-devices-grid">
+                                    <div class="dom-device" id="dev-light" onclick="toggleDevice('light')">
+                                        <div class="dom-dev-icon">💡</div>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Luce</div>
+                                            <div class="dom-dev-state" id="dev-light-state">OFF</div>
+                                        </div>
+                                        <div class="dom-dev-dot"></div>
+                                    </div>
+                                    <div class="dom-device" id="dev-relay" onclick="toggleDevice('relay')">
+                                        <div class="dom-dev-icon">⚡</div>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Relay</div>
+                                            <div class="dom-dev-state" id="dev-relay-state">OFF</div>
+                                        </div>
+                                        <div class="dom-dev-dot"></div>
+                                    </div>
+                                    <div class="dom-device" id="dev-servo" onclick="toggleDevice('servo')">
+                                        <div class="dom-dev-icon">🚪</div>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Porta</div>
+                                            <div class="dom-dev-state" id="dev-servo-state">CHIUSA</div>
+                                        </div>
+                                        <div class="dom-dev-dot"></div>
+                                    </div>
+                                    <div class="dom-device" id="dev-alarm" onclick="toggleDevice('alarm')">
+                                        <div class="dom-dev-icon">🔔</div>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">Buzzer</div>
+                                            <div class="dom-dev-state" id="dev-alarm-state">OFF</div>
+                                        </div>
+                                        <div class="dom-dev-dot" id="casa-buzzer-dot"></div>
+                                    </div>
+                                    <div class="dom-device" style="grid-column: span 2; cursor: default;">
+                                        <div class="dom-dev-icon">🌈</div>
+                                        <div class="dom-dev-info">
+                                            <div class="dom-dev-name">RGB</div>
+                                            <div class="dom-dev-state">Colore corrente</div>
+                                        </div>
+                                        <span class="casa-rgb-swatch" id="casa-rgb-swatch"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Sidebar: sistema stats -->
+                        <!-- Sidebar: sensori + sistema -->
                         <div class="dom-sidebar">
-                            <div class="dom-stats" style="margin-top:0">
-                                <div class="dom-sidebar-hdr" style="padding:0 0 8px 0">SISTEMA</div>
+                            <div class="dom-sidebar-hdr" style="padding:16px 20px 8px">SENSORI</div>
+                            <div class="dom-stats" style="margin-top:0;padding-top:0">
+                                <div class="dom-stat-row">
+                                    <span class="dom-stat-label">Temperatura</span>
+                                    <span class="dom-stat-val" id="casa-temp-val">--</span>
+                                </div>
+                                <div class="dom-stat-row">
+                                    <span class="dom-stat-label">Umidità</span>
+                                    <span class="dom-stat-val" id="casa-humidity-val">--</span>
+                                </div>
+                            </div>
+                            <div class="dom-sidebar-hdr" style="padding:16px 20px 8px;border-top:1px solid rgba(255,255,255,0.04);margin-top:8px">SISTEMA</div>
+                            <div class="dom-stats" style="margin-top:0;padding-top:0">
                                 <div class="dom-stat-row">
                                     <span class="dom-stat-label">CPU</span>
                                     <span class="dom-stat-val" id="dash-cpu">--%</span>
@@ -1639,31 +1657,75 @@
         }
 
         // =============================================
-        // BACKGROUND PARTICLES
+        // HUD GRID BACKGROUND
         // =============================================
         function initBackground() {
             const canvas = document.getElementById('bg-canvas');
             if (!canvas) return;
+            // Guarantee canvas is always strictly behind the orb
+            canvas.style.zIndex = '0';
+            canvas.style.pointerEvents = 'none';
             const ctx = canvas.getContext('2d');
-            let pts = [];
-            const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+            const CELL = 56;
+            let scanY = 0;
+
+            function resize() {
+                canvas.width  = window.innerWidth  || document.documentElement.clientWidth;
+                canvas.height = window.innerHeight || document.documentElement.clientHeight;
+            }
             window.addEventListener('resize', resize);
             resize();
-            for (let i = 0; i < 150; i++) {
-                pts.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5, r: Math.random() * 0.8 });
+
+            function draw() {
+                const W = canvas.width, H = canvas.height;
+                // Guard: if layout not ready yet, retry next frame
+                if (!W || !H) { requestAnimationFrame(draw); return; }
+
+                ctx.clearRect(0, 0, W, H);
+
+                // — Main grid lines —
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 30, 30, 0.07)';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                for (let x = 0; x < W; x += CELL) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+                for (let y = 0; y < H; y += CELL) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+                ctx.stroke();
+                ctx.restore();
+
+                // — Intersection corner marks (every 4 cells) —
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 30, 30, 0.22)';
+                ctx.lineWidth = 1;
+                const mk = 5;
+                for (let x = 0; x <= W; x += CELL * 4) {
+                    for (let y = 0; y <= H; y += CELL * 4) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, y + mk); ctx.lineTo(x, y); ctx.lineTo(x + mk, y);
+                        ctx.moveTo(x, y - mk); ctx.lineTo(x, y); ctx.lineTo(x + mk, y);
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+
+                // — Slow horizontal scan line —
+                scanY = (scanY + 0.35) % (H + 80);
+                const sg = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
+                sg.addColorStop(0,   'rgba(255,30,30,0)');
+                sg.addColorStop(0.45,'rgba(255,30,30,0.05)');
+                sg.addColorStop(0.5, 'rgba(255,30,30,0.09)');
+                sg.addColorStop(0.55,'rgba(255,30,30,0.05)');
+                sg.addColorStop(1,   'rgba(255,30,30,0)');
+                ctx.save();
+                ctx.fillStyle = sg;
+                ctx.fillRect(0, scanY - 50, W, 100);
+                ctx.restore();
+
+                requestAnimationFrame(draw);
             }
-            function anim() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'rgba(255,255,255,0.15)';
-                pts.forEach(p => {
-                    p.x += p.vx; p.y += p.vy;
-                    if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
-                    if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
-                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
-                });
-                requestAnimationFrame(anim);
-            }
-            anim();
+
+            // Start via rAF so first frame is always in a valid paint cycle
+            requestAnimationFrame(draw);
         }
 
         // =============================================
@@ -1839,8 +1901,8 @@
                     }
                 }
                 if (d.type === 'stats') {
-                    if (d.cpu !== undefined) document.getElementById('dash-cpu').innerText = `${d.cpu}%`;
-                    if (d.ram !== undefined) document.getElementById('dash-ram').innerText = `${d.ram}%`;
+                    if (d.neural_load !== undefined) document.getElementById('dash-cpu').innerText = `${Math.round(d.neural_load)}%`;
+                    if (d.memory !== undefined) document.getElementById('dash-ram').innerText = `${Math.round(d.memory)}%`;
                 }
                 if (d.type === 'spotify') updateSpotify(d);
                 if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
@@ -2255,31 +2317,25 @@
 
         // Stato locale dispositivi per la mappa casa
         const domState = {
-            light: false, relay: false, servo: false,
-            blind: false, fan: false, alarm: false
+            light: false, relay: false, servo: false, alarm: false
         };
 
         function toggleDevice(dev) {
-            // Mappa device -> comando Arduino
-            const cmdMap = {
-                light: () => domState.light ? 'LIGHT_OFF' : 'LIGHT_ON',
-                relay:  () => domState.relay  ? 'RELAY_OFF'  : 'RELAY_ON',
-                servo:  () => domState.servo  ? 'SERVO_CLOSE': 'SERVO_OPEN',
-                blind:  () => domState.blind  ? 'BLIND_CLOSE': 'BLIND_OPEN',
-                fan:    () => domState.fan    ? 'FAN_OFF'    : 'FAN_ON',
-                alarm:  () => domState.alarm  ? 'BUZZER_OFF' : 'BUZZER_ON',
+            const actionMap = {
+                light: () => ({ op: 'SET', target: 'light', value: domState.light ? 0 : 1 }),
+                relay: () => ({ op: 'SET', target: 'relay', value: domState.relay ? 0 : 1 }),
+                servo: () => ({ op: 'SET', target: 'servo', value: domState.servo ? 0 : 90 }),
+                alarm: () => ({ op: 'SET', target: 'buzzer', value: 1 }),
             };
-            const cmd = cmdMap[dev]?.();
-            if (!cmd) return;
-
-            // Invia via WebSocket come comando utente
+            const action = actionMap[dev]?.();
+            if (!action) return;
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', command: cmd } }));
+                ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', ...action } }));
             }
-
-            // Aggiorna stato locale ottimisticamente
-            domState[dev] = !domState[dev];
-            refreshDomUI();
+            if (dev !== 'alarm') {
+                domState[dev] = !domState[dev];
+                refreshDomUI();
+            }
         }
 
         function refreshDomUI() {
@@ -2287,8 +2343,6 @@
                 light: { onLabel: 'ON',     offLabel: 'OFF' },
                 relay: { onLabel: 'ON',     offLabel: 'OFF' },
                 servo: { onLabel: 'APERTA', offLabel: 'CHIUSA' },
-                blind: { onLabel: 'APERTA', offLabel: 'CHIUSA' },
-                fan:   { onLabel: 'ON',     offLabel: 'OFF' },
                 alarm: { onLabel: 'ATTIVO', offLabel: 'OFF' },
             };
             for (const [dev, labels] of Object.entries(devMap)) {
@@ -2309,28 +2363,10 @@
             if (d.system && d.system.reset_storage) {
                 document.getElementById('debug-controls').style.display = 'flex';
             }
-
-            // Aggiorna stato dal server
-            if (d.led !== undefined) {
-                domState.light = (d.led === 'on');
-                const dot = document.getElementById('casa-light-dot');
-                const val = document.getElementById('casa-light-val');
-                if (dot) dot.className = 'casa-dot' + (domState.light ? ' on-green' : '');
-                if (val) val.textContent = domState.light ? 'ON' : 'OFF';
-            }
-            if (d.relay !== undefined) {
-                domState.relay = (d.relay === 'on');
-                const dot = document.getElementById('casa-relay-dot');
-                const val = document.getElementById('casa-relay-val');
-                if (dot) dot.className = 'casa-dot' + (domState.relay ? ' on-green' : '');
-                if (val) val.textContent = domState.relay ? 'ON' : 'OFF';
-            }
-            if (d.servo !== undefined) {
-                domState.servo = (d.servo === 'open' || d.servo === '90');
-                const val = document.getElementById('casa-servo-val');
-                if (val) val.textContent = d.servo + '°';
-            }
-            if (d.rgb !== undefined) {
+            if (d.led   !== undefined) domState.light = (d.led === 'on');
+            if (d.relay !== undefined) domState.relay = (d.relay === 'on');
+            if (d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90');
+            if (d.rgb   !== undefined) {
                 const rgb = Array.isArray(d.rgb) ? d.rgb : [0, 0, 0];
                 const hex = '#' + rgb.map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
                 const sw = document.getElementById('casa-rgb-swatch');
@@ -2338,18 +2374,10 @@
             }
             if (d.buzzer !== undefined) {
                 const dot = document.getElementById('casa-buzzer-dot');
-                const val = document.getElementById('casa-buzzer-val');
                 if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
-                if (val) val.textContent = d.buzzer ? 'ATTIVO' : 'OFF';
             }
-
-            // Aggiorna pill Arduino
             const pill = document.getElementById('dom-arduino-pill');
-            if (pill) {
-                const isOnline = d.system || d.led || d.relay || d.servo;
-                if (isOnline) pill.classList.add('online');
-            }
-
+            if (pill && (d.system || d.led || d.relay || d.servo)) pill.classList.add('online');
             refreshDomUI();
         }
 

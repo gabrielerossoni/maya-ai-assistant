@@ -1,5 +1,5 @@
 /*
- * JARVIS Arduino Controller — JSON Protocol
+ * MAYA Arduino Controller — JSON Protocol
  * ─────────────────────────────────────────────
  * ArduinoJson 6.x | 115200 baud
  *
@@ -29,13 +29,13 @@
 #include <DHT.h>
 
 // ── Pin definitions ───────────────────────────
-const int PIN_LED   = 13;
-const int PIN_RELAY =  7;
-const int PIN_SERVO =  9;
-const int PIN_R     =  5;
-const int PIN_G     =  6;
-const int PIN_B     =  3;
-const int PIN_BUZZ  =  8;
+const int LED_PIN   = 13;
+const int RELAY_PIN =  7;
+const int SERVO_PIN =  9;
+const int RGB_R_PIN =  5;
+const int RGB_G_PIN =  6;
+const int RGB_B_PIN =  3;
+const int BUZZ_PIN  =  8;
 const int DHT_PIN   =  4;
 #define   DHT_TYPE  DHT11
 
@@ -67,21 +67,21 @@ void applyRGBInt(long color);
 void setup() {
   Serial.begin(115200);
 
-  pinMode(PIN_LED,   OUTPUT);
-  pinMode(PIN_RELAY, OUTPUT);
-  pinMode(PIN_BUZZ,  OUTPUT);
-  pinMode(PIN_R,     OUTPUT);
-  pinMode(PIN_G,     OUTPUT);
-  pinMode(PIN_B,     OUTPUT);
+  pinMode(LED_PIN,   OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(BUZZ_PIN,  OUTPUT);
+  pinMode(RGB_R_PIN, OUTPUT);
+  pinMode(RGB_G_PIN, OUTPUT);
+  pinMode(RGB_B_PIN, OUTPUT);
 
-  digitalWrite(PIN_LED,   LOW);
-  digitalWrite(PIN_RELAY, LOW);
-  digitalWrite(PIN_BUZZ,  LOW);
-  analogWrite(PIN_R, 0);
-  analogWrite(PIN_G, 0);
-  analogWrite(PIN_B, 0);
+  digitalWrite(LED_PIN,   LOW);
+  digitalWrite(RELAY_PIN, LOW);
+  digitalWrite(BUZZ_PIN,  LOW);
+  analogWrite(RGB_R_PIN, 0);
+  analogWrite(RGB_G_PIN, 0);
+  analogWrite(RGB_B_PIN, 0);
 
-  myServo.attach(PIN_SERVO);
+  myServo.attach(SERVO_PIN);
   myServo.write(0);
 
   dht.begin();
@@ -114,14 +114,14 @@ void loop() {
         } else if (strcmp(target, "light") == 0) {
           if (isSET) {
             lightOn = doc["value"].as<int>() != 0;
-            digitalWrite(PIN_LED, lightOn ? HIGH : LOW);
+            digitalWrite(LED_PIN, lightOn ? HIGH : LOW);
           }
           sendResponse(id, true);
 
         } else if (strcmp(target, "relay") == 0) {
           if (isSET) {
             relayOn = doc["value"].as<int>() != 0;
-            digitalWrite(PIN_RELAY, relayOn ? HIGH : LOW);
+            digitalWrite(RELAY_PIN, relayOn ? HIGH : LOW);
           }
           sendResponse(id, true);
 
@@ -142,9 +142,9 @@ void loop() {
             } else {
               applyRGBInt(val.as<long>());
             }
-            analogWrite(PIN_R, rgbR);
-            analogWrite(PIN_G, rgbG);
-            analogWrite(PIN_B, rgbB);
+            analogWrite(RGB_R_PIN, rgbR);
+            analogWrite(RGB_G_PIN, rgbG);
+            analogWrite(RGB_B_PIN, rgbB);
           }
           sendResponse(id, true);
 
@@ -153,10 +153,10 @@ void loop() {
             if (doc["value"].as<int>() != 0) {
               buzzerOn    = true;
               buzzStartMs = millis();
-              digitalWrite(PIN_BUZZ, HIGH);
+              digitalWrite(BUZZ_PIN, HIGH);
             } else {
               buzzerOn = false;
-              digitalWrite(PIN_BUZZ, LOW);
+              digitalWrite(BUZZ_PIN, LOW);
             }
           }
           sendResponse(id, true);
@@ -188,7 +188,7 @@ void loop() {
   // 2. Non-blocking buzzer auto-off
   if (buzzerOn && (millis() - buzzStartMs >= BUZZ_DURATION_MS)) {
     buzzerOn = false;
-    digitalWrite(PIN_BUZZ, LOW);
+    digitalWrite(BUZZ_PIN, LOW);
   }
 
   // 3. Periodic telemetry

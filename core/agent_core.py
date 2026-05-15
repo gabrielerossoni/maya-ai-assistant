@@ -218,6 +218,7 @@ class AgentCore:
         self.memory = MemoryManager()
         self.conversation_history = []
         self._last_layout = {"type": "orb", "params": {}}
+        self.socket_manager = None
 
     async def initialize(self):
         """Inizializza tutti i componenti."""
@@ -266,7 +267,6 @@ class AgentCore:
         if any(v in lower for v in domotic_verbs) and any(
             o in lower for o in domotic_objects
         ):
-            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Hardware)")
             return "DOMOTIC"
 
         # Finanza: PREZZO/QUANTO VALE + ASSET
@@ -284,18 +284,15 @@ class AgentCore:
         if any(v in lower for v in crypto_verbs) and any(
             a in lower for a in crypto_assets
         ):
-            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Finance)")
             return "DOMOTIC"
 
         # Meteo e News (già filtrati per lunghezza > 12 sopra)
         if any(x in lower for x in ["meteo", "che tempo fa", "temperatura"]):
-            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Meteo)")
             return "DOMOTIC"
 
         if any(
             x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]
         ):
-            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (News)")
             return "DOMOTIC"
 
         # Spotify: VERBO + OGGETTO
@@ -311,7 +308,6 @@ class AgentCore:
         if any(v in lower for v in spotify_verbs) and any(
             o in lower for o in spotify_objects
         ):
-            print(f"[ROUTER] Hard-routing rilevato: DOMOTIC (Spotify)")
             return "DOMOTIC"
 
         # --- 2. HARD ROUTING: CHITCHAT ---
@@ -321,11 +317,9 @@ class AgentCore:
 
         # Se è un saluto e non ci sono altre keyword (finanza/meteo/ecc già controllate sopra)
         if is_greeting and word_count <= 4:
-            print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Saluto)")
             return "CHITCHAT"
 
         if word_count <= 2:
-            print(f"[ROUTER] Hard-routing rilevato: CHITCHAT (Short)")
             return "CHITCHAT"
 
         # --- 3. FALLBACK LLM ---
@@ -481,7 +475,7 @@ class AgentCore:
         model_name = MODELS.get(model_key, MODELS["chitchat"])
         system_prompt = SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)
 
-        print(f"[PIPELINE] Specialist: {model_key.upper()} | Model: {model_name}")
+        print(f"[LLM] {model_key.upper()} → {model_name}")
 
         # Feedback all'utente se il modello è pesante
         if intent == "REASONING" and progress_cb:
@@ -585,10 +579,12 @@ class AgentCore:
         results = []
         for action in actions:
             tool_name = action.get("tool", "none")
-            print(f"[EXECUTOR] Eseguo tool: {tool_name} → {action}")
+            target = action.get("target", action.get("operation", ""))
+            print(f"[→] {tool_name}{': ' + target if target else ''}")
             result = await self.tool_manager.execute(action)
             results.append({"tool": tool_name, "result": result})
-            print(f"[EXECUTOR] Risultato: {result}")
+            if result.get("status") == "error":
+                print(f"[✗] {tool_name}: {result.get('message', result)}")
 
             # --- BROADCAST AUTOMATICO PER DASHBOARD ---
             if self.socket_manager:
@@ -603,24 +599,30 @@ class AgentCore:
 
                 if tool_name in ws_map and result.get("status") == "ok":
                     msg_type = ws_map[tool_name]
-                    # Alcuni tool mettono i dati in 'data', altri no
                     payload = {"type": msg_type}
-
                     if "data" in result:
                         if isinstance(result["data"], dict):
                             payload.update(result["data"])
                         else:
                             payload["data"] = result["data"]
                     else:
-                        # Fallback: metti tutto il risultato nel payload
                         payload.update(result)
-
-                    # Rimuovi campi ridondanti
                     payload.pop("status", None)
                     payload.pop("message", None)
-
-                    print(f"[EXECUTOR] Broadcasting {msg_type} for dashboard")
                     await self.socket_manager.broadcast(payload)
+
+                # Arduino: aggiorna subito la dashboard con il nuovo stato
+                if tool_name == "arduino" and result.get("status") == "ok":
+                    st = result.get("state", {})
+                    if st:
+                        await self.socket_manager.broadcast({
+                            "type": "state",
+                            "led":    "on" if st.get("light") else "off",
+                            "relay":  "on" if st.get("relay") else "off",
+                            "servo":  "open" if (st.get("servo") or 0) > 0 else "0",
+                            "rgb":    st.get("rgb", [0, 0, 0]),
+                            "buzzer": st.get("buzzer", False),
+                        })
 
         return results
 
@@ -657,7 +659,6 @@ class AgentCore:
 
         # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
         if intent == "CHITCHAT":
-            print(f"[PIPELINE] Single-shot CHITCHAT per: '{user_input}'")
             messages = [
                 {"role": "system", "content": SPECIALIST_PROMPTS["CHITCHAT"]},
                 {"role": "user", "content": user_input},
@@ -706,11 +707,10 @@ class AgentCore:
         final_reply = ""
         model_name = MODELS.get(intent.lower(), MODELS["domotic"])
 
-        print(f"[ReAct] Avvio loop ({intent}) per: '{user_input}'")
+        print(f"[ReAct] {intent} ← '{user_input[:60]}'")
 
         while current_step < max_steps:
             current_step += 1
-            print(f"[ReAct] Step {current_step}...")
 
             # 2b. Chiedi all'LLM cosa fare
             try:
@@ -786,7 +786,6 @@ class AgentCore:
                         msg = data.get("message", "")
                         observation += f"Risultato tool '{tool}' ({status}): {msg}\n"
 
-                    print(f"[ReAct] Osservazione: {observation.strip()}")
 
                     # --- EARLY EXIT CHECK ---
                     # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
@@ -809,9 +808,6 @@ class AgentCore:
                         and len(reply) > 15
                         and not is_short_q_reply
                     ):
-                        print(
-                            f"[ReAct] Early Exit: risposta soddisfacente dopo Step 1."
-                        )
                         final_reply = reply
                         for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token
