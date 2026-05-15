@@ -204,6 +204,93 @@ AUTOMATIONS = {
         {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
         {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF0000},
     ],
+    "buongiorno": [
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFD580},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},        # porta chiusa
+        {"tool": "spotify", "command": "search", "query": "buongiorno playlist mattina"},
+        {"tool": "weather", "location": None},
+        {"tool": "news", "limit": 5},
+        {"tool": "calendar", "action": "list"},
+    ],
+    "sveglia": [
+        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFFFFF},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "spotify", "command": "search", "query": "energetic morning wake up"},
+    ],
+    "cena": [
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF4400},   # arancio caldo candela
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
+        {"tool": "spotify", "command": "search", "query": "cena romantica musica italiana"},
+    ],
+    "ospiti in arrivo": [
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},       # porta aperta
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFEECC},   # bianco caldo
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "spotify", "command": "search", "query": "house party background music"},
+    ],
+    "vado fuori": [
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},        # porta chiusa
+        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},       # bip conferma
+        {"tool": "spotify", "command": "pause"},
+        {"tool": "weather", "location": None},
+    ],
+    "sono rientrato": [
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF8C42},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "spotify", "command": "search", "query": "relax after work playlist"},
+        {"tool": "timer", "minutes": 5, "message": "Ricordati di chiudere la porta!"},
+        {"tool": "news", "limit": 3},
+    ],
+    "ora di dormire": [
+        {"tool": "spotify", "command": "pause"},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000008},   # blu notte minimo
+        {"tool": "calendar", "action": "list"},
+    ],
+    "piove": [
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},        # chiudi porta/tapparella
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x4488FF},   # blu pioggia
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "spotify", "command": "search", "query": "rain lofi study"},
+        {"tool": "weather", "location": None},
+    ],
+    "pausa caffè": [
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},        # accende macchinetta via relay
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x8B4513},   # marrone caffè
+        {"tool": "spotify", "command": "search", "query": "espresso morning jazz"},
+        {"tool": "news", "limit": 3},
+        {"tool": "timer", "minutes": 3, "message": "Caffè pronto!"},
+    ],
+    "bambini dormono": [
+        {"tool": "spotify", "command": "pause"},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000003},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
+    ],
+    "weekend mattina": [
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},        # no luce piena
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFCC88},   # ambra soffusa
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "spotify", "command": "search", "query": "lazy sunday morning playlist"},
+        {"tool": "weather", "location": None},
+        {"tool": "news", "limit": 5},
+    ],
 }
 
 

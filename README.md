@@ -28,7 +28,7 @@ La differenza rispetto ai sistemi già esistenti:
 - **Gestione multi-scenario** — non un singolo dispositivo acceso/spento, ma un ambiente coordinato
 - **Dashboard HUD dinamica** — pannello "STATO CASA // LIVE" con stato real-time di ogni dispositivo
 - **Linguaggio naturale in italiano** — comandi normali, senza formule rigide
-- **7 scene configurate** — modalità studio, notte, film, relax, uscita, ospite, allarme
+- **18 scene configurate** — modalità studio, notte, film, relax, uscita, ospite, allarme + scene giornaliere (buongiorno, cena, sveglia, piove, pausa caffè e altre)
 
 ---
 
@@ -174,6 +174,8 @@ Senza Arduino connesso il sistema entra automaticamente in **modalità simulazio
 
 Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), pulsanti dashboard o voce.
 
+**Scene ambiente:**
+
 | Scena | Luci | Relay | Servo | RGB | Buzzer | Altro |
 |---|---|---|---|---|---|---|
 | `modalità notte` | ❌ | ❌ | 0° | `#000022` blu scuro | — | Spotify pause |
@@ -183,6 +185,22 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 | `modalità uscita` | ❌ | ❌ | 0° | spento | ✅ 1 bip | — |
 | `modalità ospite` | ✅ | ✅ | 90° | `#FFFFFF` bianco | — | — |
 | `allarme` | — | — | — | `#FF0000` rosso | ✅ | — |
+
+**Scene giornaliere:**
+
+| Scena | Azione principale | Extra |
+|---|---|---|
+| `buongiorno` | Luce + RGB alba `#FFD580` | Meteo, notizie, calendario, Spotify mattina |
+| `sveglia` | Buzzer + luce piena + RGB bianco | Spotify energetico |
+| `cena` | RGB arancio `#FF4400`, tutto soffuso | Spotify cena romantica |
+| `ospiti in arrivo` | Luce + porta aperta 90° + RGB caldo | Spotify house party |
+| `vado fuori` | Tutto spento, porta chiusa, bip | Spotify pause, meteo |
+| `sono rientrato` | Luce + porta 90° + RGB `#FF8C42` | Timer 5min chiudi porta, notizie |
+| `ora di dormire` | Tutto spento, RGB blu `#000008` | Spotify pause, calendario domani |
+| `piove` | Porta chiusa, luce + RGB blu `#4488FF` | Spotify lofi, meteo |
+| `pausa caffè` | Relay ON (macchinetta) + RGB marrone | Spotify jazz, timer 3min, notizie |
+| `bambini dormono` | Tutto spento silenzioso | Spotify pause |
+| `weekend mattina` | RGB ambra `#FFCC88` soffusa | Spotify lazy, meteo, notizie |
 
 ---
 
@@ -480,7 +498,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] Firmware Arduino JSON 115200 baud (LED, relay, servo, RGB, buzzer, DHT11)
 - [x] Protocollo telemetria automatica da DHT11 ogni 5 s
 - [x] Pannello "STATO CASA // LIVE" con stato real-time di tutti i dispositivi
-- [x] 7 scene configurate con controllo RGB e buzzer
+- [x] 18 scene configurate con controllo RGB e buzzer (7 ambiente + 11 giornaliere)
 - [x] `sensor_broadcaster` — aggiornamento temperatura/umidità ogni 30 s
 - [x] `SPOTIFY_ENABLED` flag — Spotify disattivabile via `.env`
 - [x] `OLLAMA_ENABLED` flag — Ollama disabilitabile; sistema usa Groq o parser keyword
