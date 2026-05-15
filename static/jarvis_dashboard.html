@@ -59,6 +59,14 @@
             background: #000000;
         }
 
+        #bg-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            display: block;
+        }
+
         #screen-work {
             width: 100vw;
             height: 100vh;
@@ -1326,7 +1334,7 @@
 
         <!-- SCREEN 1: Idle — sfondo nero, orb centrato, clock -->
         <div id="screen-idle">
-            <canvas id="bg-canvas" style="position:absolute;inset:0;z-index:0;pointer-events:none;"></canvas>
+            <canvas id="bg-canvas"></canvas>
             <div id="idle-clock">
                 <div class="time" id="clock-time">00:00</div>
                 <div class="date" id="clock-date">LUNEDÌ, 1 GENNAIO</div>
@@ -1649,31 +1657,75 @@
         }
 
         // =============================================
-        // BACKGROUND PARTICLES
+        // HUD GRID BACKGROUND
         // =============================================
         function initBackground() {
             const canvas = document.getElementById('bg-canvas');
             if (!canvas) return;
+            // Guarantee canvas is always strictly behind the orb
+            canvas.style.zIndex = '0';
+            canvas.style.pointerEvents = 'none';
             const ctx = canvas.getContext('2d');
-            let pts = [];
-            const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+            const CELL = 56;
+            let scanY = 0;
+
+            function resize() {
+                canvas.width  = window.innerWidth  || document.documentElement.clientWidth;
+                canvas.height = window.innerHeight || document.documentElement.clientHeight;
+            }
             window.addEventListener('resize', resize);
             resize();
-            for (let i = 0; i < 150; i++) {
-                pts.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5, r: Math.random() * 0.8 });
+
+            function draw() {
+                const W = canvas.width, H = canvas.height;
+                // Guard: if layout not ready yet, retry next frame
+                if (!W || !H) { requestAnimationFrame(draw); return; }
+
+                ctx.clearRect(0, 0, W, H);
+
+                // — Main grid lines —
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 30, 30, 0.07)';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                for (let x = 0; x < W; x += CELL) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+                for (let y = 0; y < H; y += CELL) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+                ctx.stroke();
+                ctx.restore();
+
+                // — Intersection corner marks (every 4 cells) —
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 30, 30, 0.22)';
+                ctx.lineWidth = 1;
+                const mk = 5;
+                for (let x = 0; x <= W; x += CELL * 4) {
+                    for (let y = 0; y <= H; y += CELL * 4) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, y + mk); ctx.lineTo(x, y); ctx.lineTo(x + mk, y);
+                        ctx.moveTo(x, y - mk); ctx.lineTo(x, y); ctx.lineTo(x + mk, y);
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+
+                // — Slow horizontal scan line —
+                scanY = (scanY + 0.35) % (H + 80);
+                const sg = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
+                sg.addColorStop(0,   'rgba(255,30,30,0)');
+                sg.addColorStop(0.45,'rgba(255,30,30,0.05)');
+                sg.addColorStop(0.5, 'rgba(255,30,30,0.09)');
+                sg.addColorStop(0.55,'rgba(255,30,30,0.05)');
+                sg.addColorStop(1,   'rgba(255,30,30,0)');
+                ctx.save();
+                ctx.fillStyle = sg;
+                ctx.fillRect(0, scanY - 50, W, 100);
+                ctx.restore();
+
+                requestAnimationFrame(draw);
             }
-            function anim() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'rgba(255,255,255,0.15)';
-                pts.forEach(p => {
-                    p.x += p.vx; p.y += p.vy;
-                    if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
-                    if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
-                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
-                });
-                requestAnimationFrame(anim);
-            }
-            anim();
+
+            // Start via rAF so first frame is always in a valid paint cycle
+            requestAnimationFrame(draw);
         }
 
         // =============================================

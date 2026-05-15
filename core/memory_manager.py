@@ -16,6 +16,7 @@ MEMORY_DIR = "data"
 METADATA_FILE = os.path.join(MEMORY_DIR, "memory_metadata.json")
 CHROMA_PERSIST_DIR = os.path.join(MEMORY_DIR, "chroma_db")
 EMBEDDING_MODEL = "nomic-embed-text"  # Via Ollama
+_ollama_available = True  # Set to False after first connection failure to suppress repeated errors
 
 
 class MemoryManager:
@@ -77,7 +78,8 @@ class MemoryManager:
 
     async def _get_embedding(self, text: str) -> Optional[list]:
         """Ottieni embedding da Ollama (nomic-embed-text)."""
-        if not text.strip():
+        global _ollama_available
+        if not _ollama_available or not text.strip():
             return None
             
         try:
@@ -87,13 +89,13 @@ class MemoryManager:
                 model=EMBEDDING_MODEL,
                 input=text
             )
-            # Ollama 0.3+ torna una lista di embeddings
             embeddings = response.get("embeddings", [])
             if embeddings:
                 return embeddings[0]
             return None
-        except Exception as e:
-            print(f"[MEMORY] Errore embedding Ollama ({EMBEDDING_MODEL}): {e}")
+        except Exception:
+            _ollama_available = False
+            print(f"[MEMORY] Ollama non disponibile — embedding semantici disabilitati.")
             return None
 
     async def add_turn(self, role: str, text: str):
