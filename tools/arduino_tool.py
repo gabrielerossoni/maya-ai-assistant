@@ -17,13 +17,13 @@ BAUD_RATE   = 115200
 TIMEOUT_SEC = 3
 SERIAL_PORT = os.getenv("ARDUINO_PORT", "AUTO")
 
-VALID_TARGETS = {"light", "relay", "servo", "light_pwm"}
+VALID_TARGETS = {"light", "relay", "servo", "light_pwm", "rgb", "buzzer", "sensor_read"}
 
 class ArduinoTool:
     def __init__(self):
         self.connection  = None
         self.simulated   = not SERIAL_AVAILABLE
-        self.sim_state   = {"light": False, "relay": False, "servo": 0}
+        self.sim_state   = {"light": False, "relay": False, "servo": 0, "rgb": [0, 0, 0], "buzzer": False}
         self._reader     = None
         self._running    = False
         self._msg_id     = 0
@@ -31,6 +31,7 @@ class ArduinoTool:
         self._event_queue: queue.Queue = queue.Queue()
         self._telemetry  : dict = {}
         self._event_hooks: list[Callable] = []
+        self._sync_pending: dict[int, tuple[threading.Event, list]] = {}
         self._lock       = threading.Lock()
 
     def initialize(self):
@@ -105,6 +106,13 @@ class ArduinoTool:
                     loop.call_soon_threadsafe(future.set_result, data)
                 except Exception:
                     pass
+
+            with self._lock:
+                sync_entry = self._sync_pending.pop(msg_id, None)
+            if sync_entry:
+                event, holder = sync_entry
+                holder[0] = data
+                event.set()
 
             if "state" in data:
                 s = data["state"]
@@ -193,9 +201,52 @@ class ArduinoTool:
                 self.sim_state["relay"] = bool(value)
             elif target == "servo":
                 self.sim_state["servo"] = max(0, min(180, int(value)))
+            elif target == "rgb":
+                if isinstance(value, dict):
+                    self.sim_state["rgb"] = [value.get("r", 0), value.get("g", 0), value.get("b", 0)]
+                else:
+                    v = int(value)
+                    self.sim_state["rgb"] = [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
+            elif target == "buzzer":
+                self.sim_state["buzzer"] = bool(value)
             print(f"[ARDUINO SIM] {target} → {value}")
 
+        if target == "sensor_read":
+            return {"status": "ok", "simulated": True, "temp": 22.0, "humidity": 55.0}
+
         return {"status": "ok", "simulated": True, "state": self.sim_state.copy()}
+
+    def get_sensor_data(self) -> dict:
+        if self.simulated:
+            return {"temp": 22.0, "humidity": 55.0}
+
+        msg_id  = self._next_id()
+        payload = {"id": msg_id, "cmd": "GET", "target": "sensor_read"}
+
+        event  = threading.Event()
+        holder: list = [None]
+        with self._lock:
+            self._sync_pending[msg_id] = (event, holder)
+
+        try:
+            self.connection.write((json.dumps(payload) + "\n").encode())
+            self.connection.flush()
+        except Exception as e:
+            with self._lock:
+                self._sync_pending.pop(msg_id, None)
+            return None
+
+        if event.wait(timeout=1.5):
+            data = holder[0] or {}
+            temp = data.get("temp")
+            hum  = data.get("humidity")
+            if temp is not None and hum is not None:
+                return {"temp": float(temp), "humidity": float(hum)}
+        else:
+            with self._lock:
+                self._sync_pending.pop(msg_id, None)
+
+        return None
 
     def _find_port(self) -> Optional[str]:
         for p in serial.tools.list_ports.comports():

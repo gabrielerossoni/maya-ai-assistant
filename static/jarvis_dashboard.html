@@ -1216,6 +1216,67 @@
         #panel-map { height: 100%; width: 100%; border-radius: 12px; overflow: hidden; }
         #map-container { height: 100%; width: 100%; }
         #panel-browser iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: white; }
+
+        /* =============================================
+           DOMOTICA — Scene Rapide & Stato Casa
+           ============================================= */
+        .dom-main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3px;
+            overflow: hidden;
+        }
+        .dom-scenes-panel {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+            border-right: 1px solid rgba(255,255,255,0.04);
+        }
+        .dom-state-panel {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.01);
+        }
+        .dom-state-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dom-state-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .casa-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+            flex-shrink: 0;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+        }
+        .casa-dot.on-green {
+            background: #4CAF50;
+            box-shadow: 0 0 8px rgba(76,175,80,0.5);
+        }
+        .casa-dot.on-red {
+            background: #f44336;
+            box-shadow: 0 0 8px rgba(244,67,54,0.5);
+        }
+        .casa-rgb-swatch {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            background: #000000;
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: background 0.4s ease;
+        }
     </style>
 </head>
 <body>
@@ -1344,117 +1405,75 @@
                     </div>
 
                     <div class="dom-body">
-                        <!-- House floor plan -->
-                        <div class="dom-house">
-                            <!-- Soggiorno -->
-                            <div class="dom-room">
-                                <div class="dom-room-name">Soggiorno</div>
-                                <div class="dom-room-devices">
-                                    <div class="dom-device" id="dev-light" onclick="toggleDevice('light')">
-                                        <span class="dom-dev-icon">💡</span>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Luci principali</div>
-                                            <div class="dom-dev-state" id="dev-light-state">OFF</div>
-                                        </div>
-                                        <span class="dom-dev-dot" id="dev-light-dot"></span>
-                                    </div>
-                                    <div class="dom-device" id="dev-relay" onclick="toggleDevice('relay')">
-                                        <span class="dom-dev-icon">⚡</span>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Relè / RGB</div>
-                                            <div class="dom-dev-state" id="dev-relay-state">OFF</div>
-                                        </div>
-                                        <span class="dom-dev-dot" id="dev-relay-dot"></span>
-                                    </div>
+                        <!-- Main content: Scene Rapide + Stato Casa -->
+                        <div class="dom-main">
+                            <div class="dom-scenes-panel">
+                                <div class="dom-sidebar-hdr" style="padding:0 0 12px 0">SCENE // ATTIVAZIONE RAPIDA</div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità notte')">
+                                    <span class="scene-icon">🌙</span>
+                                    <span class="scene-label">Notte</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità studio')">
+                                    <span class="scene-icon">📚</span>
+                                    <span class="scene-label">Studio</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità film')">
+                                    <span class="scene-icon">🎬</span>
+                                    <span class="scene-label">Film</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità relax')">
+                                    <span class="scene-icon">🛋️</span>
+                                    <span class="scene-label">Relax</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità uscita')">
+                                    <span class="scene-icon">🚪</span>
+                                    <span class="scene-label">Uscita</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità ospite')">
+                                    <span class="scene-icon">👥</span>
+                                    <span class="scene-label">Ospite</span>
+                                </div>
+                                <div class="dom-scene-btn" onclick="sendCmdToWS('allarme')">
+                                    <span class="scene-icon">🚨</span>
+                                    <span class="scene-label">Allarme</span>
                                 </div>
                             </div>
-
-                            <!-- Camera -->
-                            <div class="dom-room">
-                                <div class="dom-room-name">Camera</div>
-                                <div class="dom-room-devices">
-                                    <div class="dom-device" id="dev-blind" onclick="toggleDevice('blind')">
-                                        <span class="dom-dev-icon">🪟</span>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Tapparella</div>
-                                            <div class="dom-dev-state" id="dev-blind-state">CHIUSA</div>
-                                        </div>
-                                        <span class="dom-dev-dot" id="dev-blind-dot"></span>
-                                    </div>
-                                    <div class="dom-device" id="dev-fan" onclick="toggleDevice('fan')">
-                                        <span class="dom-dev-icon">🌀</span>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Ventilazione</div>
-                                            <div class="dom-dev-state" id="dev-fan-state">OFF</div>
-                                        </div>
-                                        <span class="dom-dev-dot" id="dev-fan-dot"></span>
-                                    </div>
+                            <div class="dom-state-panel">
+                                <div class="dom-sidebar-hdr" style="padding:0 0 16px 0">STATO CASA // LIVE</div>
+                                <div class="dom-state-row">
+                                    <span class="dom-stat-label">Luci</span>
+                                    <span class="dom-state-right"><span class="casa-dot" id="casa-light-dot"></span><span class="dom-dev-state" id="casa-light-val">OFF</span></span>
                                 </div>
-                            </div>
-
-                            <!-- Ingresso -->
-                            <div class="dom-room">
-                                <div class="dom-room-name">Ingresso</div>
-                                <div class="dom-room-devices">
-                                    <div class="dom-device" id="dev-servo" onclick="toggleDevice('servo')">
-                                        <span class="dom-dev-icon">🚪</span>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Porta principale</div>
-                                            <div class="dom-dev-state" id="dev-servo-state">CHIUSA</div>
-                                        </div>
-                                        <span class="dom-dev-dot" id="dev-servo-dot"></span>
-                                    </div>
+                                <div class="dom-state-row">
+                                    <span class="dom-stat-label">Relay</span>
+                                    <span class="dom-state-right"><span class="casa-dot" id="casa-relay-dot"></span><span class="dom-dev-state" id="casa-relay-val">OFF</span></span>
                                 </div>
-                            </div>
-
-                            <!-- Cucina -->
-                            <div class="dom-room">
-                                <div class="dom-room-name">Cucina</div>
-                                <div class="dom-room-devices">
-                                    <div class="dom-device" id="dev-alarm" onclick="toggleDevice('alarm')">
-                                        <span class="dom-dev-icon">🔔</span>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Allarme</div>
-                                            <div class="dom-dev-state" id="dev-alarm-state">OFF</div>
-                                        </div>
-                                        <span class="dom-dev-dot" id="dev-alarm-dot"></span>
-                                    </div>
+                                <div class="dom-state-row">
+                                    <span class="dom-stat-label">Servo</span>
+                                    <span class="dom-stat-val" id="casa-servo-val">0°</span>
+                                </div>
+                                <div class="dom-state-row">
+                                    <span class="dom-stat-label">RGB</span>
+                                    <span class="dom-state-right"><span class="casa-rgb-swatch" id="casa-rgb-swatch"></span></span>
+                                </div>
+                                <div class="dom-state-row">
+                                    <span class="dom-stat-label">Buzzer</span>
+                                    <span class="dom-state-right"><span class="casa-dot" id="casa-buzzer-dot"></span><span class="dom-dev-state" id="casa-buzzer-val">OFF</span></span>
+                                </div>
+                                <div class="dom-state-row" style="margin-top:16px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
+                                    <span class="dom-stat-label">Temperatura</span>
+                                    <span class="dom-stat-val" id="casa-temp-val">--</span>
+                                </div>
+                                <div class="dom-state-row">
+                                    <span class="dom-stat-label">Umidità</span>
+                                    <span class="dom-stat-val" id="casa-humidity-val">--</span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Sidebar: scene + stats -->
+                        <!-- Sidebar: sistema stats -->
                         <div class="dom-sidebar">
-                            <div class="dom-sidebar-hdr">SCENE // ATTIVAZIONE RAPIDA</div>
-                            <div class="dom-scenes">
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità notte')">
-                                    <span class="scene-icon">🌙</span>
-                                    <span class="scene-label">Modalità Notte</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità studio')">
-                                    <span class="scene-icon">📖</span>
-                                    <span class="scene-label">Modalità Studio</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità relax')">
-                                    <span class="scene-icon">🛋️</span>
-                                    <span class="scene-label">Modalità Relax</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità uscita')">
-                                    <span class="scene-icon">🏠</span>
-                                    <span class="scene-label">Modalità Uscita</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità ospite')">
-                                    <span class="scene-icon">👋</span>
-                                    <span class="scene-label">Modalità Ospite</span>
-                                </div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità gaming')">
-                                    <span class="scene-icon">🎮</span>
-                                    <span class="scene-label">Modalità Gaming</span>
-                                </div>
-                            </div>
-
-                            <!-- System stats -->
-                            <div class="dom-stats">
+                            <div class="dom-stats" style="margin-top:0">
                                 <div class="dom-sidebar-hdr" style="padding:0 0 8px 0">SISTEMA</div>
                                 <div class="dom-stat-row">
                                     <span class="dom-stat-label">CPU</span>
@@ -1808,6 +1827,17 @@
                     }
                 }
                 if (d.type === 'state') updateArduino(d);
+                if (d.type === 'arduino_event' && d.telemetry) {
+                    const t = d.telemetry;
+                    if (t.temp !== undefined) {
+                        const el = document.getElementById('casa-temp-val');
+                        if (el) el.textContent = t.temp.toFixed(1) + ' °C';
+                    }
+                    if (t.humidity !== undefined) {
+                        const el = document.getElementById('casa-humidity-val');
+                        if (el) el.textContent = t.humidity.toFixed(1) + ' %';
+                    }
+                }
                 if (d.type === 'stats') {
                     if (d.cpu !== undefined) document.getElementById('dash-cpu').innerText = `${d.cpu}%`;
                     if (d.ram !== undefined) document.getElementById('dash-ram').innerText = `${d.ram}%`;
@@ -2137,9 +2167,9 @@
         // kind:'video'   → embed by video ID, oEmbed-checked for availability
         // kind:'channel' → embed via live_stream?channel=, no check needed
         const NEWS_STREAM_CONFIG = [
-            { primary:  { src: 'lzRMElMrvC0',              label: 'BBC NEWS',  kind: 'video' },
+            { primary:  { src: 'UCLXo7UDZvByw2ixzpQCufnA',  label: 'BBC NEWS',  kind: 'channel' },
               fallback: { src: 'YBRbxDWLcl4',              label: 'CNBC',      kind: 'video' } },
-            { primary:  { src: '_SZdAteqF6s',              label: 'REUTERS',   kind: 'video' },
+            { primary:  { src: 'UCosnml68cGE8fzm8OLKJ8SQ', label: 'REUTERS',   kind: 'channel' },
               fallback: { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA',kind: 'channel' } },
             { primary:  { src: 'iEpJwprxDdk',              label: 'BLOOMBERG', kind: 'video' },
               fallback: { src: 'bFO_VVRAmCM',              label: 'SKY NEWS',  kind: 'video' } },
@@ -2281,9 +2311,37 @@
             }
 
             // Aggiorna stato dal server
-            if (d.led) domState.light = (d.led === 'on');
-            if (d.relay) domState.relay = (d.relay === 'on');
-            if (d.servo) domState.servo = (d.servo === 'open' || d.servo === '90');
+            if (d.led !== undefined) {
+                domState.light = (d.led === 'on');
+                const dot = document.getElementById('casa-light-dot');
+                const val = document.getElementById('casa-light-val');
+                if (dot) dot.className = 'casa-dot' + (domState.light ? ' on-green' : '');
+                if (val) val.textContent = domState.light ? 'ON' : 'OFF';
+            }
+            if (d.relay !== undefined) {
+                domState.relay = (d.relay === 'on');
+                const dot = document.getElementById('casa-relay-dot');
+                const val = document.getElementById('casa-relay-val');
+                if (dot) dot.className = 'casa-dot' + (domState.relay ? ' on-green' : '');
+                if (val) val.textContent = domState.relay ? 'ON' : 'OFF';
+            }
+            if (d.servo !== undefined) {
+                domState.servo = (d.servo === 'open' || d.servo === '90');
+                const val = document.getElementById('casa-servo-val');
+                if (val) val.textContent = d.servo + '°';
+            }
+            if (d.rgb !== undefined) {
+                const rgb = Array.isArray(d.rgb) ? d.rgb : [0, 0, 0];
+                const hex = '#' + rgb.map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
+                const sw = document.getElementById('casa-rgb-swatch');
+                if (sw) sw.style.background = hex;
+            }
+            if (d.buzzer !== undefined) {
+                const dot = document.getElementById('casa-buzzer-dot');
+                const val = document.getElementById('casa-buzzer-val');
+                if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
+                if (val) val.textContent = d.buzzer ? 'ATTIVO' : 'OFF';
+            }
 
             // Aggiorna pill Arduino
             const pill = document.getElementById('dom-arduino-pill');

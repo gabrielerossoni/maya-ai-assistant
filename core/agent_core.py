@@ -20,6 +20,10 @@ load_dotenv()
 # Forza l'utilizzo di IPv4 per evitare problemi con localhost su Windows
 os.environ["OLLAMA_HOST"] = os.getenv("OLLAMA_HOST", "127.0.0.1")
 
+def is_ollama_enabled() -> bool:
+    """Controlla se Ollama è abilitato tramite variabile d'ambiente."""
+    return os.getenv("OLLAMA_ENABLED", "true").strip().lower() in ("1", "true", "yes")
+
 # ──────────────────────────────────────────────
 # CONFIGURAZIONE
 # ──────────────────────────────────────────────
@@ -64,7 +68,7 @@ NON aggiungere testo fuori dal JSON.
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
-- arduino: comandi hardware (LIGHT_ON, LIGHT_OFF, SERVO_OPEN, SERVO_CLOSE, RELAY_ON, RELAY_OFF)
+- arduino: comandi hardware (op: SET/GET, target: light/relay/servo/rgb/buzzer, value: 0|1|int per servo|0xRRGGBB per rgb; scene: modalità notte/studio/relax/uscita/ospite/film, allarme)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: invia comandi al secondo PC (qualsiasi stringa)
 - system: comandi OS (shutdown, open_browser, screenshot)
@@ -155,51 +159,50 @@ AUTOMATIONS = {
         {"tool": "network", "message": "WORK_MODE"},
     ],
     "modalità film": [
-        {"tool": "arduino", "command": "RELAY_ON"},
-        {"tool": "arduino", "command": "LIGHT_OFF"},
-        {"tool": "system", "command": "open_browser"},
-        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#1A0033"},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x220000},
     ],
     # ── Scene nuove (template per espansione futura) ──
     "modalità notte": [
-        {"tool": "arduino", "command": "LIGHT_OFF"},
-        {"tool": "arduino", "command": "SERVO_CLOSE"},
-        {"tool": "arduino", "command": "RELAY_OFF"},
-        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#000033"},  # blu notte
-        # TODO: {"tool": "arduino", "command": "BLIND_CLOSE"},
-        # TODO: {"tool": "arduino", "command": "FAN_OFF"},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000022},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
+        {"tool": "spotify", "command": "pause"},
     ],
     "modalità studio": [
-        {"tool": "arduino", "command": "LIGHT_ON"},
-        {"tool": "arduino", "command": "RELAY_OFF"},
-        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FFE0B2"},  # bianco caldo
-        # TODO: {"tool": "arduino", "command": "FAN_OFF"},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFEE99},
     ],
     "modalità relax": [
-        {"tool": "arduino", "command": "LIGHT_OFF"},
-        {"tool": "arduino", "command": "RELAY_ON"},
-        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#6A0DAD"},  # viola
-        # TODO: {"tool": "arduino", "command": "FAN_ON"},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x440055},
     ],
     "modalità uscita": [
-        {"tool": "arduino", "command": "LIGHT_OFF"},
-        {"tool": "arduino", "command": "RELAY_OFF"},
-        {"tool": "arduino", "command": "SERVO_CLOSE"},
-        # TODO: {"tool": "arduino", "command": "RGB_OFF"},
-        # TODO: {"tool": "arduino", "command": "BLIND_CLOSE"},
-        # TODO: {"tool": "arduino", "command": "BUZZER_ON"},  # conferma allarme attivo
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
     ],
     "modalità ospite": [
-        {"tool": "arduino", "command": "LIGHT_ON"},
-        {"tool": "arduino", "command": "SERVO_OPEN"},
-        {"tool": "arduino", "command": "RELAY_ON"},
-        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FFFFFF"},  # bianco pieno
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFFFFF},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},
     ],
     "modalità gaming": [
         {"tool": "arduino", "command": "LIGHT_OFF"},
         {"tool": "arduino", "command": "RELAY_ON"},
         {"tool": "system", "command": "open_browser"},
         # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FF0044"},  # rosso gaming
+    ],
+    "allarme": [
+        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF0000},
     ],
 }
 
@@ -346,6 +349,9 @@ class AgentCore:
                             return category
 
             # FALLBACK OLLAMA
+            if not is_ollama_enabled():
+                print("[ROUTER] Ollama disabilitato, uso fallback CHITCHAT")
+                return "CHITCHAT"
             client = ollama.AsyncClient()
             response = await client.generate(
                 model=MODELS["router"],
@@ -499,6 +505,9 @@ class AgentCore:
                     return self._clean_json(response_text)
 
             # FALLBACK OLLAMA
+            if not is_ollama_enabled():
+                print("[LLM] Ollama disabilitato, salto fallback")
+                return None
             try:
                 client = ollama.AsyncClient()
                 response = await client.generate(
@@ -659,6 +668,9 @@ class AgentCore:
                 res_text = await self._call_groq(messages, json_mode=True)
 
             if not res_text:
+                if not is_ollama_enabled():
+                    print("[LLM] Ollama disabilitato, salto chitchat")
+                    return
                 client = ollama.AsyncClient()
                 response = await client.chat(
                     model=MODELS["chitchat"],
@@ -710,6 +722,9 @@ class AgentCore:
 
                 # FALLBACK OLLAMA
                 if not full_response_text:
+                    if not is_ollama_enabled():
+                        print("[LLM] Ollama disabilitato, salto fallback planner")
+                        return
                     client = ollama.AsyncClient()
 
                     # Streaming della risposta dell'LLM
