@@ -19,6 +19,13 @@ class SpotifyTool:
         self.current_device_id: str | None = None
 
     def initialize(self):
+        enabled = os.environ.get("SPOTIFY_ENABLED", "true").strip().lower() not in ("0", "false", "no")
+        if not enabled:
+            print("[SPOTIFY] Disabilitato via SPOTIFY_ENABLED=false — skip init.")
+            return
+        if not os.getenv("SPOTIFY_CLIENT_ID") or not os.getenv("SPOTIFY_CLIENT_SECRET"):
+            print("[SPOTIFY] Credenziali mancanti — skip init.")
+            return
         try:
             auth_manager = SpotifyOAuth(
                 client_id=os.getenv("SPOTIFY_CLIENT_ID"),
@@ -26,7 +33,7 @@ class SpotifyTool:
                 redirect_uri=os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback"),
                 scope=SCOPE,
                 cache_path="data/.spotify_token_cache",
-                open_browser=True,
+                open_browser=False,
             )
             self.sp = spotipy.Spotify(auth_manager=auth_manager)
             user = self.sp.current_user()
