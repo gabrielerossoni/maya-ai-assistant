@@ -116,22 +116,28 @@ class MemoryManager:
         
         # Calcola embedding e aggiungilo a ChromaDB
         if self.collection:
+            import random
+            ts_ms = int(datetime.now().timestamp() * 1000)
+            rnd = random.randint(100, 999)
+            turn_id = f"{role}_{ts_ms}_{rnd}"
             embedding = await self._get_embedding(text)
-            if embedding:
-                # ID univoco: timestamp ms + random per evitare collisioni
-                import random
-                ts_ms = int(datetime.now().timestamp() * 1000)
-                rnd = random.randint(100, 999)
-                turn_id = f"{role}_{ts_ms}_{rnd}"
-                try:
+            try:
+                if embedding:
                     self.collection.add(
                         ids=[turn_id],
                         documents=[text],
                         metadatas=[{"role": role, "time": timestamp}],
                         embeddings=[embedding]
                     )
-                except Exception as e:
-                    print(f"[MEMORY] Errore aggiunta a ChromaDB: {e}")
+                else:
+                    # Ollama non disponibile: ChromaDB usa all-MiniLM-L6-v2 integrato
+                    self.collection.add(
+                        ids=[turn_id],
+                        documents=[text],
+                        metadatas=[{"role": role, "time": timestamp}]
+                    )
+            except Exception as e:
+                print(f"[MEMORY] Errore aggiunta a ChromaDB: {e}")
         
         await self.save()
 
@@ -156,13 +162,17 @@ class MemoryManager:
         # Retrieval semantico per il passato remoto
         try:
             embedding = await self._get_embedding(query)
-            if not embedding:
-                return recent_context
-            
-            results = self.collection.query(
-                query_embeddings=[embedding],
-                n_results=top_k
-            )
+            if embedding:
+                results = self.collection.query(
+                    query_embeddings=[embedding],
+                    n_results=top_k
+                )
+            else:
+                # Fallback: ChromaDB usa il proprio embedding integrato
+                results = self.collection.query(
+                    query_texts=[query],
+                    n_results=top_k
+                )
             
             semantic_context = ""
             if results and results.get("documents") and results["documents"][0]:
@@ -179,6 +189,47 @@ class MemoryManager:
             print(f"[MEMORY] Errore retrieval semantico: {e}")
             return recent_context
 
+    async def migrate_json_to_chroma(self):
+        """Reindicizza i turni JSON in ChromaDB se il database vettoriale è vuoto."""
+        if not self.collection or not self.turns:
+            return
+        if self.collection.count() > 0:
+            return
+
+        print(f"[MEMORY] ChromaDB vuoto — reindicizzazione di {len(self.turns)} turni dal JSON...")
+        imported = 0
+        errors = 0
+        for i, turn in enumerate(self.turns):
+            text = turn.get("text", "").strip()
+            if not text:
+                continue
+            role      = turn.get("role", "unknown")
+            timestamp = turn.get("time", "")
+            turn_id   = f"migrate_{role}_{i}"
+            try:
+                embedding = await self._get_embedding(text)
+                if embedding:
+                    self.collection.add(
+                        ids=[turn_id],
+                        documents=[text],
+                        metadatas=[{"role": role, "time": timestamp}],
+                        embeddings=[embedding]
+                    )
+                else:
+                    self.collection.add(
+                        ids=[turn_id],
+                        documents=[text],
+                        metadatas=[{"role": role, "time": timestamp}]
+                    )
+                imported += 1
+            except Exception:
+                errors += 1
+
+        msg = f"[MEMORY] Migrazione completata: {imported} turni indicizzati"
+        if errors:
+            msg += f", {errors} saltati"
+        print(msg)
+
     async def get_all(self) -> list:
         """Ritorna tutti i turni caricati."""
         return self.turns
@@ -190,13 +241,16 @@ class MemoryManager:
             
         try:
             embedding = await self._get_embedding(query)
-            if not embedding:
-                return []
-            
-            results = self.collection.query(
-                query_embeddings=[embedding],
-                n_results=top_k
-            )
+            if embedding:
+                results = self.collection.query(
+                    query_embeddings=[embedding],
+                    n_results=top_k
+                )
+            else:
+                results = self.collection.query(
+                    query_texts=[query],
+                    n_results=top_k
+                )
             
             if results and results.get("documents"):
                 return results["documents"][0]

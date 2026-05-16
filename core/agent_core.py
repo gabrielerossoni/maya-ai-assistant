@@ -311,6 +311,7 @@ class AgentCore:
         """Inizializza tutti i componenti."""
         self.tool_manager.initialize()
         self.memory.load()
+        await self.memory.migrate_json_to_chroma()
         print("[AGENT] AgentCore pronto.\n")
 
     # ── FASE 1: PLANNER ──────────────────────────────────
