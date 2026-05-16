@@ -51,8 +51,11 @@ class InstanceGuard:
     def _try_socket_lock(self) -> bool:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # SO_REUSEADDR=0: altra istanza attiva blocca davvero il bind sulla LOCK_PORT.
+        # SO_REUSEPORT=0 combinato garantisce lock anche su Linux
         try:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+            if hasattr(socket, "SO_REUSEPORT"):
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 0)
         except OSError:
             pass
         try:

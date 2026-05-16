@@ -63,8 +63,10 @@ class VoiceManager:
         self._loop_ready.set()
 
     def _initialize_models(self):
-        # STT: faster-whisper (tiny per velocità estrema)
-        self.stt_model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        # STT: faster-whisper (small per accuratezza italiano)
+        model_size = os.environ.get("MAYA_WHISPER_MODEL", "small")
+        beam_size = int(os.environ.get("MAYA_WHISPER_BEAM_SIZE", "3"))
+        self.stt_model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
     def get_dashboard_voice_status(self) -> str:
         """Stato voce da propagare sulla dashboard (WebSocket reconnect / piggyback)."""
