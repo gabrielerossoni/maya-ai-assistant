@@ -662,7 +662,7 @@ async def stats_broadcaster():
             await manager.broadcast(stats)
         except:
             pass
-        await asyncio.sleep(0.33)
+        await asyncio.sleep(1.0)
 
 
 async def sensor_broadcaster():

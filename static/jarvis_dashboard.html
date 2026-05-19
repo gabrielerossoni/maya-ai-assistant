@@ -1,2397 +1,9879 @@
 <!DOCTYPE html>
+
+
+
 <html lang="it">
+
+
+
 <head>
+
+
+
     <meta charset="UTF-8">
+
+
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
     <title>MAYA | Neural Interface</title>
+
+
+
     <link rel="icon" type="image/png" href="/static/maya_logo_no_sfondo.png">
+
+
+
     
+
+
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+
+
+
+
+
+
     <style>
+
+
+
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap');
 
+
+
+
+
+
+
         :root {
+
+
+
             --orb-color: 255, 30, 30;
+
+
+
             --bg-dark: #000000;
+
+
+
             --accent: #ff0000;
+
+
+
             --text-main: #ffffff;
+
+
+
             --text-dim: rgba(255, 255, 255, 0.4);
+
+
+
             --panel-bg: rgba(0, 0, 0, 0.95);
+
+
+
             --glass-border: 1px solid rgba(255, 0, 0, 0.5);
+
+
+
             --transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+
+
+
             --hud-color: rgba(255, 0, 0, 0.4);
+
+
+
         }
 
         /* =============================================
-           SCREEN SLIDER SYSTEM
-           Screen 1 (idle): sfondo nero, orb, clock
-           Screen 2 (work): sfondo-maya.png "tavolo da lavoro"
+           GLOBAL TYPOGRAPHY — legibility boost
            ============================================= */
+
+        /* Base body: slightly heavier weight */
+        body { font-weight: 350 !important; }
+
+        /* All Sora text: never lighter than 350 */
+        .dom-card-name,
+        .dom-metric-name,
+        .dom-card-state,
+        .ntk-item,
+        .ns-title,
+        .wx-fc-desc,
+        .wx-feels-val,
+        .tn-title,
+        .tn-meta,
+        .trading-news-item,
+        .news-sidebar-list,
+        .ns-item,
+        #log-strip,
+        #cmd-input,
+        .dom-header-title,
+        .wx-city,
+        #weather-desc,
+        #weather-city,
+        .wx-fc-temps,
+        .dom-scene-chip,
+        .dom-sb-label,
+        .dom-section-label { font-weight: 400 !important; }
+
+        /* Syncopate labels: boost from opacity tricks to actual weight */
+        .dom-header-label,
+        .dom-scene-strip-label,
+        .dom-status-pill,
+        .dom-sb-label,
+        .dom-section-label,
+        .dom-card-state,
+        .dom-metric-name,
+        .wx-tag,
+        .wx-cond,
+        .wx-fc-day,
+        .wx-wind-label,
+        .wx-fc-hdr,
+        .wx-feels-label,
+        .ntk-label,
+        .ns-source,
+        .ns-rank,
+        .news-sidebar-header,
+        .dom-sidebar-hdr,
+        .trading-news-header { letter-spacing: 2.5px !important; }
+
+        /* Small monospace-ish labels: bump from 7px → 8px */
+        .dom-header-label,
+        .dom-scene-strip-label,
+        .dom-status-pill,
+        .dom-sb-label,
+        .dom-section-label,
+        .wx-tag,
+        .wx-cond,
+        .wx-fc-day,
+        .wx-wind-label,
+        .wx-fc-hdr,
+        .wx-feels-label,
+        .ntk-label,
+        .ns-source,
+        .ns-rank,
+        .news-sidebar-header { font-size: 8.5px !important; }
+
+        /* Card text */
+        .dom-card-name { font-size: 13px !important; }
+        .dom-card-state { font-size: 8.5px !important; opacity: 0.45 !important; }
+        .dom-card.active .dom-card-state { opacity: 0.85 !important; }
+
+        /* Metric values in sidebar */
+        .dom-metric-val { font-size: 22px !important; font-weight: 300 !important; }
+        .dom-metric-name { font-size: 12px !important; opacity: 0.6 !important; }
+
+        /* Scene chips */
+        .dom-scene-chip { font-size: 12px !important; }
+
+        /* News items */
+        .ntk-item { font-size: 12px !important; opacity: 0.8 !important; }
+        .ns-title { font-size: 12px !important; opacity: 0.88 !important; }
+        .ns-source { opacity: 0.65 !important; }
+
+        /* Weather */
+        .wx-fc-desc { font-size: 11px !important; opacity: 0.6 !important; }
+        .wx-fc-temps { font-size: 15px !important; }
+        .wx-cond { opacity: 0.5 !important; }
+
+        /* Ticker strip */
+        .tk-symbol { opacity: 0.9 !important; }
+
+        /* Log strip */
+        #log-strip { font-size: 11px !important; opacity: 0.75 !important; font-weight: 400 !important; }
+
+        /* Status pills */
+        .dom-status-pill { opacity: 0.6 !important; }
+        .dom-status-pill.online { opacity: 1 !important; }
+
+        /* Header title */
+        .dom-header-title { font-weight: 300 !important; }
+
+        /* Calendar */
+        #panel-calendar .event-item { font-size: 13px !important; }
+        #panel-calendar .event-time { font-size: 13px !important; opacity: 0.55 !important; }
+
+        /* Red accent text — bolder */
+        .dom-header-label,
+        .dom-scene-strip-label,
+        .wx-tag,
+        .ntk-label,
+        .ns-source,
+        .ns-rank,
+        .ns-live-label,
+        .dom-card-state.active,
+        .dom-card.active .dom-card-state,
+        .dom-status-pill.online,
+        .tk-symbol,
+        #orb-branding,
+        .corner { font-weight: 700 !important; }
+
+        /* Accent color labels specifically */
+        [style*="color: var(--accent)"],
+        [style*="color:#ff"] { font-weight: 600 !important; }
+
+
+
+
+
+
+
+        /* =============================================
+
+
+
+           SCREEN SLIDER SYSTEM
+
+
+
+           Screen 1 (idle): sfondo nero, orb, clock
+
+
+
+           Screen 2 (work): sfondo-maya.png "tavolo da lavoro"
+
+
+
+           ============================================= */
+
+
+
+
+
+
 
         body {
+
+
+
             background: #000000;
+
+
+
             color: var(--text-main);
+
+
+
             font-family: 'Sora', sans-serif;
+
+
+
             overflow: hidden;
+
+
+
             height: 100vh;
+
+
+
             width: 100vw;
+
+
+
             margin: 0;
+
+
+
         }
+
+
+
+
+
+
 
         #screen-slider {
+
+
+
             width: 100vw;
+
+
+
             height: 200vh;
+
+
+
             transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+
+
             will-change: transform;
+
+
+
         }
+
+
+
+
+
+
 
         body.work-mode #screen-slider {
+
+
+
             transform: translateY(-100vh);
+
+
+
         }
+
+
+
+
+
+
 
         #screen-idle {
+
+
+
             width: 100vw;
+
+
+
             height: 100vh;
+
+
+
             position: relative;
+
+
+
             background: #000000;
+
+
+
         }
+
+
+
+
+
+
 
         #bg-canvas {
+
+
+
             position: absolute;
+
+
+
             inset: 0;
+
+
+
             z-index: 0;
+
+
+
             pointer-events: none;
+
+
+
             display: block;
+
+
+
         }
+
+
+
+
+
+
 
         #screen-work {
+
+
+
             width: 100vw;
+
+
+
             height: 100vh;
+
+
+
             position: relative;
+
+
+
             background-color: #0a0406;
+
+
+
             background-image: url('/static/sfondo-maya.png');
+
+
+
             background-size: cover;
+
+
+
             background-position: center;
+
+
+
             background-repeat: no-repeat;
+
+
+
         }
+
+
+
+
+
+
 
         /* Vignette sottile su screen-work */
+
+
+
         #screen-work::after {
+
+
+
             content: '';
+
+
+
             position: absolute;
+
+
+
             inset: 0;
+
+
+
             background: radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.45) 100%);
+
+
+
             pointer-events: none;
+
+
+
             z-index: 0;
+
+
+
         }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            LOGO
+
+
+
            ============================================= */
+
+
+
         #top-logo {
+
+
+
             position: fixed;
+
+
+
             top: 15px;
+
+
+
             left: 15px;
+
+
+
             width: 80px;
+
+
+
             height: 80px;
+
+
+
             z-index: 210;
+
+
+
             opacity: 0.6;
+
+
+
             filter: drop-shadow(0 0 5px rgba(255, 30, 30, 0.3));
+
+
+
             pointer-events: none;
+
+
+
             transition: var(--transition);
+
+
+
         }
+
+
+
+
+
+
 
         body.work-mode #top-logo,
+
+
+
         body.content-open #top-logo {
+
+
+
             opacity: 0;
+
+
+
             transform: translateX(-20px);
+
+
+
             pointer-events: none;
+
+
+
         }
+
+
+
+
+
+
 
         /* =============================================
+
+
+
            ORB
+
+
+
            ============================================= */
+
+
+
         #maya-orb-container {
+
+
+
             position: fixed;
+
+
+
             top: 45%; left: 50%;
+
+
+
             transform: translate(-50%, -50%);
+
+
+
             width: 420px; height: 420px;
+
+
+
             z-index: 100;
+
+
+
             transition: var(--transition);
+
+
+
             cursor: pointer;
+
+
+
             background: transparent;
+
+
+
         }
+
+
+
+
+
+
 
         #maya-orb-container.corner {
+
+
+
             top: 24px; left: 24px;
+
+
+
             transform: translate(0, 0);
+
+
+
             width: 80px; height: 80px;
+
+
+
             border: none !important;
+
+
+
             box-shadow: none !important;
+
+
+
             background: none !important;
+
+
+
             outline: none !important;
+
+
+
         }
+
+
+
+
+
+
 
         #orb-branding {
+
+
+
             position: fixed;
+
+
+
             top: 45%; left: 50%;
+
+
+
             transform: translate(-50%, -50%);
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 14px;
+
+
+
             font-weight: 700;
+
+
+
             letter-spacing: 12px;
+
+
+
             color: #ffffff;
+
+
+
             pointer-events: none;
+
+
+
             z-index: 102;
+
+
+
             text-align: center;
+
+
+
             opacity: 0.8;
+
+
+
             display: block;
+
+
+
             text-indent: 12px;
+
+
+
             transition: var(--transition);
+
+
+
         }
 
+
+
+
+
+
+
         body.content-open #orb-branding {
+
+
+
             top: 108px;
+
+
+
             left: 0;
+
+
+
             width: 128px;
+
+
+
             transform: translate(0, 0);
+
+
+
             font-size: 9px;
+
+
+
             letter-spacing: 4px;
+
+
+
             text-indent: 4px;
+
+
+
             opacity: 0.4;
+
+
+
             display: block;
+
+
+
         }
+
+
+
+
+
+
+
+
+
 
 
         #orb-canvas {
+
+
+
             position: absolute;
+
+
+
             top: 0; left: 0;
+
+
+
             width: 100%; height: 100%;
+
+
+
             z-index: 101;
+
+
+
         }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            CLOCK — Screen 1
+
+
+
            ============================================= */
+
+
+
         #idle-clock {
+
+
+
             position: absolute;
+
+
+
             top: 78%; left: 50%;
+
+
+
             transform: translate(-50%, -50%);
+
+
+
             text-align: center;
+
+
+
             z-index: 10;
+
+
+
             transition: opacity 0.6s ease, visibility 0.6s ease, transform 0.6s ease;
+
+
+
             pointer-events: none;
+
+
+
         }
+
+
+
+
+
+
 
         #idle-clock .time { 
+
+
+
             font-family: 'Sora', sans-serif;
+
+
+
             font-size: 58px; 
+
+
+
             font-weight: 100; 
+
+
+
             letter-spacing: -1px; 
+
+
+
             color: rgba(255, 255, 255, 0.35);
+
+
+
             line-height: 1;
+
+
+
         }
+
+
+
+
+
+
 
         #idle-clock .date { 
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 9px; 
+
+
+
             color: rgba(255, 255, 255, 0.35); 
+
+
+
             text-transform: uppercase; 
+
+
+
             letter-spacing: 0.5em;
+
+
+
             margin-top: 12px;
+
+
+
         }
+
+
+
+
+
+
 
         body.content-open #idle-clock {
+
+
+
             opacity: 0;
+
+
+
             visibility: hidden;
+
+
+
             transform: translate(-50%, -60%);
+
+
+
         }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            CONTENT AREA — Screen 2
+
+
+
            ============================================= */
+
+
+
         #content-area {
+
+
+
             position: absolute;
+
+
+
             top: 0; right: -100vw;
+
+
+
             width: 100vw; height: 100vh;
+
+
+
             box-sizing: border-box;
+
+
+
             background: rgba(4, 4, 8, 0.94);
+
+
+
             z-index: 10;
+
+
+
             transition: var(--transition);
+
+
+
             padding: 40px;
+
+
+
             overflow: hidden;
+
+
+
             backdrop-filter: blur(40px);
+
+
+
             pointer-events: none;
+
+
+
             opacity: 0;
+
+
+
         }
+
+
+
+
+
+
 
         #content-area.open { 
+
+
+
             right: 0; 
+
+
+
             padding: 32px 48px 40px 156px;
+
+
+
             pointer-events: auto;
+
+
+
             opacity: 1;
+
+
+
         }
+
+
+
+
+
+
 
         .panel { display: none; height: 100%; flex-direction: column; gap: 30px; }
+
+
+
         .panel.active { display: flex; animation: fadeIn 0.5s ease forwards; }
 
+
+
+
+
+
+
         @keyframes fadeIn {
+
+
+
             from { opacity: 0; transform: translateX(20px); }
+
+
+
             to { opacity: 1; transform: translateX(0); }
+
+
+
         }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            WEATHER PANEL — redesign
+
+
+
            ============================================= */
+
+
+
         #panel-weather {
+
+
+
             display: none;
+
+
+
             height: calc(100vh - 80px);
+
+
+
             padding: 0;
+
+
+
             overflow: hidden;
+
+
+
         }
+
+
+
         #panel-weather.active {
+
+
+
             display: flex;
+
+
+
             flex-direction: row;
+
+
+
             animation: fadeIn 0.5s ease forwards;
+
+
+
         }
+
+
+
         .wx-left {
+
+
+
             flex: 1;
+
+
+
             min-width: 0;
+
+
+
             display: flex;
+
+
+
             flex-direction: column;
+
+
+
         }
+
+
+
         .wx-topbar {
+
+
+
             display: flex;
+
+
+
             align-items: center;
+
+
+
             padding: 26px 40px;
+
+
+
             gap: 52px;
+
+
+
             border-bottom: 1px solid rgba(255,255,255,0.06);
+
+
+
             flex-shrink: 0;
+
+
+
             background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+
+
+
             backdrop-filter: blur(20px);
+
+
+
         }
+
+
+
         .wx-tag {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 7px;
+
+
+
             letter-spacing: 3px;
+
+
+
             color: var(--accent);
+
+
+
             opacity: 0.6;
+
+
+
             margin-bottom: 7px;
+
+
+
         }
+
+
+
         .wx-city {
+
+
+
             font-size: 34px;
+
+
+
             font-weight: 100;
+
+
+
             letter-spacing: -1px;
+
+
+
             line-height: 1;
+
+
+
         }
+
+
+
         .wx-cond {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 8px;
+
+
+
             opacity: 0.28;
+
+
+
             letter-spacing: 3px;
+
+
+
             text-transform: uppercase;
+
+
+
             margin-top: 8px;
+
+
+
         }
+
+
+
         .wx-temp-block {
+
+
+
             display: flex;
+
+
+
             align-items: flex-start;
+
+
+
             line-height: 1;
+
+
+
         }
+
+
+
         .wx-temp {
+
+
+
             font-size: 88px;
+
+
+
             font-weight: 100;
+
+
+
             letter-spacing: -6px;
+
+
+
             line-height: 0.85;
+
+
+
             transition: color 1s ease, text-shadow 1s ease;
+
+
+
         }
+
+
+
         .wx-unit {
+
+
+
             font-size: 22px;
+
+
+
             opacity: 0.18;
+
+
+
             margin-top: 8px;
+
+
+
             margin-left: 5px;
+
+
+
         }
+
+
+
         .wx-feels { margin-left: auto; text-align: right; }
+
+
+
         .wx-feels-val { font-size: 22px; font-weight: 200; opacity: 0.55; }
+
+
+
         .wx-feels-label {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 7px; letter-spacing: 2px; opacity: 0.22; margin-top: 4px;
+
+
+
         }
+
+
+
         .wx-wind {
+
+
+
             border-left: 1px solid rgba(255,255,255,0.06);
+
+
+
             padding-left: 52px;
+
+
+
         }
+
+
+
         .wx-wind-val {
+
+
+
             font-size: 34px;
+
+
+
             font-weight: 200;
+
+
+
             letter-spacing: -1px;
+
+
+
         }
+
+
+
         .wx-wind-val span { font-size: 13px; opacity: 0.28; }
+
+
+
         .wx-wind-label {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 7px;
+
+
+
             letter-spacing: 2px;
+
+
+
             opacity: 0.22;
+
+
+
             margin-top: 5px;
+
+
+
         }
+
+
+
         .wx-radar {
+
+
+
             flex: 1;
+
+
+
             min-height: 0;
+
+
+
             position: relative;
+
+
+
         }
+
+
+
         #weather-mini-map { width: 100%; height: 100%; }
+
+
+
         .wx-forecast {
+
+
+
             width: 260px;
+
+
+
             flex-shrink: 0;
+
+
+
             border-left: 1px solid rgba(255,255,255,0.06);
+
+
+
             display: flex;
+
+
+
             flex-direction: column;
+
+
+
             overflow: hidden;
+
+
+
             background: rgba(255,255,255,0.01);
+
+
+
         }
+
+
+
         .wx-fc-hdr {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 7px;
+
+
+
             letter-spacing: 3px;
+
+
+
             opacity: 0.18;
+
+
+
             padding: 16px 20px 12px;
+
+
+
             border-bottom: 1px solid rgba(255,255,255,0.04);
+
+
+
             flex-shrink: 0;
+
+
+
         }
+
+
+
         .wx-fc-row {
+
+
+
             display: flex;
+
+
+
             align-items: center;
+
+
+
             padding: 16px 22px;
+
+
+
             border-bottom: 1px solid rgba(255,255,255,0.03);
+
+
+
             gap: 10px;
+
+
+
             transition: all 0.2s;
+
+
+
             border-left: 2px solid transparent;
+
+
+
         }
+
+
+
         .wx-fc-row:hover {
+
+
+
             background: rgba(255,255,255,0.02);
+
+
+
             border-left-color: rgba(255,30,30,0.35);
+
+
+
         }
+
+
+
         .wx-fc-day {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 8px;
+
+
+
             letter-spacing: 1px;
+
+
+
             opacity: 0.4;
+
+
+
             width: 36px;
+
+
+
             text-transform: uppercase;
+
+
+
         }
+
+
+
         .wx-fc-desc {
+
+
+
             flex: 1;
+
+
+
             font-size: 10px;
+
+
+
             opacity: 0.45;
+
+
+
             text-transform: capitalize;
+
+
+
         }
+
+
+
         .wx-fc-temps { font-size: 14px; font-weight: 200; }
+
+
+
         .wx-fc-min { opacity: 0.28; font-size: 11px; margin-left: 5px; }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            NEWS PANEL — HUD redesign
+
+
+
            ============================================= */
+
+
+
         #panel-news {
+
+
+
             display: none;
+
+
+
             flex-direction: column;
+
+
+
             height: calc(100vh - 80px);
+
+
+
             padding: 0;
+
+
+
             gap: 0;
+
+
+
             overflow: hidden;
+
+
+
         }
+
+
+
         #panel-news.active {
+
+
+
             display: flex;
+
+
+
             animation: fadeIn 0.5s ease forwards;
+
+
+
         }
+
+
+
         .news-ticker-bar {
+
+
+
             flex-shrink: 0;
+
+
+
             height: 36px;
+
+
+
             background: rgba(255, 30, 30, 0.04);
+
+
+
             border-bottom: 1px solid rgba(255, 30, 30, 0.12);
+
+
+
             overflow: hidden;
+
+
+
             display: flex;
+
+
+
             align-items: center;
+
+
+
         }
+
+
+
         .news-ticker-track {
+
+
+
             display: flex;
+
+
+
             gap: 32px;
+
+
+
             align-items: center;
+
+
+
             height: 100%;
+
+
+
             padding: 0 16px;
+
+
+
             white-space: nowrap;
+
+
+
             animation: scroll-ticker 50s linear infinite;
+
+
+
         }
+
+
+
         .ntk-label {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 7px;
+
+
+
             letter-spacing: 3px;
+
+
+
             color: var(--accent);
+
+
+
             opacity: 0.8;
+
+
+
             flex-shrink: 0;
+
+
+
         }
+
+
+
         .ntk-item { font-size: 11px; opacity: 0.65; flex-shrink: 0; }
+
+
+
         .ntk-sep { opacity: 0.15; font-size: 10px; flex-shrink: 0; }
+
+
+
         .news-main-area {
+
+
+
             flex: 1;
+
+
+
             display: grid;
+
+
+
             grid-template-columns: 1fr 340px;
+
+
+
             gap: 12px;
+
+
+
             padding: 12px 0 0 0;
+
+
+
             overflow: hidden;
+
+
+
         }
+
+
+
         /* Live news stream grid */
+
+
+
         .news-live-grid {
+
+
+
             display: grid;
+
+
+
             grid-template-columns: 1fr 1fr;
+
+
+
             grid-template-rows: 1fr 1fr;
+
+
+
             gap: 3px;
+
+
+
             overflow: hidden;
+
+
+
             background: #000;
+
+
+
         }
+
+
+
         .news-stream-tile {
+
+
+
             position: relative;
+
+
+
             overflow: hidden;
+
+
+
             background: #0a0406;
+
+
+
         }
+
+
+
         .news-stream-tile iframe {
+
+
+
             width: 100%; height: 100%;
+
+
+
             border: none; display: block;
+
+
+
         }
+
+
+
         .ns-live-label {
+
+
+
             position: absolute;
+
+
+
             top: 7px; left: 7px;
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 6px;
+
+
+
             letter-spacing: 2px;
+
+
+
             color: #fff;
+
+
+
             background: rgba(0,0,0,0.65);
+
+
+
             padding: 3px 7px;
+
+
+
             pointer-events: none;
+
+
+
             z-index: 2;
+
+
+
         }
+
+
+
         .ns-live-dot {
+
+
+
             display: inline-block;
+
+
+
             width: 5px; height: 5px;
+
+
+
             border-radius: 50%;
+
+
+
             background: var(--accent);
+
+
+
             margin-right: 5px;
+
+
+
             animation: pulse 1.5s ease infinite;
+
+
+
             vertical-align: middle;
+
+
+
         }
+
+
+
         .news-sidebar {
+
+
+
             display: flex;
+
+
+
             flex-direction: column;
+
+
+
             border: 1px solid rgba(255,255,255,0.04);
+
+
+
             background: rgba(255,255,255,0.01);
+
+
+
             overflow: hidden;
+
+
+
         }
+
+
+
         .news-sidebar-header {
+
+
+
             padding: 12px 18px;
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 7px;
+
+
+
             letter-spacing: 3px;
+
+
+
             opacity: 0.22;
+
+
+
             border-bottom: 1px solid rgba(255,255,255,0.04);
+
+
+
             flex-shrink: 0;
+
+
+
         }
+
+
+
         .news-sidebar-list { flex: 1; overflow-y: auto; }
+
+
+
         .ns-item {
+
+
+
             padding: 14px 18px;
+
+
+
             border-bottom: 1px solid rgba(255,255,255,0.04);
+
+
+
             cursor: pointer;
+
+
+
             transition: background 0.2s;
+
+
+
             display: flex;
+
+
+
             gap: 12px;
+
+
+
             align-items: flex-start;
+
+
+
         }
+
+
+
         .ns-item:hover { background: rgba(255,30,30,0.03); }
+
+
+
         .ns-rank {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 9px;
+
+
+
             color: var(--accent);
+
+
+
             opacity: 0.35;
+
+
+
             flex-shrink: 0;
+
+
+
             padding-top: 2px;
+
+
+
             min-width: 20px;
+
+
+
         }
+
+
+
         .ns-content { flex: 1; min-width: 0; }
+
+
+
         .ns-source {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 6px;
+
+
+
             letter-spacing: 2px;
+
+
+
             color: var(--accent);
+
+
+
             opacity: 0.5;
+
+
+
             margin-bottom: 5px;
+
+
+
         }
+
+
+
         .ns-title { font-size: 11px; line-height: 1.5; opacity: 0.78; }
 
+
+
+
+
+
+
         /* =============================================
-           DASHBOARD / DOMOTICA PANEL
+
+
+
+           DASHBOARD / DOMOTICA PANEL — Modern
+
+
+
            ============================================= */
+
+
+
         #panel-dashboard {
+
+
+
             display: none;
+
+
+
             flex-direction: column;
+
+
+
             height: calc(100vh - 80px);
+
+
+
             padding: 0;
+
+
+
             overflow: hidden;
+
+
+
             gap: 0;
+
+
+
         }
+
+
+
         #panel-dashboard.active {
+
+
+
             display: flex;
+
+
+
             animation: fadeIn 0.5s ease forwards;
+
+
+
         }
 
-        /* Header bar */
-        .dom-topbar {
+
+
+
+
+
+
+        /* Header */
+
+
+
+        .dom-header {
+
+
+
             display: flex;
+
+
+
             align-items: center;
+
+
+
             padding: 18px 32px;
-            gap: 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
+
+
+
+            gap: 20px;
+
+
+
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+
+
+
             flex-shrink: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+
+
+
         }
-        .dom-tag {
+
+
+
+        .dom-header-left { flex: 1; }
+
+
+
+        .dom-header-label {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 7px;
+
+
+
             letter-spacing: 3px;
+
+
+
             color: var(--accent);
-            opacity: 0.6;
+
+
+
+            opacity: 0.5;
+
+
+
+            margin-bottom: 4px;
+
+
+
         }
-        .dom-title {
+
+
+
+        .dom-header-title {
+
+
+
             font-size: 22px;
-            font-weight: 100;
-            letter-spacing: -0.5px;
-        }
-        .dom-status-pills {
-            margin-left: auto;
-            display: flex;
-            gap: 12px;
-        }
-        .dom-pill {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
-            letter-spacing: 2px;
-            padding: 5px 12px;
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 20px;
-            opacity: 0.4;
-        }
-        .dom-pill.online { border-color: rgba(76,175,80,0.4); color: #4CAF50; opacity: 0.7; }
 
-        /* Main body: house map + sidebar */
-        .dom-body {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 320px;
-            gap: 0;
-            overflow: hidden;
-        }
 
-        /* House floor plan */
-        .dom-house {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-            gap: 3px;
-            padding: 20px;
-            overflow: hidden;
-        }
-        .dom-room {
-            position: relative;
-            background: rgba(255,255,255,0.015);
-            border: 1px solid rgba(255,255,255,0.06);
-            padding: 18px;
-            display: flex;
-            flex-direction: column;
-            transition: all 0.3s ease;
-            overflow: hidden;
-        }
-        .dom-room:hover {
-            background: rgba(255,30,30,0.02);
-            border-color: rgba(255,30,30,0.15);
-        }
-        .dom-room-name {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 16px;
-            letter-spacing: 3px;
-            opacity: 0.35;
-            margin-bottom: 14px;
-            text-transform: uppercase;
-        }
-        .dom-room-devices {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .dom-device {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            background: rgba(255,255,255,0.02);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            user-select: none;
-        }
-        .dom-device:hover {
-            background: rgba(255,255,255,0.05);
-            border-color: rgba(255,255,255,0.1);
-        }
-        .dom-device.active {
-            border-color: rgba(76,175,80,0.5);
-            background: rgba(76,175,80,0.06);
-        }
-        .dom-device.active .dom-dev-dot { background: #4CAF50; box-shadow: 0 0 8px rgba(76,175,80,0.5); }
-        .dom-dev-icon {
-            font-size: 18px;
-            width: 28px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-        .dom-dev-info { flex: 1; min-width: 0; }
-        .dom-dev-name {
-            font-size: 11px;
-            font-weight: 400;
-            opacity: 0.8;
-        }
-        .dom-dev-state {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
-            letter-spacing: 1px;
-            opacity: 0.3;
-            margin-top: 2px;
-        }
-        .dom-dev-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.15);
-            flex-shrink: 0;
-            transition: all 0.3s ease;
-        }
 
-        /* Sidebar: scenes + stats */
-        .dom-sidebar {
-            border-left: 1px solid rgba(255,255,255,0.06);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            background: rgba(255,255,255,0.01);
-        }
-        .dom-sidebar-hdr {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
-            letter-spacing: 3px;
-            opacity: 0.18;
-            padding: 16px 20px 12px;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            flex-shrink: 0;
-        }
-        .dom-scenes {
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-        .dom-scene-btn {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            background: rgba(255,255,255,0.02);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: #fff;
-            font-family: 'Sora', sans-serif;
-            font-size: 11px;
-            border-left: 2px solid transparent;
-        }
-        .dom-scene-btn:hover {
-            background: rgba(255,30,30,0.04);
-            border-left-color: rgba(255,30,30,0.4);
-        }
-        .dom-scene-btn .scene-icon { font-size: 16px; width: 24px; text-align: center; }
-        .dom-scene-btn .scene-label { opacity: 0.7; }
-
-        /* Stats bottom */
-        .dom-stats {
-            margin-top: auto;
-            padding: 16px 20px;
-            border-top: 1px solid rgba(255,255,255,0.04);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .dom-stat-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .dom-stat-label {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
-            letter-spacing: 2px;
-            opacity: 0.22;
-        }
-        .dom-stat-val {
-            font-size: 16px;
             font-weight: 200;
+
+
+
+            letter-spacing: -0.5px;
+
+
+
         }
+
+
+
+        .dom-header-right { display: flex; gap: 10px; align-items: center; }
+
+
+
+        .dom-status-pill {
+
+
+
+            display: flex;
+
+
+
+            align-items: center;
+
+
+
+            gap: 6px;
+
+
+
+            padding: 5px 14px;
+
+
+
+            border: 1px solid rgba(255,255,255,0.08);
+
+
+
+            border-radius: 99px;
+
+
+
+            font-family: 'Syncopate', sans-serif;
+
+
+
+            font-size: 7px;
+
+
+
+            letter-spacing: 2px;
+
+
+
+            opacity: 0.35;
+
+
+
+            transition: all 0.4s ease;
+
+
+
+        }
+
+
+
+        .dom-status-pill .dot {
+
+
+
+            width: 5px; height: 5px;
+
+
+
+            border-radius: 50%;
+
+
+
+            background: rgba(255,255,255,0.25);
+
+
+
+            transition: all 0.4s ease;
+
+
+
+        }
+
+
+
+        .dom-status-pill.online { border-color: rgba(76,175,80,0.3); color: #4CAF50; opacity: 0.85; }
+
+
+
+        .dom-status-pill.online .dot { background: #4CAF50; box-shadow: 0 0 6px rgba(76,175,80,0.7); }
+
+
+
+
+
+
+
+        /* Scene strip */
+
+
+
+        .dom-scene-strip {
+
+
+
+            padding: 12px 32px;
+
+
+
+            display: flex;
+
+
+
+            gap: 8px;
+
+
+
+            overflow-x: auto;
+
+
+
+            flex-shrink: 0;
+
+
+
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+
+
+
+            scrollbar-width: none;
+
+
+
+            align-items: center;
+
+
+
+        }
+
+
+
+        .dom-scene-strip::-webkit-scrollbar { display: none; }
+
+
+
+        .dom-scene-strip-label {
+
+
+
+            font-family: 'Syncopate', sans-serif;
+
+
+
+            font-size: 7px;
+
+
+
+            letter-spacing: 2px;
+
+
+
+            opacity: 0.18;
+
+
+
+            white-space: nowrap;
+
+
+
+            margin-right: 4px;
+
+
+
+            flex-shrink: 0;
+
+
+
+        }
+
+
+
+        .dom-scene-chip {
+
+
+
+            display: flex;
+
+
+
+            align-items: center;
+
+
+
+            gap: 7px;
+
+
+
+            padding: 7px 15px;
+
+
+
+            background: rgba(255,255,255,0.03);
+
+
+
+            border: 1px solid rgba(255,255,255,0.07);
+
+
+
+            border-radius: 99px;
+
+
+
+            cursor: pointer;
+
+
+
+            white-space: nowrap;
+
+
+
+            font-size: 11px;
+
+
+
+            font-family: 'Sora', sans-serif;
+
+
+
+            color: rgba(255,255,255,0.6);
+
+
+
+            transition: all 0.2s ease;
+
+
+
+            user-select: none;
+
+
+
+            flex-shrink: 0;
+
+
+
+        }
+
+
+
+        .dom-scene-chip:hover {
+
+
+
+            background: rgba(255,30,30,0.06);
+
+
+
+            border-color: rgba(255,30,30,0.3);
+
+
+
+            color: #fff;
+
+
+
+        }
+
+
+
+        .dom-scene-chip:active { transform: scale(0.97); }
+
+
+
+        .dom-chip-icon { font-size: 12px; }
+
+
+
+
+
+
+
+        /* Content layout */
+
+
+
+        .dom-content {
+
+
+
+            flex: 1;
+
+
+
+            display: grid;
+
+
+
+            grid-template-columns: 1fr 260px;
+
+
+
+            gap: 0;
+
+
+
+            overflow: hidden;
+
+
+
+        }
+
+
+
+
+
+
+
+        /* Devices area */
+
+
+
+        .dom-devices-area {
+
+
+
+            padding: 22px 28px;
+
+
+
+            overflow-y: auto;
+
+
+
+            scrollbar-width: none;
+
+
+
+        }
+
+
+
+        .dom-devices-area::-webkit-scrollbar { display: none; }
+
+
+
+        .dom-section-label {
+
+
+
+            font-family: 'Syncopate', sans-serif;
+
+
+
+            font-size: 7px;
+
+
+
+            letter-spacing: 3px;
+
+
+
+            opacity: 0.18;
+
+
+
+            margin-bottom: 14px;
+
+
+
+            display: block;
+
+
+
+        }
+
+
+
+        .dom-cards-grid {
+
+
+
+            display: grid;
+
+
+
+            grid-template-columns: repeat(3, 1fr);
+
+
+
+            gap: 10px;
+
+
+
+        }
+
+
+
+
+
+
+
+        /* Device card */
+
+
+
+        .dom-card {
+
+
+
+            background: rgba(255,255,255,0.025);
+
+
+
+            border: 1px solid rgba(255,255,255,0.06);
+
+
+
+            border-radius: 16px;
+
+
+
+            padding: 18px 16px 14px;
+
+
+
+            cursor: pointer;
+
+
+
+            transition: background 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
+
+
+
+            position: relative;
+
+
+
+            overflow: hidden;
+
+
+
+            user-select: none;
+
+
+
+            display: flex;
+
+
+
+            flex-direction: column;
+
+
+
+            gap: 14px;
+
+
+
+            min-height: 108px;
+
+
+
+        }
+
+
+
+        .dom-card:hover {
+
+
+
+            background: rgba(255,255,255,0.04);
+
+
+
+            border-color: rgba(255,255,255,0.1);
+
+
+
+            transform: translateY(-1px);
+
+
+
+        }
+
+
+
+        .dom-card:active { transform: scale(0.98); }
+
+
+
+        .dom-card.active {
+
+
+
+            background: rgba(76,175,80,0.07);
+
+
+
+            border-color: rgba(76,175,80,0.32);
+
+
+
+        }
+
+
+
+        .dom-card.active:hover { background: rgba(76,175,80,0.1); }
+
+
+
+        .dom-card-top {
+
+
+
+            display: flex;
+
+
+
+            justify-content: space-between;
+
+
+
+            align-items: flex-start;
+
+
+
+        }
+
+
+
+        .dom-card-icon { font-size: 20px; line-height: 1; }
+
+
+
+
+
+
+
+        /* Toggle pill */
+
+
+
+        .dom-toggle {
+
+
+
+            width: 30px; height: 17px;
+
+
+
+            background: rgba(255,255,255,0.1);
+
+
+
+            border-radius: 9px;
+
+
+
+            position: relative;
+
+
+
+            transition: background 0.3s ease;
+
+
+
+            flex-shrink: 0;
+
+
+
+        }
+
+
+
+        .dom-toggle::after {
+
+
+
+            content: '';
+
+
+
+            position: absolute;
+
+
+
+            top: 2px; left: 2px;
+
+
+
+            width: 13px; height: 13px;
+
+
+
+            border-radius: 50%;
+
+
+
+            background: rgba(255,255,255,0.45);
+
+
+
+            transition: left 0.3s ease, background 0.3s ease;
+
+
+
+        }
+
+
+
+        .dom-card.active .dom-toggle { background: rgba(76,175,80,0.45); }
+
+
+
+        .dom-card.active .dom-toggle::after { left: 15px; background: #4CAF50; }
+
+
+
+
+
+
+
+        .dom-card-name { font-size: 12px; font-weight: 400; opacity: 0.8; }
+
+
+
+        .dom-card-state {
+
+
+
+            font-family: 'Syncopate', sans-serif;
+
+
+
+            font-size: 7px;
+
+
+
+            letter-spacing: 1.5px;
+
+
+
+            opacity: 0.28;
+
+
+
+            margin-top: 2px;
+
+
+
+            transition: all 0.3s ease;
+
+
+
+        }
+
+
+
+        .dom-card.active .dom-card-state { opacity: 0.7; color: #4CAF50; }
+
+
+
+
+
+
+
+        /* Buzzer card (pulse on trigger) */
+
+
+
+        .dom-card-buzzer { cursor: pointer; }
+
+
+
+        .dom-card-buzzer:hover { border-color: rgba(255,100,30,0.25); background: rgba(255,100,30,0.04); }
+
+
+
+
+
+
+
+        /* RGB bar */
+
+
+
+        .dom-rgb-bar {
+
+
+
+            height: 5px;
+
+
+
+            border-radius: 3px;
+
+
+
+            background: rgba(255,255,255,0.08);
+
+
+
+            transition: background 0.5s ease;
+
+
+
+            margin-top: 4px;
+
+
+
+        }
+
+
+
+
+
+
+
+        /* Right sidebar */
+
+
+
+        .dom-sidebar-new {
+
+
+
+            border-left: 1px solid rgba(255,255,255,0.05);
+
+
+
+            display: flex;
+
+
+
+            flex-direction: column;
+
+
+
+            overflow-y: auto;
+
+
+
+            background: rgba(255,255,255,0.008);
+
+
+
+            padding: 22px 20px;
+
+
+
+            gap: 0;
+
+
+
+            scrollbar-width: none;
+
+
+
+        }
+
+
+
+        .dom-sidebar-new::-webkit-scrollbar { display: none; }
+
+
+
+        .dom-sb-section { margin-bottom: 26px; }
+
+
+
+        .dom-sb-label {
+
+
+
+            font-family: 'Syncopate', sans-serif;
+
+
+
+            font-size: 7px;
+
+
+
+            letter-spacing: 3px;
+
+
+
+            opacity: 0.18;
+
+
+
+            display: block;
+
+
+
+            margin-bottom: 16px;
+
+
+
+        }
+
+
+
+        .dom-metric { margin-bottom: 18px; }
+
+
+
+        .dom-metric-row {
+
+
+
+            display: flex;
+
+
+
+            justify-content: space-between;
+
+
+
+            align-items: baseline;
+
+
+
+            margin-bottom: 7px;
+
+
+
+        }
+
+
+
+        .dom-metric-name { font-size: 11px; opacity: 0.45; }
+
+
+
+        .dom-metric-val { font-size: 20px; font-weight: 200; letter-spacing: -0.5px; }
+
+
+
+        .dom-metric-bar {
+
+
+
+            height: 2px;
+
+
+
+            background: rgba(255,255,255,0.06);
+
+
+
+            border-radius: 1px;
+
+
+
+            overflow: hidden;
+
+
+
+        }
+
+
+
+        .dom-metric-fill {
+
+
+
+            height: 100%;
+
+
+
+            border-radius: 1px;
+
+
+
+            background: var(--accent);
+
+
+
+            width: 0%;
+
+
+
+            transition: width 0.9s ease;
+
+
+
+        }
+
+
+
+        .dom-metric-fill.blue { background: #4488ff; }
+
+
+
+        .dom-metric-fill.green { background: #4CAF50; }
+
+
+
+
+
+
 
         /* =============================================
+
+
+
            CALENDAR PANEL
+
+
+
            ============================================= */
+
+
+
         #panel-calendar .event-item {
+
+
+
             padding: 20px;
+
+
+
             border-bottom: 1px solid rgba(255,255,255,0.05);
+
+
+
             display: flex;
+
+
+
             justify-content: space-between;
+
+
+
             align-items: center;
+
+
+
         }
+
+
+
         #panel-calendar .event-time { opacity: 0.4; font-size: 13px; }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            TRADING PANEL — Redesigned
+
+
+
            ============================================= */
+
+
+
         #panel-trading {
+
+
+
             display: none;
+
+
+
             flex-direction: column;
+
+
+
             height: calc(100vh - 100px);
+
+
+
             padding: 0;
+
+
+
             overflow: hidden;
+
+
+
             gap: 0;
+
+
+
         }
+
+
+
         #panel-trading.active {
+
+
+
             display: flex;
+
+
+
             animation: fadeIn 0.5s ease forwards;
+
+
+
         }
+
+
+
+
+
+
 
         /* Ticker strip — top bar con asset e % change */
+
+
+
         .trading-ticker-strip {
+
+
+
             width: 100%;
+
+
+
             height: 40px;
+
+
+
             background: rgba(255, 30, 30, 0.04);
+
+
+
             border-bottom: 1px solid rgba(255, 30, 30, 0.12);
+
+
+
             overflow: hidden;
+
+
+
             position: relative;
+
+
+
             flex-shrink: 0;
+
+
+
         }
+
+
+
         .ticker-track {
+
+
+
             display: flex;
+
+
+
             gap: 40px;
+
+
+
             align-items: center;
+
+
+
             height: 100%;
+
+
+
             padding: 0 20px;
+
+
+
             white-space: nowrap;
+
+
+
             animation: scroll-ticker 30s linear infinite;
+
+
+
         }
+
+
+
         @keyframes scroll-ticker {
+
+
+
             0% { transform: translateX(0); }
+
+
+
             100% { transform: translateX(-50%); }
+
+
+
         }
+
+
+
         .ticker-item {
+
+
+
             display: flex;
+
+
+
             align-items: center;
+
+
+
             gap: 10px;
+
+
+
             font-size: 12px;
+
+
+
             flex-shrink: 0;
+
+
+
         }
+
+
+
         .ticker-item .tk-symbol {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 10px;
+
+
+
             letter-spacing: 2px;
+
+
+
             opacity: 0.7;
+
+
+
         }
+
+
+
         .ticker-item .tk-price { color: #fff; font-weight: 400; }
+
+
+
         .ticker-item .tk-change { font-size: 10px; font-weight: 600; }
+
+
+
         .up { color: #4CAF50; }
+
+
+
         .down { color: #f44336; }
+
+
+
         .ticker-item .tk-change.up { color: #4CAF50; }
+
+
+
         .ticker-item .tk-change.down { color: #f44336; }
+
+
+
         .ticker-item .tk-sep {
+
+
+
             width: 1px;
+
+
+
             height: 16px;
+
+
+
             background: rgba(255, 255, 255, 0.08);
+
+
+
             margin-left: 10px;
+
+
+
         }
+
+
+
+
+
+
 
         /* Trading body — news left, chart+info right */
+
+
+
         .trading-body {
+
+
+
             flex: 1;
+
+
+
             display: grid;
+
+
+
             grid-template-columns: 1fr 380px;
+
+
+
             gap: 15px;
+
+
+
             padding: 15px;
+
+
+
             overflow: hidden;
+
+
+
         }
+
+
+
+
+
+
 
         .trading-news-feed {
+
+
+
             background: rgba(255, 255, 255, 0.02);
+
+
+
             border: 1px solid rgba(255, 255, 255, 0.05);
+
+
+
             display: flex;
+
+
+
             flex-direction: column;
+
+
+
             overflow: hidden;
+
+
+
         }
+
+
+
         .trading-news-header {
+
+
+
             display: flex;
+
+
+
             align-items: center;
+
+
+
             gap: 12px;
+
+
+
             padding: 14px 20px;
+
+
+
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+
+
         }
+
+
+
         .trading-tag {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 8px;
+
+
+
             letter-spacing: 2px;
+
+
+
             color: var(--accent);
+
+
+
             opacity: 0.7;
+
+
+
         }
+
+
+
         .trading-news-title {
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 10px;
+
+
+
             letter-spacing: 3px;
+
+
+
             opacity: 0.4;
+
+
+
             text-transform: uppercase;
+
+
+
         }
+
+
+
         .trading-news-list {
+
+
+
             flex: 1;
+
+
+
             overflow-y: auto;
+
+
+
             padding: 10px;
+
+
+
         }
+
+
+
         .trading-news-item {
+
+
+
             padding: 12px 14px;
+
+
+
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+
+
+
             cursor: pointer;
+
+
+
             transition: all 0.2s ease;
+
+
+
             display: flex;
+
+
+
             align-items: center;
+
+
+
             gap: 12px;
+
+
+
             border-left: 2px solid transparent;
+
+
+
         }
+
+
+
         .trading-news-item:hover {
+
+
+
             background: rgba(255, 30, 30, 0.03);
+
+
+
             border-left-color: rgba(255,30,30,0.3);
+
+
+
         }
+
+
+
         .tn-logo-wrap { width: 26px; height: 26px; flex-shrink: 0; position: relative; }
+
+
+
         .tn-logo {
+
+
+
             width: 26px; height: 26px;
+
+
+
             border-radius: 50%;
+
+
+
             object-fit: contain;
+
+
+
             background: rgba(255,255,255,0.06);
+
+
+
             flex-shrink: 0;
+
+
+
         }
+
+
+
         .tn-logo-badge {
+
+
+
             width: 26px; height: 26px;
+
+
+
             border-radius: 50%;
+
+
+
             background: rgba(255,30,30,0.1);
+
+
+
             border: 1px solid rgba(255,30,30,0.2);
+
+
+
             display: flex; align-items: center; justify-content: center;
+
+
+
             font-family: 'Syncopate', sans-serif;
+
+
+
             font-size: 6px; letter-spacing: 0;
+
+
+
             flex-shrink: 0;
+
+
+
         }
+
+
+
         .tn-body { flex: 1; min-width: 0; }
+
+
+
         .trading-news-item .tn-title {
+
+
+
             font-size: 12px;
+
+
+
             font-weight: 500;
+
+
+
             line-height: 1.3;
+
+
+
             margin-bottom: 5px;
+
+
+
         }
+
+
+
         .trading-news-item .tn-meta {
+
+
+
             display: flex;
+
+
+
             justify-content: space-between;
+
+
+
             font-size: 9px;
+
+
+
             opacity: 0.3;
+
+
+
             text-transform: uppercase;
+
+
+
             letter-spacing: 1px;
+
+
+
         }
+
+
+
+
+
+
 
         .trading-right-col {
+
+
+
             display: flex;
+
+
+
             flex-direction: column;
+
+
+
             gap: 15px;
+
+
+
         }
+
+
+
         .trading-chart-area {
+
+
+
             flex: 1;
+
+
+
             background: #000;
+
+
+
             border: 1px solid rgba(255, 30, 30, 0.12);
+
+
+
             padding: 0;
+
+
+
             display: flex;
+
+
+
             flex-direction: column;
+
+
+
             position: relative;
+
+
+
             overflow: hidden;
+
+
+
         }
+
+
+
         .trading-chart-area::before {
+
+
+
             content: '';
+
+
+
             position: absolute;
+
+
+
             top: 0; left: 0;
+
+
+
             width: 28px; height: 28px;
+
+
+
             border-top: 1px solid rgba(255,30,30,0.5);
+
+
+
             border-left: 1px solid rgba(255,30,30,0.5);
+
+
+
             z-index: 5; pointer-events: none;
+
+
+
         }
+
+
+
         .trading-chart-area::after {
+
+
+
             content: '';
+
+
+
             position: absolute;
+
+
+
             bottom: 0; right: 0;
+
+
+
             width: 28px; height: 28px;
+
+
+
             border-bottom: 1px solid rgba(255,30,30,0.5);
+
+
+
             border-right: 1px solid rgba(255,30,30,0.5);
+
+
+
             z-index: 5; pointer-events: none;
+
+
+
         }
+
+
+
         #main-trading-graph { flex: 1; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+
+
+
         #main-trading-graph iframe { width: 100%; height: 100%; border: none; display: block; }
 
+
+
+
+
+
+
         .trading-info-bottom {
+
+
+
             background: rgba(255, 30, 30, 0.02);
+
+
+
             border: 1px solid rgba(255, 30, 30, 0.08);
+
+
+
             padding: 20px;
+
+
+
             display: flex;
+
+
+
             justify-content: space-between;
+
+
+
             align-items: center;
+
+
+
             gap: 20px;
-        }
-        .trading-info-bottom .label {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
-            letter-spacing: 2px;
-            opacity: 0.3;
-        }
-        .trading-info-bottom .big-val {
-            font-size: 22px;
-            color: #fff;
-            margin-top: 6px;
+
+
+
         }
 
-        /* =============================================
-           CMD INPUT
-           ============================================= */
-        #cmd-container {
-            position: fixed;
-            bottom: 50px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 600px;
-            z-index: 110;
-            transition: var(--transition);
-            display: flex;
-            justify-content: center;
+
+
+        .trading-info-bottom .label {
+
+
+
+            font-family: 'Syncopate', sans-serif;
+
+
+
+            font-size: 7px;
+
+
+
+            letter-spacing: 2px;
+
+
+
+            opacity: 0.3;
+
+
+
         }
+
+
+
+        .trading-info-bottom .big-val {
+
+
+
+            font-size: 22px;
+
+
+
+            color: #fff;
+
+
+
+            margin-top: 6px;
+
+
+
+        }
+
+
+
+
+
+
+
+        /* =============================================
+
+
+
+           CMD INPUT
+
+
+
+           ============================================= */
+
+
+
+        #cmd-container {
+
+
+
+            position: fixed;
+
+
+
+            bottom: 50px;
+
+
+
+            left: 50%;
+
+
+
+            transform: translateX(-50%);
+
+
+
+            width: 90%;
+
+
+
+            max-width: 600px;
+
+
+
+            z-index: 110;
+
+
+
+            transition: var(--transition);
+
+
+
+            display: flex;
+
+
+
+            justify-content: center;
+
+
+
+        }
+
+
+
+
+
+
 
         #cmd-container.corner {
+
+
+
             bottom: auto;
+
+
+
             top: 120px;
+
+
+
             left: 12px;
+
+
+
             transform: translateX(0);
+
+
+
             width: 104px;
+
+
+
             justify-content: flex-start;
+
+
+
         }
+
+
+
+
+
+
 
         #cmd-input {
+
+
+
             width: 100%;
+
+
+
             background: rgba(255, 255, 255, 0.05);
+
+
+
             border: 1px solid rgba(255, 255, 255, 0.1);
+
+
+
             border-radius: 50px;
+
+
+
             padding: 18px 30px;
+
+
+
             color: white;
+
+
+
             font-family: 'Sora', sans-serif;
+
+
+
             font-weight: 300;
+
+
+
             font-size: 16px;
+
+
+
             outline: none;
+
+
+
             backdrop-filter: blur(15px);
+
+
+
             transition: all 0.3s ease;
+
+
+
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+
+
+
             text-align: center;
+
+
+
         }
+
+
+
+
+
+
 
         #cmd-input:focus {
+
+
+
             border-color: rgba(255, 30, 30, 0.4);
+
+
+
             background: rgba(255, 255, 255, 0.08);
+
+
+
             box-shadow: 0 0 20px rgba(255, 30, 30, 0.15);
+
+
+
         }
+
+
+
+
+
+
 
         body.content-open #cmd-container {
+
+
+
             opacity: 0;
+
+
+
             pointer-events: none;
+
+
+
         }
+
+
+
+
+
+
 
         #cmd-container.corner #cmd-input {
+
+
+
             text-align: left;
+
+
+
             padding: 6px 10px;
+
+
+
             font-size: 10px;
+
+
+
             border-radius: 4px;
+
+
+
             opacity: 0;
+
+
+
             border: none !important;
+
+
+
             outline: none !important;
+
+
+
             box-shadow: none !important;
+
+
+
             background: transparent !important;
+
+
+
         }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            LOG STRIP
+
+
+
            ============================================= */
+
+
+
         #log-strip {
+
+
+
             position: fixed;
+
+
+
             bottom: 0; left: 0; width: 100%;
+
+
+
             padding: 10px 20px;
+
+
+
             background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+
+
+
             font-size: 12px;
+
+
+
             color: var(--text-dim);
+
+
+
             z-index: 100;
+
+
+
             pointer-events: none;
+
+
+
             white-space: nowrap;
+
+
+
             overflow: hidden;
+
+
+
             text-overflow: ellipsis;
+
+
+
         }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            SPOTIFY WIDGET
+
+
+
            ============================================= */
+
+
+
         #spotify-widget {
+
+
+
             position: fixed;
+
+
+
             top: 120px;
+
+
+
             left: 24px;
+
+
+
             width: 320px;
+
+
+
             background: rgba(10, 10, 12, 0.8);
+
+
+
             border: 1px solid rgba(255, 30, 30, 0.2);
+
+
+
             border-radius: 12px;
+
+
+
             padding: 15px;
+
+
+
             z-index: 200;
+
+
+
             display: none;
+
+
+
             opacity: 0;
+
+
+
             transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+
+
             backdrop-filter: blur(20px);
+
+
+
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+
+
+
         }
+
+
+
         #spotify-widget.active { display: block; opacity: 1; }
+
+
+
         body.content-open #spotify-widget { opacity: 0; pointer-events: none; }
+
+
+
         .widget-close {
+
+
+
             position: absolute;
+
+
+
             top: 12px; right: 15px;
+
+
+
             cursor: pointer;
+
+
+
             font-size: 14px;
+
+
+
             opacity: 0.4;
+
+
+
             transition: 0.2s;
+
+
+
         }
+
+
+
         .widget-close:hover { opacity: 1; color: var(--accent); }
+
+
+
         .spotify-mini-card { display: flex; align-items: center; gap: 20px; }
+
+
+
         .spotify-mini-card .album-art {
+
+
+
             width: 80px; height: 80px;
+
+
+
             border-radius: 8px;
+
+
+
             object-fit: cover;
+
+
+
         }
+
+
+
         .spotify-mini-card .info { flex-grow: 1; overflow: hidden; }
+
+
+
         .spotify-mini-card .title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+
+
         .spotify-mini-card .artist { font-size: 12px; opacity: 0.5; margin-top: 4px; }
+
+
+
         .spotify-mini-controls {
+
+
+
             display: flex;
+
+
+
             gap: 15px;
+
+
+
             margin-top: 15px;
+
+
+
             justify-content: center;
+
+
+
             border-top: 1px solid rgba(255,255,255,0.05);
+
+
+
             padding-top: 15px;
+
+
+
         }
+
+
+
         .btn-mini-ctrl { background: none; border: none; color: white; font-size: 18px; cursor: pointer; opacity: 0.6; transition: 0.2s; }
+
+
+
         .btn-mini-ctrl:hover { opacity: 1; transform: scale(1.1); }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            SCREEN BORDER HUD
+
+
+
            ============================================= */
+
+
+
         #screen-border {
+
+
+
             position: fixed;
+
+
+
             inset: 0;
+
+
+
             z-index: 999;
+
+
+
             pointer-events: none;
+
+
+
             opacity: 0;
+
+
+
             transition: box-shadow 0.15s ease, opacity 0.15s ease;
+
+
+
         }
+
+
+
+
+
+
 
         body.listening #screen-border {
+
+
+
             opacity: 1;
+
+
+
             box-shadow:
+
+
+
                 inset 0 0 30px rgba(255, 30, 30, 0.15),
+
+
+
                 inset 0 0 60px rgba(255, 30, 30, 0.08),
+
+
+
                 inset 0 0 2px rgba(255, 30, 30, 0.6);
+
+
+
             animation: border-pulse 1.5s ease-in-out infinite;
+
+
+
         }
+
+
+
+
+
+
 
         body.speaking #screen-border {
+
+
+
             opacity: 1;
+
+
+
             box-shadow:
+
+
+
                 inset 0 0 50px rgba(255, 30, 30, 0.2),
+
+
+
                 inset 0 0 100px rgba(255, 30, 30, 0.1),
+
+
+
                 inset 0 0 3px rgba(255, 30, 30, 0.8);
+
+
+
             animation: border-speak 0.8s ease-in-out infinite;
+
+
+
         }
+
+
+
+
+
+
 
         body.processing #screen-border {
+
+
+
             opacity: 1;
+
+
+
             box-shadow:
+
+
+
                 inset 0 0 40px rgba(255, 30, 30, 0.1),
+
+
+
                 inset 0 0 2px rgba(255, 30, 30, 0.4);
+
+
+
             animation: border-scan 2s linear infinite;
+
+
+
         }
+
+
+
+
+
+
 
         @keyframes border-pulse {
+
+
+
             0%, 100% { box-shadow: inset 0 0 30px rgba(255, 30, 30, 0.15), inset 0 0 2px rgba(255, 30, 30, 0.6); }
+
+
+
             50% { box-shadow: inset 0 0 50px rgba(255, 30, 30, 0.25), inset 0 0 3px rgba(255, 30, 30, 0.9); }
+
+
+
         }
+
+
+
+
+
+
 
         @keyframes border-speak {
+
+
+
             0%, 100% { box-shadow: inset 0 0 50px rgba(255, 30, 30, 0.2), inset 0 0 3px rgba(255, 30, 30, 0.8); }
+
+
+
             50% { box-shadow: inset 0 0 80px rgba(255, 30, 30, 0.35), inset 0 0 4px rgba(255, 30, 30, 1.0); }
+
+
+
         }
+
+
+
+
+
+
 
         @keyframes border-scan {
+
+
+
             0% { box-shadow: inset 0 2px 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+
+
+
             25% { box-shadow: inset -2px 0 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+
+
+
             50% { box-shadow: inset 0 -2px 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+
+
+
             75% { box-shadow: inset 2px 0 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+
+
+
             100% { box-shadow: inset 0 2px 0 rgba(255,30,30,0.6), inset 0 0 40px rgba(255,30,30,0.05); }
+
+
+
         }
+
+
+
+
+
+
 
         #screen-corners {
+
+
+
             position: fixed;
+
+
+
             inset: 0;
+
+
+
             z-index: 998;
+
+
+
             pointer-events: none;
+
+
+
             opacity: 0;
+
+
+
             transition: opacity 0.3s ease;
+
+
+
         }
+
+
+
+
+
+
 
         body.listening #screen-corners,
+
+
+
         body.speaking #screen-corners { opacity: 1; }
 
+
+
+
+
+
+
         .corner {
+
+
+
             position: absolute;
+
+
+
             width: 50px; height: 50px;
+
+
+
             border-color: rgba(255, 30, 30, 0.6);
+
+
+
             border-style: solid;
+
+
+
             transition: all 0.3s ease;
+
+
+
         }
+
+
+
         .corner.tl { top: 20px; left: 20px; border-width: 2px 0 0 2px; }
+
+
+
         .corner.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; }
+
+
+
         .corner.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; }
+
+
+
         .corner.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; }
 
+
+
+
+
+
+
         body.speaking .corner {
+
+
+
             border-color: rgba(255, 30, 30, 0.9);
+
+
+
             width: 70px; height: 70px;
+
+
+
             filter: drop-shadow(0 0 6px rgba(255,30,30,0.5));
+
+
+
         }
 
+
+
+
+
+
+
         /* =============================================
+
+
+
            DEBUG CONTROLS
+
+
+
            ============================================= */
+
+
+
         #debug-controls {
+
+
+
             position: fixed;
+
+
+
             bottom: 20px;
+
+
+
             right: 20px;
+
+
+
             display: none;
+
+
+
             gap: 10px;
+
+
+
             z-index: 1000;
+
+
+
             background: rgba(0, 0, 0, 0.5);
+
+
+
             padding: 10px;
+
+
+
             border-radius: 12px;
+
+
+
             backdrop-filter: blur(5px);
+
+
+
             border: 1px solid rgba(255, 255, 255, 0.1);
+
+
+
             opacity: 0.3;
+
+
+
             transition: opacity 0.3s ease;
+
+
+
         }
+
+
+
         #debug-controls:hover { opacity: 1; }
+
+
+
         .debug-btn {
+
+
+
             padding: 5px 10px;
+
+
+
             background: rgba(255, 255, 255, 0.1);
+
+
+
             border: 1px solid rgba(255, 255, 255, 0.2);
+
+
+
             color: white;
+
+
+
             font-size: 10px;
+
+
+
             border-radius: 6px;
+
+
+
             cursor: pointer;
+
+
+
             text-transform: uppercase;
+
+
+
         }
+
+
+
         .debug-btn:hover { background: rgba(255, 30, 30, 0.2); border-color: var(--accent); }
 
+
+
+
+
+
+
         #panel-map { height: 100%; width: 100%; border-radius: 12px; overflow: hidden; }
+
+
+
         #map-container { height: 100%; width: 100%; }
+
+
+
         #panel-browser iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: white; }
 
-        /* =============================================
-           DOMOTICA — Scene Rapide & Stato Casa
-           ============================================= */
-        .dom-main {
-            display: grid;
-            grid-template-columns: 210px 1fr;
-            gap: 0;
-            overflow: hidden;
-        }
-        .dom-scenes-panel {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            overflow-y: auto;
-            border-right: 1px solid rgba(255,255,255,0.04);
-        }
-        .dom-state-panel {
-            padding: 16px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-            overflow-y: auto;
-            background: rgba(255,255,255,0.01);
-        }
-        .dom-devices-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 4px;
-        }
-        .dom-state-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .dom-state-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+
+
+
+
+
+
+        /* .dom-main / .dom-devices-grid — removed, replaced by .dom-card system above */
+
+
+
         .casa-dot {
-            width: 10px;
-            height: 10px;
+
+
+
+            width: 8px; height: 8px;
+
+
+
             border-radius: 50%;
+
+
+
             background: rgba(255,255,255,0.12);
+
+
+
             flex-shrink: 0;
+
+
+
             transition: background 0.3s ease, box-shadow 0.3s ease;
+
+
+
+            display: none;
+
+
+
         }
-        .casa-dot.on-green {
-            background: #4CAF50;
-            box-shadow: 0 0 8px rgba(76,175,80,0.5);
-        }
-        .casa-dot.on-red {
-            background: #f44336;
-            box-shadow: 0 0 8px rgba(244,67,54,0.5);
-        }
-        .casa-rgb-swatch {
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-            background: #000000;
-            border: 1px solid rgba(255,255,255,0.15);
-            transition: background 0.4s ease;
-        }
+
+
+
+        .casa-dot.on-red { background: #f44336; box-shadow: 0 0 8px rgba(244,67,54,0.5); }
+
+
+
     </style>
+
+
+
 </head>
+
+
+
 <body>
+
+
+
     <div id="screen-border"></div>
+
+
+
     <div id="screen-corners">
+
+
+
         <span class="corner tl"></span>
+
+
+
         <span class="corner tr"></span>
+
+
+
         <span class="corner bl"></span>
+
+
+
         <span class="corner br"></span>
+
+
+
     </div>
+
+
+
     <img src="/static/maya_logo_no_sfondo.png" id="top-logo" alt="MAYA Logo">
 
+
+
+
+
+
+
     <!-- Fixed elements (above slider) -->
+
+
+
     <div id="maya-orb-container" onclick="handleOrbClick()">
+
+
+
         <canvas id="orb-canvas"></canvas>
+
+
+
     </div>
+
+
+
     <div id="orb-branding">MAYA</div>
 
+
+
+
+
+
+
     <div id="spotify-widget">
+
+
+
         <div class="widget-close" onclick="closeSpotifyWidget()">✕</div>
+
+
+
         <div class="spotify-mini-card">
+
+
+
             <img id="spotify-art" class="album-art" src="" alt="Album Art">
+
+
+
             <div class="info">
+
+
+
                 <div id="spotify-track" class="title">Nessun brano</div>
+
+
+
                 <div id="spotify-artist" class="artist">In attesa...</div>
+
+
+
             </div>
+
+
+
         </div>
+
+
+
         <div class="spotify-mini-controls">
+
+
+
             <button class="btn-mini-ctrl" onclick="sendCmdToWS('spotify previous')">⏮</button>
+
+
+
             <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="sendCmdToWS('spotify play_pause')">▶</button>
+
+
+
             <button class="btn-mini-ctrl" onclick="sendCmdToWS('spotify next')">⏭</button>
+
+
+
         </div>
+
+
+
     </div>
+
+
+
+
+
+
 
     <div id="cmd-container">
+
+
+
         <input type="text" id="cmd-input" placeholder="Comando neurale..." onkeydown="if(event.key==='Enter') sendCmd()">
+
+
+
     </div>
+
+
+
+
+
+
 
     <!-- ========== SCREEN SLIDER ========== -->
+
+
+
     <div id="screen-slider">
 
+
+
+
+
+
+
         <!-- SCREEN 1: Idle — sfondo nero, orb centrato, clock -->
+
+
+
         <div id="screen-idle">
+
+
+
             <canvas id="bg-canvas"></canvas>
+
+
+
             <div id="idle-clock">
+
+
+
                 <div class="time" id="clock-time">00:00</div>
+
+
+
                 <div class="date" id="clock-date">LUNEDÌ, 1 GENNAIO</div>
+
+
+
             </div>
+
+
+
         </div>
+
+
+
+
+
+
 
         <!-- SCREEN 2: Work — sfondo-maya.png, content panels -->
+
+
+
         <div id="screen-work">
+
+
+
             <div id="content-area">
+
+
+
                 <div style="height:0"></div>
 
+
+
+
+
+
+
                 <!-- WEATHER PANEL -->
+
+
+
                 <div id="panel-weather" class="panel">
+
+
+
                     <div class="wx-left">
+
+
+
                         <div class="wx-topbar">
+
+
+
                             <div>
+
+
+
                                 <div class="wx-tag">ATMOSPHERIC_FEED // LIVE</div>
+
+
+
                                 <div class="wx-city" id="weather-city">--</div>
+
+
+
                                 <div class="wx-cond" id="weather-desc">--</div>
+
+
+
                             </div>
+
+
+
                             <div class="wx-temp-block">
+
+
+
                                 <span class="wx-temp" id="weather-temp">--</span>
+
+
+
                                 <span class="wx-unit">°C</span>
+
+
+
                             </div>
+
+
+
                             <div class="wx-wind">
+
+
+
                                 <div class="wx-wind-val"><span id="weather-wind">--</span> <span>km/h</span></div>
+
+
+
                                 <div class="wx-wind-label">VENTO</div>
+
+
+
                             </div>
+
+
+
                             <div class="wx-feels">
+
+
+
                                 <div class="wx-feels-val"><span id="weather-feels">--</span>°</div>
+
+
+
                                 <div class="wx-feels-label">PERCEPITA</div>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                         <div class="wx-radar">
+
+
+
                             <div id="weather-mini-map"></div>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                     <div class="wx-forecast">
+
+
+
                         <div class="wx-fc-hdr">FORECAST // 5 GIORNI</div>
+
+
+
                         <div id="weather-forecast-col"></div>
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 <div id="panel-map" class="panel">
+
+
+
                     <div id="map-container"></div>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 <div id="panel-browser" class="panel">
+
+
+
                     <iframe id="browser-iframe" src="about:blank"></iframe>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 <div id="panel-news" class="panel">
+
+
+
                     <div class="news-ticker-bar">
+
+
+
                         <div class="news-ticker-track" id="news-ticker-track">
+
+
+
                             <span class="ntk-label">NEURAL_FEED</span>
+
+
+
                             <span class="ntk-sep">//</span>
+
+
+
                             <span class="ntk-item">In attesa di notizie — chiedi a Maya le ultime news</span>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                     <div class="news-main-area">
+
+
+
                         <div class="news-live-grid" id="news-live-grid"></div>
+
+
+
                         <div class="news-sidebar">
+
+
+
                             <div class="news-sidebar-header">PRIORITÀ // NEURAL FEED</div>
+
+
+
                             <div class="news-sidebar-list" id="news-sidebar-list">
+
+
+
                                 <div style="padding:24px 18px;opacity:0.15;font-family:'Syncopate',sans-serif;font-size:7px;letter-spacing:2px;">IN ATTESA FEED...</div>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 <div id="panel-dashboard" class="panel">
-                    <!-- Top bar -->
-                    <div class="dom-topbar">
-                        <div>
-                            <div class="dom-tag">DOMOTIC_CONTROL // LIVE</div>
-                            <div class="dom-title">Casa M.A.Y.A.</div>
-                        </div>
-                        <div class="dom-status-pills">
-                            <span class="dom-pill" id="dom-arduino-pill">ARDUINO</span>
-                            <span class="dom-pill online">MAYA ONLINE</span>
-                        </div>
-                    </div>
 
-                    <div class="dom-body">
-                        <!-- Main content: Scene Rapide + Dispositivi -->
-                        <div class="dom-main">
-                            <div class="dom-scenes-panel">
-                                <div class="dom-sidebar-hdr" style="padding:0 0 12px 0">SCENE RAPIDE</div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità notte')"><span class="scene-icon">🌙</span><span class="scene-label">Notte</span></div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità studio')"><span class="scene-icon">📚</span><span class="scene-label">Studio</span></div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità film')"><span class="scene-icon">🎬</span><span class="scene-label">Film</span></div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità relax')"><span class="scene-icon">🛋️</span><span class="scene-label">Relax</span></div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità uscita')"><span class="scene-icon">🚪</span><span class="scene-label">Uscita</span></div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('modalità ospite')"><span class="scene-icon">👥</span><span class="scene-label">Ospite</span></div>
-                                <div class="dom-scene-btn" onclick="sendCmdToWS('allarme')"><span class="scene-icon">🚨</span><span class="scene-label">Allarme</span></div>
-                            </div>
-                            <div class="dom-state-panel">
-                                <div class="dom-sidebar-hdr" style="padding:0 0 14px 0">DISPOSITIVI // CONTROLLO LIVE</div>
-                                <div class="dom-devices-grid">
-                                    <div class="dom-device" id="dev-light" onclick="toggleDevice('light')">
-                                        <div class="dom-dev-icon">💡</div>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Luce</div>
-                                            <div class="dom-dev-state" id="dev-light-state">OFF</div>
-                                        </div>
-                                        <div class="dom-dev-dot"></div>
-                                    </div>
-                                    <div class="dom-device" id="dev-relay" onclick="toggleDevice('relay')">
-                                        <div class="dom-dev-icon">⚡</div>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Relay</div>
-                                            <div class="dom-dev-state" id="dev-relay-state">OFF</div>
-                                        </div>
-                                        <div class="dom-dev-dot"></div>
-                                    </div>
-                                    <div class="dom-device" id="dev-servo" onclick="toggleDevice('servo')">
-                                        <div class="dom-dev-icon">🚪</div>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Porta</div>
-                                            <div class="dom-dev-state" id="dev-servo-state">CHIUSA</div>
-                                        </div>
-                                        <div class="dom-dev-dot"></div>
-                                    </div>
-                                    <div class="dom-device" id="dev-alarm" onclick="toggleDevice('alarm')">
-                                        <div class="dom-dev-icon">🔔</div>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">Buzzer</div>
-                                            <div class="dom-dev-state" id="dev-alarm-state">OFF</div>
-                                        </div>
-                                        <div class="dom-dev-dot" id="casa-buzzer-dot"></div>
-                                    </div>
-                                    <div class="dom-device" style="grid-column: span 2; cursor: default;">
-                                        <div class="dom-dev-icon">🌈</div>
-                                        <div class="dom-dev-info">
-                                            <div class="dom-dev-name">RGB</div>
-                                            <div class="dom-dev-state">Colore corrente</div>
-                                        </div>
-                                        <span class="casa-rgb-swatch" id="casa-rgb-swatch"></span>
-                                    </div>
-                                </div>
-                            </div>
+
+
+                    <!-- Header -->
+
+
+
+                    <div class="dom-header">
+
+
+
+                        <div class="dom-header-left">
+
+
+
+                            <div class="dom-header-label">DOMOTICA // LIVE</div>
+
+
+
+                            <div class="dom-header-title">Casa M.A.Y.A.</div>
+
+
+
                         </div>
 
-                        <!-- Sidebar: sensori + sistema -->
-                        <div class="dom-sidebar">
-                            <div class="dom-sidebar-hdr" style="padding:16px 20px 8px">SENSORI</div>
-                            <div class="dom-stats" style="margin-top:0;padding-top:0">
-                                <div class="dom-stat-row">
-                                    <span class="dom-stat-label">Temperatura</span>
-                                    <span class="dom-stat-val" id="casa-temp-val">--</span>
-                                </div>
-                                <div class="dom-stat-row">
-                                    <span class="dom-stat-label">Umidità</span>
-                                    <span class="dom-stat-val" id="casa-humidity-val">--</span>
-                                </div>
-                            </div>
-                            <div class="dom-sidebar-hdr" style="padding:16px 20px 8px;border-top:1px solid rgba(255,255,255,0.04);margin-top:8px">SISTEMA</div>
-                            <div class="dom-stats" style="margin-top:0;padding-top:0">
-                                <div class="dom-stat-row">
-                                    <span class="dom-stat-label">CPU</span>
-                                    <span class="dom-stat-val" id="dash-cpu">--%</span>
-                                </div>
-                                <div class="dom-stat-row">
-                                    <span class="dom-stat-label">RAM</span>
-                                    <span class="dom-stat-val" id="dash-ram">--%</span>
-                                </div>
-                            </div>
+
+
+                        <div class="dom-header-right">
+
+
+
+                            <span class="dom-status-pill" id="dom-arduino-pill">
+
+
+
+                                <span class="dot"></span>ARDUINO
+
+
+
+                            </span>
+
+
+
+                            <span class="dom-status-pill online">
+
+
+
+                                <span class="dot"></span>MAYA ONLINE
+
+
+
+                            </span>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
+
+
+
+
+                    <!-- Scene chips -->
+
+
+
+                    <div class="dom-scene-strip">
+
+
+
+                        <span class="dom-scene-strip-label">SCENE</span>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità notte')"><span class="dom-chip-icon">🌙</span>Notte</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità studio')"><span class="dom-chip-icon">📚</span>Studio</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità film')"><span class="dom-chip-icon">🎬</span>Film</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('pausa caffè')"><span class="dom-chip-icon">☕</span>Caffè</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità ospite')"><span class="dom-chip-icon">👥</span>Ospiti</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità uscita')"><span class="dom-chip-icon">🚶</span>Uscita</div>
+
+
+
+                        <div class="dom-scene-chip" onclick="sendCmdToWS('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
+
+
+
+                    </div>
+
+
+
+
+
+
+
+                    <!-- Main content -->
+
+
+
+                    <div class="dom-content">
+
+
+
+                        <!-- Device cards -->
+
+
+
+                        <div class="dom-devices-area">
+
+
+
+                            <span class="dom-section-label">DISPOSITIVI</span>
+
+
+
+                            <div class="dom-cards-grid">
+
+
+
+                                <!-- Luce -->
+
+
+
+                                <div class="dom-card" id="dev-light" onclick="toggleDevice('light')">
+
+
+
+                                    <div class="dom-card-top">
+
+
+
+                                        <span class="dom-card-icon">💡</span>
+
+
+
+                                        <div class="dom-toggle"></div>
+
+
+
+                                    </div>
+
+
+
+                                    <div>
+
+
+
+                                        <div class="dom-card-name">Luce</div>
+
+
+
+                                        <div class="dom-card-state" id="dev-light-state">OFF</div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                                <!-- Relay -->
+
+
+
+                                <div class="dom-card" id="dev-relay" onclick="toggleDevice('relay')">
+
+
+
+                                    <div class="dom-card-top">
+
+
+
+                                        <span class="dom-card-icon">⚡</span>
+
+
+
+                                        <div class="dom-toggle"></div>
+
+
+
+                                    </div>
+
+
+
+                                    <div>
+
+
+
+                                        <div class="dom-card-name">Relay</div>
+
+
+
+                                        <div class="dom-card-state" id="dev-relay-state">OFF</div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                                <!-- Porta -->
+
+
+
+                                <div class="dom-card" id="dev-servo" onclick="toggleDevice('servo')">
+
+
+
+                                    <div class="dom-card-top">
+
+
+
+                                        <span class="dom-card-icon">🔒</span>
+
+
+
+                                        <div class="dom-toggle"></div>
+
+
+
+                                    </div>
+
+
+
+                                    <div>
+
+
+
+                                        <div class="dom-card-name">Porta</div>
+
+
+
+                                        <div class="dom-card-state" id="dev-servo-state">CHIUSA</div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                                <!-- Buzzer -->
+
+
+
+                                <div class="dom-card dom-card-buzzer" id="dev-alarm" onclick="toggleDevice('alarm')">
+
+
+
+                                    <div class="dom-card-top">
+
+
+
+                                        <span class="dom-card-icon">🔔</span>
+
+
+
+                                    </div>
+
+
+
+                                    <div>
+
+
+
+                                        <div class="dom-card-name">Buzzer</div>
+
+
+
+                                        <div class="dom-card-state" id="dev-alarm-state">STANDBY</div>
+
+
+
+                                    </div>
+
+
+
+                                    <div class="casa-dot" id="casa-buzzer-dot"></div>
+
+
+
+                                </div>
+
+
+
+                                <!-- RGB — spans 2 columns -->
+
+
+
+                                <div class="dom-card" style="grid-column: span 2;" id="dev-rgb" onclick="toggleDevice('rgb')">
+
+
+
+                                    <div class="dom-card-top">
+
+
+
+                                        <span class="dom-card-icon">🌈</span>
+
+
+
+                                        <div class="dom-rgb-bar" id="casa-rgb-swatch" style="flex:1; margin-left:12px; align-self:center;"></div>
+
+
+
+                                    </div>
+
+
+
+                                    <div>
+                                        <div class="dom-card-name">LED RGB</div>
+                                        <div class="dom-card-state">COLORE CORRENTE</div>
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                            </div>
+
+
+
+                        </div>
+
+
+
+
+
+
+
+                        <!-- Right sidebar: sensors + system -->
+
+
+
+                        <div class="dom-sidebar-new">
+
+
+
+                            <div class="dom-sb-section">
+
+
+
+                                <span class="dom-sb-label">SENSORI</span>
+
+
+
+                                <div class="dom-metric">
+
+
+
+                                    <div class="dom-metric-row">
+
+
+
+                                        <span class="dom-metric-name">Temperatura</span>
+
+
+
+                                        <span class="dom-metric-val" id="casa-temp-val">--</span>
+
+
+
+                                    </div>
+
+
+
+                                    <div class="dom-metric-bar">
+
+
+
+                                        <div class="dom-metric-fill blue" id="dom-temp-fill"></div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                                <div class="dom-metric">
+
+
+
+                                    <div class="dom-metric-row">
+
+
+
+                                        <span class="dom-metric-name">Umidità</span>
+
+
+
+                                        <span class="dom-metric-val" id="casa-humidity-val">--</span>
+
+
+
+                                    </div>
+
+
+
+                                    <div class="dom-metric-bar">
+
+
+
+                                        <div class="dom-metric-fill blue" id="dom-humidity-fill"></div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                            </div>
+
+
+
+                            <div class="dom-sb-section">
+
+
+
+                                <span class="dom-sb-label">SISTEMA</span>
+
+
+
+                                <div class="dom-metric">
+
+
+
+                                    <div class="dom-metric-row">
+
+
+
+                                        <span class="dom-metric-name">CPU</span>
+
+
+
+                                        <span class="dom-metric-val" id="dash-cpu">--%</span>
+
+
+
+                                    </div>
+
+
+
+                                    <div class="dom-metric-bar">
+
+
+
+                                        <div class="dom-metric-fill" id="dom-cpu-fill"></div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                                <div class="dom-metric">
+
+
+
+                                    <div class="dom-metric-row">
+
+
+
+                                        <span class="dom-metric-name">RAM</span>
+
+
+
+                                        <span class="dom-metric-val" id="dash-ram">--%</span>
+
+
+
+                                    </div>
+
+
+
+                                    <div class="dom-metric-bar">
+
+
+
+                                        <div class="dom-metric-fill green" id="dom-ram-fill"></div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                            </div>
+
+
+
+                        </div>
+
+
+
+                    </div>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 <div id="panel-calendar" class="panel">
+
+
+
                     <h2>Calendario</h2>
+
+
+
                     <div id="calendar-list" class="news-list"></div>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 <!-- TRADING PANEL — Redesigned -->
+
+
+
                 <div id="panel-trading" class="panel">
+
+
+
                     <div class="trading-ticker-strip" id="ticker-strip">
+
+
+
                         <div class="ticker-track" id="ticker-track">
+
+
+
                             <div class="ticker-item"><span class="tk-symbol">BTC</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+
+
+
                             <div class="ticker-item"><span class="tk-symbol">ETH</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+
+
+
                             <div class="ticker-item"><span class="tk-symbol">SPY</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+
+
+
                             <div class="ticker-item"><span class="tk-symbol">AAPL</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+
+
+
                             <div class="ticker-item"><span class="tk-symbol">NVDA</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+
+
+
                             <div class="ticker-item"><span class="tk-symbol">TSLA</span><span class="tk-price">--</span><span class="tk-change">· · ·</span><span class="tk-sep"></span></div>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                     <div class="trading-body">
+
+
+
                         <div class="trading-news-feed">
+
+
+
                             <div class="trading-news-header">
+
+
+
                                 <span class="trading-tag">LIVE_FEED</span>
+
+
+
                                 <span class="trading-news-title">Financial News</span>
+
+
+
                             </div>
+
+
+
                             <div class="trading-news-list" id="trading-news-list">
+
+
+
                                 <div style="padding:32px 20px;opacity:0.2;font-family:'Syncopate',sans-serif;font-size:8px;letter-spacing:3px;">NEURAL_FEED IN ATTESA<br><br>Chiedi a Maya il prezzo<br>di un asset per attivare<br>il feed in tempo reale.</div>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                         <div class="trading-right-col">
+
+
+
                             <div class="trading-chart-area">
+
+
+
                                 <div id="main-trading-graph"></div>
+
+
+
                             </div>
+
+
+
                             <div class="trading-info-bottom">
+
+
+
                                 <div>
+
+
+
                                     <div class="label">Sentiment</div>
+
+
+
                                     <div class="big-val" id="market-sentiment">NEUTRALE</div>
+
+
+
                                 </div>
+
+
+
                                 <div>
+
+
+
                                     <div class="label">Volume 24h</div>
+
+
+
                                     <div class="big-val" id="market-volume">--</div>
+
+
+
                                 </div>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
             </div>
+
+
+
         </div>
+
+
+
     </div>
 
+
+
+
+
+
+
     <div id="debug-controls">
+
+
+
         <button class="debug-btn" onclick="exitWorkMode(); setLayout('orb')">IDLE</button>
+
+
+
         <button class="debug-btn" onclick="enterWorkMode(); setLayout('weather')">WEATHER</button>
+
+
+
         <button class="debug-btn" onclick="enterWorkMode(); setLayout('news')">NEWS</button>
+
+
+
         <button class="debug-btn" onclick="enterWorkMode(); setLayout('dashboard')">DASH</button>
+
+
+
         <button class="debug-btn" onclick="enterWorkMode(); setLayout('spotify')">SPOTIFY</button>
+
+
+
         <button class="debug-btn" onclick="enterWorkMode(); setLayout('calendar')">CAL</button>
+
+
+
         <button class="debug-btn" onclick="enterWorkMode(); setLayout('trading')">TRADE</button>
+
+
+
         <button class="debug-btn" onclick="setOrbState('listening')">LISTEN</button>
+
+
+
         <button class="debug-btn" onclick="setOrbState('speaking')">SPEAK</button>
+
+
+
         <button class="debug-btn" onclick="setOrbState('idle')">ORB_IDLE</button>
+
+
+
     </div>
+
+
+
+
+
+
 
     <div id="log-strip">MAYA System Online...</div>
 
+
+
+
+
+
+
     <script>
+
+
+
         let ws;
+
+
+
         let map;
+
+
+
         let audioContext, analyser, dataArray;
+
+
+
         let orbState = 'idle';
+
+
+
         let tradingAccum = [];
+
+
+
+        let _tradingFetchInProgress = false;
+
+
+
         
+
+
+
         // Three.js globals
+
+
+
         let scene, camera, renderer, mainOrb, originalPositions;
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // SCREEN STATE MACHINE
+
+
+
         // Screen 1: idle  → sfondo nero, orb centrato, clock
+
+
+
         // Screen 2: work-mode → sfondo-maya.png, panel content
+
+
+
         // =============================================
+
+
+
+
+
+
 
         let inactivityTimer = null;
+
+
+
         let isWorkMode = false;
 
+
+
+
+
+
+
         function enterWorkMode() {
+
+
+
             if (isWorkMode) return;
+
+
+
             isWorkMode = true;
+
+
+
             document.body.classList.add('work-mode');
+
+
+
             clearInactivityTimer();
+
+
+
         }
+
+
+
+
+
+
 
         function exitWorkMode() {
+
+
+
             if (!isWorkMode) return;
+
+
+
             isWorkMode = false;
+
+
+
             document.body.classList.remove('work-mode', 'content-open');
+
+
+
             
+
+
+
             // Ripristina orb al centro
+
+
+
             const orb = document.getElementById('maya-orb-container');
+
+
+
             const content = document.getElementById('content-area');
+
+
+
             const cmd = document.getElementById('cmd-container');
+
+
+
             const cmdInput = document.getElementById('cmd-input');
+
+
+
             
+
+
+
             orb.classList.remove('corner');
+
+
+
             content.classList.remove('open');
+
+
+
             cmd.classList.remove('corner');
+
+
+
             cmdInput.placeholder = "Comando neurale...";
+
+
+
             
+
+
+
             // Nasconde tutti i panel
+
+
+
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+
+
             
+
+
+
             setTimeout(handleResize, 600);
+
+
+
         }
+
+
+
+
+
+
 
         function startInactivityTimer(ms) {
+
+
+
             clearInactivityTimer();
+
+
+
             inactivityTimer = setTimeout(() => {
+
+
+
                 exitWorkMode();
+
+
+
                 setOrbState('idle');
+
+
+
             }, ms);
+
+
+
         }
+
+
+
+
+
+
 
         function clearInactivityTimer() {
+
+
+
             if (inactivityTimer) {
+
+
+
                 clearTimeout(inactivityTimer);
+
+
+
                 inactivityTimer = null;
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         // Reset timer su qualsiasi interazione utente in work-mode
+
+
+
         ['keydown', 'mousemove', 'click', 'touchstart'].forEach(evt => {
+
+
+
             document.addEventListener(evt, () => {
+
+
+
                 if (isWorkMode) startInactivityTimer(600000);
+
+
+
             }, { passive: true });
+
+
+
         });
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // CLOCK
+
+
+
         // =============================================
+
+
+
         function initClock() {
+
+
+
             const timeEl = document.getElementById('clock-time');
+
+
+
             const dateEl = document.getElementById('clock-date');
+
+
+
             function update() {
+
+
+
                 const now = new Date();
+
+
+
                 timeEl.textContent = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+
+
+
                 dateEl.textContent = now.toLocaleDateString('it-IT', {
+
+
+
                     weekday: 'long', day: 'numeric', month: 'long'
+
+
+
                 }).toUpperCase();
+
+
+
             }
+
+
+
             setInterval(update, 1000);
+
+
+
             update();
+
+
+
         }
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // HUD GRID BACKGROUND
+
+
+
         // =============================================
+
+
+
         function initBackground() {
+
+
+
             const canvas = document.getElementById('bg-canvas');
+
+
+
             if (!canvas) return;
+
+
+
             // Guarantee canvas is always strictly behind the orb
+
+
+
             canvas.style.zIndex = '0';
+
+
+
             canvas.style.pointerEvents = 'none';
+
+
+
             const ctx = canvas.getContext('2d');
+
+
+
             const CELL = 56;
+
+
+
             let scanY = 0;
 
+
+
+
+
+
+
             function resize() {
+
+
+
                 canvas.width  = window.innerWidth  || document.documentElement.clientWidth;
+
+
+
                 canvas.height = window.innerHeight || document.documentElement.clientHeight;
+
+
+
             }
+
+
+
             window.addEventListener('resize', resize);
+
+
+
             resize();
 
+
+
+
+
+
+
             function draw() {
+
+
+
                 const W = canvas.width, H = canvas.height;
+
+
+
                 // Guard: if layout not ready yet, retry next frame
+
+
+
                 if (!W || !H) { requestAnimationFrame(draw); return; }
+
+
+
+
+
+
 
                 ctx.clearRect(0, 0, W, H);
 
+
+
+
+
+
+
                 // — Main grid lines —
+
+
+
                 ctx.save();
+
+
+
                 ctx.strokeStyle = 'rgba(255, 30, 30, 0.07)';
+
+
+
                 ctx.lineWidth = 0.5;
+
+
+
                 ctx.beginPath();
+
+
+
                 for (let x = 0; x < W; x += CELL) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+
+
+
                 for (let y = 0; y < H; y += CELL) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+
+
+
                 ctx.stroke();
+
+
+
                 ctx.restore();
+
+
+
+
+
+
 
                 // — Intersection corner marks (every 4 cells) —
+
+
+
                 ctx.save();
+
+
+
                 ctx.strokeStyle = 'rgba(255, 30, 30, 0.22)';
+
+
+
                 ctx.lineWidth = 1;
+
+
+
                 const mk = 5;
+
+
+
                 for (let x = 0; x <= W; x += CELL * 4) {
+
+
+
                     for (let y = 0; y <= H; y += CELL * 4) {
+
+
+
                         ctx.beginPath();
+
+
+
                         ctx.moveTo(x, y + mk); ctx.lineTo(x, y); ctx.lineTo(x + mk, y);
+
+
+
                         ctx.moveTo(x, y - mk); ctx.lineTo(x, y); ctx.lineTo(x + mk, y);
+
+
+
                         ctx.stroke();
+
+
+
                     }
+
+
+
                 }
+
+
+
                 ctx.restore();
+
+
+
+
+
+
 
                 // — Slow horizontal scan line —
+
+
+
                 scanY = (scanY + 0.35) % (H + 80);
+
+
+
                 const sg = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
+
+
+
                 sg.addColorStop(0,   'rgba(255,30,30,0)');
+
+
+
                 sg.addColorStop(0.45,'rgba(255,30,30,0.05)');
+
+
+
                 sg.addColorStop(0.5, 'rgba(255,30,30,0.09)');
+
+
+
                 sg.addColorStop(0.55,'rgba(255,30,30,0.05)');
+
+
+
                 sg.addColorStop(1,   'rgba(255,30,30,0)');
+
+
+
                 ctx.save();
+
+
+
                 ctx.fillStyle = sg;
+
+
+
                 ctx.fillRect(0, scanY - 50, W, 100);
+
+
+
                 ctx.restore();
 
+
+
+
+
+
+
                 requestAnimationFrame(draw);
+
+
+
             }
+
+
+
+
+
+
 
             // Start via rAF so first frame is always in a valid paint cycle
+
+
+
             requestAnimationFrame(draw);
+
+
+
         }
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // THREE.JS ORB
+
+
+
         // =============================================
+
+
+
         function initThree() {
+
+
+
             const container = document.getElementById('maya-orb-container');
+
+
+
             const canvas = document.getElementById('orb-canvas');
+
+
+
             if (!container || !canvas) return;
+
+
+
             const w = container.clientWidth, h = container.clientHeight;
+
+
+
             canvas.width = w; canvas.height = h;
+
+
+
             scene = new THREE.Scene();
+
+
+
             camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+
+
+
             camera.position.z = 3.5;
+
+
+
             renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+
+
+
             renderer.setSize(w, h);
+
+
+
             renderer.setPixelRatio(window.devicePixelRatio);
+
+
+
             renderer.setClearColor(0x000000, 0);
 
+
+
+
+
+
+
             const coreGeom = new THREE.SphereGeometry(0.65, 64, 64);
+
+
+
             const coreMat = new THREE.MeshBasicMaterial({ color: 0xff1e1e, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending });
+
+
+
             mainOrb = new THREE.Mesh(coreGeom, coreMat);
+
+
+
             originalPositions = coreGeom.attributes.position.array.slice();
+
+
+
             scene.add(mainOrb);
 
+
+
+
+
+
+
             window.glowSpheres = [];
+
+
+
             [{ r: 0.68, op: 0.20 }, { r: 0.78, op: 0.10 }, { r: 0.95, op: 0.04 }].forEach(layer => {
+
+
+
                 const gGeom = new THREE.SphereGeometry(layer.r, 32, 32);
+
+
+
                 const gMat = new THREE.MeshBasicMaterial({ color: 0xff1e1e, transparent: true, opacity: layer.op, blending: THREE.AdditiveBlending });
+
+
+
                 const gMesh = new THREE.Mesh(gGeom, gMat);
+
+
+
                 scene.add(gMesh);
+
+
+
                 window.glowSpheres.push({ mesh: gMesh, baseOpacity: layer.op });
+
+
+
             });
+
+
+
+
+
+
 
             const nebulaGeom = new THREE.BufferGeometry();
+
+
+
             const nebulaPos = new Float32Array(4000 * 3);
+
+
+
             for (let i = 0; i < 4000; i++) {
+
+
+
                 const r = 0.90 + Math.random() * 0.15;
+
+
+
                 const phi = Math.random() * Math.PI * 2, theta = Math.random() * Math.PI;
+
+
+
                 nebulaPos[i * 3] = r * Math.sin(theta) * Math.cos(phi);
+
+
+
                 nebulaPos[i * 3 + 1] = r * Math.sin(theta) * Math.sin(phi);
+
+
+
                 nebulaPos[i * 3 + 2] = r * Math.cos(theta);
+
+
+
             }
+
+
+
             nebulaGeom.setAttribute('position', new THREE.BufferAttribute(nebulaPos, 3));
+
+
+
             window.nebulaParticles = new THREE.Points(nebulaGeom, new THREE.PointsMaterial({ color: 0xff1e1e, size: 0.006, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
+
+
+
             scene.add(window.nebulaParticles);
 
+
+
+
+
+
+
             const ringPos = new Float32Array(80 * 3);
+
+
+
             for (let i = 0; i < 80; i++) {
+
+
+
                 const angle = (i / 80) * Math.PI * 2;
+
+
+
                 ringPos[i * 3] = 1.1 * Math.cos(angle);
+
+
+
                 ringPos[i * 3 + 1] = 1.1 * Math.sin(angle);
+
+
+
                 ringPos[i * 3 + 2] = 0;
+
+
+
             }
+
+
+
             const ringGeom = new THREE.BufferGeometry();
+
+
+
             ringGeom.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
+
+
+
             window.outerRingPoints = new THREE.Points(ringGeom, new THREE.PointsMaterial({ color: 0xff1e1e, size: 0.015, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }));
+
+
+
             scene.add(window.outerRingPoints);
+
+
+
         }
+
+
+
+
+
+
 
         function animate(time) {
+
+
+
             requestAnimationFrame(animate);
+
+
+
             if (!renderer || !mainOrb) return;
+
+
+
             const t = time * 0.001;
+
+
+
             const rgb = getComputedStyle(document.documentElement).getPropertyValue('--orb-color').trim() || "255, 30, 30";
+
+
+
             const color = new THREE.Color(`rgb(${rgb})`);
+
+
+
             let audioLevel = 0;
+
+
+
             if (dataArray) {
+
+
+
                 analyser.getByteFrequencyData(dataArray);
+
+
+
                 let sum = 0;
+
+
+
                 for (let i = 0; i < 64; i++) sum += dataArray[i];
+
+
+
                 audioLevel = (sum / (64 * 255)) * 1.5;
+
+
+
             }
+
+
+
             const isSpeaking = audioLevel > 0.05;
+
+
+
             const pos = mainOrb.geometry.attributes.position;
+
+
+
             for (let i = 0; i < pos.count; i++) {
+
+
+
                 const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
+
+
+
                 const ox = originalPositions[ix], oy = originalPositions[iy], oz = originalPositions[iz];
+
+
+
                 const vec = new THREE.Vector3(ox, oy, oz).normalize();
+
+
+
                 const deform = (Math.sin(t * 1.3 + ox * 2.1) + Math.sin(t * 0.7 + oy * 1.8) + Math.sin(t * 1.9 + oz * 2.4)) / 3.0;
+
+
+
                 const d = 0.65 + deform * 0.06;
+
+
+
                 pos.array[ix] = vec.x * d; pos.array[iy] = vec.y * d; pos.array[iz] = vec.z * d;
+
+
+
             }
+
+
+
             pos.needsUpdate = true;
+
+
+
             if (window.glowSpheres) window.glowSpheres.forEach(l => { l.mesh.scale.setScalar(1.0 + audioLevel * 0.15); l.mesh.material.color = color; });
+
+
+
             if (window.nebulaParticles) {
+
+
+
                 window.nebulaParticles.rotation.y += 0.002 + (isSpeaking ? audioLevel * 0.03 : 0);
+
+
+
                 window.nebulaParticles.rotation.z += 0.001;
+
+
+
                 window.nebulaParticles.material.opacity = isSpeaking ? (0.3 + audioLevel * 0.4) : 0.25;
+
+
+
                 window.nebulaParticles.material.color = color;
+
+
+
             }
+
+
+
             if (window.outerRingPoints) { window.outerRingPoints.rotation.z -= 0.005; window.outerRingPoints.material.color = color; }
+
+
+
             mainOrb.material.color = color;
+
+
+
             const pulse = isSpeaking ? (Math.sin(t * 10) * 0.01 + audioLevel * 0.05) : (Math.sin(t * 2) * 0.005);
+
+
+
             scene.scale.setScalar(1.0 + pulse);
+
+
+
             renderer.render(scene, camera);
+
+
+
         }
+
+
+
+
+
+
 
         window.addEventListener('load', async () => {
+
+
+
             initBackground();
+
+
+
             initClock();
+
+
+
             initThree();
+
+
+
             animate(0);
+
+
+
             initWS();
+
+
+
         });
+
+
+
+
+
+
 
         function handleResize() {
+
+
+
             const container = document.getElementById('maya-orb-container');
+
+
+
             const w = container.clientWidth, h = container.clientHeight;
+
+
+
             if (renderer) { renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+
+
+
         }
+
+
+
+
+
+
 
         window.addEventListener('resize', () => {
+
+
+
             const bgCanvas = document.getElementById('bg-canvas');
+
+
+
             bgCanvas.width = window.innerWidth;
+
+
+
             bgCanvas.height = window.innerHeight;
+
+
+
             handleResize();
+
+
+
         });
 
+
+
+
+
+
+
         async function initAudio() {
+
+
+
             if (audioContext) return;
+
+
+
             try {
+
+
+
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+
+
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+
+
                 const source = audioContext.createMediaStreamSource(stream);
+
+
+
                 analyser = audioContext.createAnalyser();
+
+
+
                 analyser.fftSize = 256;
+
+
+
                 source.connect(analyser);
+
+
+
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+
+
             } catch (e) {
+
+
+
                 console.log("Audio Init Failed:", e);
+
+
+
                 dataArray = new Uint8Array(128).fill(0);
+
+
+
             }
+
+
+
         }
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // WEBSOCKET
-        // =============================================
-        function initWS() {
-            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${proto}//${location.host}/ws`);
-            ws.onmessage = (e) => {
-                const d = JSON.parse(e.data);
-                if (d.type === 'layout') { enterWorkMode(); setLayout(d.layout, d.params); }
-                if (d.type === 'voice_status') setOrbState(d.status.toLowerCase());
-                if (d.type === 'news' && d.articles) updateNews(d.articles);
-                if (d.type === 'weather') {
-                    const wData = d.data || d; // support both flat and nested
-                    if (wData.location) updateWeather(wData);
-                }
-                if (d.type === 'calendar' && d.events) updateCalendar(d.events);
-                if (d.type === 'trading') {
-                    if (d.data && Array.isArray(d.data)) {
-                        updateTrading(d.data);
-                    } else if (d.symbol) {
-                        // Single item from backend — accumulate
-                        const exists = tradingAccum.findIndex(x => x.symbol === d.symbol);
-                        if (exists >= 0) tradingAccum[exists] = d;
-                        else tradingAccum.push(d);
-                        updateTrading(tradingAccum);
-                    }
-                }
-                if (d.type === 'state') updateArduino(d);
-                if (d.type === 'arduino_event' && d.telemetry) {
-                    const t = d.telemetry;
-                    if (t.temp !== undefined) {
-                        const el = document.getElementById('casa-temp-val');
-                        if (el) el.textContent = t.temp.toFixed(1) + ' °C';
-                    }
-                    if (t.humidity !== undefined) {
-                        const el = document.getElementById('casa-humidity-val');
-                        if (el) el.textContent = t.humidity.toFixed(1) + ' %';
-                    }
-                }
-                if (d.type === 'stats') {
-                    if (d.neural_load !== undefined) document.getElementById('dash-cpu').innerText = `${Math.round(d.neural_load)}%`;
-                    if (d.memory !== undefined) document.getElementById('dash-ram').innerText = `${Math.round(d.memory)}%`;
-                }
-                if (d.type === 'spotify') updateSpotify(d);
-                if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
-            };
-            ws.onopen = () => { document.getElementById('log-strip').innerText = "MAYA Neural Link Established."; initAudio(); };
-            ws.onclose = () => setTimeout(initWS, 3000);
-        }
+
+
 
         // =============================================
-        // ORB STATE — integrato con screen state machine
+
+
+
+        function initWS() {
+
+
+
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+
+
+            ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+
+
+            ws.onmessage = (e) => {
+
+
+
+                const d = JSON.parse(e.data);
+
+
+
+                if (d.type === 'layout') { enterWorkMode(); setLayout(d.layout, d.params); }
+
+
+
+                if (d.type === 'voice_status') setOrbState(d.status.toLowerCase());
+
+
+
+                if (d.type === 'news' && d.articles) updateNews(d.articles);
+
+
+
+                if (d.type === 'weather') {
+
+
+
+                    const wData = d.data || d; // support both flat and nested
+
+
+
+                    if (wData.location) updateWeather(wData);
+
+
+
+                }
+
+
+
+                if (d.type === 'calendar_data' && d.events) updateCalendar(d.events);
+
+
+
+                if (d.type === 'trading') {
+
+
+
+                    if (d.data && Array.isArray(d.data)) {
+
+
+
+                        updateTrading(d.data);
+
+
+
+                    } else if (d.symbol) {
+
+
+
+                        // Single item from backend — accumulate
+
+
+
+                        const exists = tradingAccum.findIndex(x => x.symbol === d.symbol);
+
+
+
+                        if (exists >= 0) tradingAccum[exists] = d;
+
+
+
+                        else tradingAccum.push(d);
+
+
+
+                        updateTrading(tradingAccum);
+
+
+
+                        _tradingFetchInProgress = false;
+
+
+
+                    }
+
+
+
+                }
+
+
+
+                if (d.type === 'state') updateArduino(d);
+
+
+
+                if (d.type === 'arduino_event' && d.telemetry) {
+
+
+
+                    const t = d.telemetry;
+
+
+
+                    if (t.temp !== undefined) {
+
+
+
+                        const el = document.getElementById('casa-temp-val');
+
+
+
+                        if (el) el.textContent = t.temp.toFixed(1) + ' °C';
+
+
+
+                        const f = document.getElementById('dom-temp-fill');
+
+
+
+                        if (f) f.style.width = Math.min(100, Math.max(0, (t.temp / 50) * 100)) + '%';
+
+
+
+                    }
+
+
+
+                    if (t.humidity !== undefined) {
+
+
+
+                        const el = document.getElementById('casa-humidity-val');
+
+
+
+                        if (el) el.textContent = t.humidity.toFixed(0) + '%';
+
+
+
+                        const f = document.getElementById('dom-humidity-fill');
+
+
+
+                        if (f) f.style.width = Math.min(100, Math.max(0, t.humidity)) + '%';
+
+
+
+                    }
+
+
+
+                }
+
+
+
+                if (d.type === 'stats') {
+
+
+
+                    if (d.neural_load !== undefined) {
+
+
+
+                        document.getElementById('dash-cpu').innerText = `${Math.round(d.neural_load)}%`;
+
+
+
+                        const f = document.getElementById('dom-cpu-fill');
+
+
+
+                        if (f) f.style.width = Math.min(100, d.neural_load) + '%';
+
+
+
+                    }
+
+
+
+                    if (d.memory !== undefined) {
+
+
+
+                        document.getElementById('dash-ram').innerText = `${Math.round(d.memory)}%`;
+
+
+
+                        const f = document.getElementById('dom-ram-fill');
+
+
+
+                        if (f) f.style.width = Math.min(100, d.memory) + '%';
+
+
+
+                    }
+
+
+
+                }
+
+
+
+                if (d.type === 'spotify') updateSpotify(d);
+
+
+
+                if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
+
+
+
+            };
+
+
+
+            ws.onopen = () => { document.getElementById('log-strip').innerText = "MAYA Neural Link Established."; initAudio(); };
+
+
+
+            ws.onclose = () => setTimeout(initWS, 3000);
+
+
+
+        }
+
+
+
+
+
+
+
         // =============================================
+
+
+
+        // ORB STATE — integrato con screen state machine
+
+
+
+        // =============================================
+
+
+
         function setOrbState(status) {
+
+
+
             orbState = status || 'idle';
+
+
+
             const voiceClasses = ['idle', 'listening', 'processing', 'speaking', 'calibrating'];
+
+
+
             voiceClasses.forEach(c => document.body.classList.remove(c));
+
+
+
             if (status) document.body.classList.add(status.toLowerCase());
+
+
+
             document.getElementById('log-strip').innerText = `MAYA | ${orbState.toUpperCase()}`;
 
+
+
+
+
+
+
             if (status === 'listening' || status === 'processing' || status === 'speaking') {
+
+
+
                 // Qualsiasi attività vocale → entra in work-mode (prima attivazione)
+
+
+
                 enterWorkMode();
+
+
+
                 clearInactivityTimer();
+
+
+
             } else if (status === 'idle') {
+
+
+
                 // Avvia il countdown per tornare alla schermata 1
+
+
+
                 startInactivityTimer(600000); // 10 minuti
+
+
+
             }
+
+
+
         }
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // LAYOUT — gestione panel
+
+
+
         // =============================================
+
+
+
         function setLayout(layout, params = {}) {
+
+
+
             const orb = document.getElementById('maya-orb-container');
+
+
+
             const content = document.getElementById('content-area');
+
+
+
             const cmd = document.getElementById('cmd-container');
+
+
+
             const cmdInput = document.getElementById('cmd-input');
 
+
+
+
+
+
+
             if (layout === 'orb') {
+
+
+
                 // Chiude i panel ma NON esce da work-mode (lo fa solo il timer)
+
+
+
                 orb.classList.remove('corner');
+
+
+
                 content.classList.remove('open');
+
+
+
                 cmd.classList.remove('corner');
+
+
+
                 document.body.classList.remove('content-open');
+
+
+
                 cmdInput.placeholder = "Comando neurale...";
+
+
+
                 setTimeout(handleResize, 600);
+
+
+
                 return;
+
+
+
             }
+
+
+
+
+
+
 
             // Apre work-mode se non già attivo
+
+
+
             enterWorkMode();
 
+
+
+
+
+
+
             orb.classList.add('corner');
+
+
+
             content.classList.add('open');
+
+
+
             cmd.classList.add('corner');
+
+
+
             document.body.classList.add('content-open');
+
+
+
             cmdInput.placeholder = "comando...";
+
+
+
             setTimeout(handleResize, 600);
 
+
+
+
+
+
+
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+
+
             const target = document.getElementById(`panel-${layout}`);
+
+
+
             if (target) target.classList.add('active');
 
+
+
+
+
+
+
             if (layout === 'map' && params.location) updateMap(params.location);
+
+
+
             if (layout === 'browser' && params.url) document.getElementById('browser-iframe').src = params.url;
+
+
+
             if (layout === 'news') {
+
+
+
                 if (newsStreamsInitialized && Date.now() - newsStreamsInitTime > 20 * 60 * 1000)
+
+
+
                     newsStreamsInitialized = false;
+
+
+
                 initNewsStreams();
+
+
+
             }
+
+
+
             if (layout === 'weather') setTimeout(() => {
+
+
+
                 if (lastWeatherLatLon) initWeatherMap(lastWeatherLatLon.lat, lastWeatherLatLon.lon);
+
+
+
                 else if (weatherMiniMap) weatherMiniMap.invalidateSize();
-            }, 700);
+
+
+
+            }, 800);
+
+
+
             if (layout === 'trading') {
+
+
+
                 if (tradingAccum.length > 0) updateTrading(tradingAccum);
-                if (ws && ws.readyState === WebSocket.OPEN) {
+
+
+
+                if (ws && ws.readyState === WebSocket.OPEN && !_tradingFetchInProgress) {
+
+
+
+                    _tradingFetchInProgress = true;
+
+
+
                     tradingAccum = [];
+
+
+
                     ws.send(JSON.stringify({type: 'tool', action: {tool: 'trading', operation: 'overview'}}));
+
+
+
                 }
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         function handleOrbClick() {
+
+
+
             if (document.getElementById('maya-orb-container').classList.contains('corner')) {
+
+
+
                 setLayout('orb');
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         function sendCmd() {
+
+
+
             const input = document.getElementById('cmd-input');
+
+
+
             if (!input.value.trim()) return;
+
+
+
             ws.send(JSON.stringify({ type: 'command', text: input.value }));
+
+
+
             input.value = '';
+
+
+
         }
+
+
+
+
+
+
 
         function sendCmdToWS(text) {
+
+
+
             if (ws && ws.readyState === WebSocket.OPEN) {
+
+
+
                 ws.send(JSON.stringify({ type: 'command', text }));
+
+
+
             }
+
+
+
         }
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // SPOTIFY
+
+
+
         // =============================================
+
+
+
         let spotifyTimeout;
+
+
+
         function updateSpotify(d) {
+
+
+
             const widget = document.getElementById('spotify-widget');
+
+
+
             if (d.track) {
+
+
+
                 document.getElementById('spotify-track').innerText = d.track;
+
+
+
                 document.getElementById('spotify-artist').innerText = d.artist;
+
+
+
                 document.getElementById('spotify-art').src = d.album_art || '';
+
+
+
                 document.getElementById('spotify-play-btn').innerText = d.is_playing ? '⏸' : '▶';
+
+
+
                 if (d.is_playing && !widget.classList.contains('active')) {
+
+
+
                     widget.style.display = 'block';
+
+
+
                     setTimeout(() => widget.classList.add('active'), 10);
+
+
+
                     if (spotifyTimeout) clearTimeout(spotifyTimeout);
+
+
+
                     spotifyTimeout = setTimeout(closeSpotifyWidget, 60000);
+
+
+
                 }
+
+
+
                 document.getElementById('log-strip').innerText = `♫ SPOTIFY: ${d.track} - ${d.artist}`;
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         function closeSpotifyWidget() {
+
+
+
             const widget = document.getElementById('spotify-widget');
+
+
+
             widget.classList.remove('active');
+
+
+
             if (spotifyTimeout) clearTimeout(spotifyTimeout);
+
+
+
             setTimeout(() => { if (!widget.classList.contains('active')) widget.style.display = 'none'; }, 500);
+
+
+
         }
 
+
+
+
+
+
+
         // =============================================
+
+
+
         // PANEL UPDATES
+
+
+
         // =============================================
+
+
+
         function updateCalendar(events) {
+
+
+
             document.getElementById('calendar-list').innerHTML = events.map(e => `
+
+
+
                 <div class="event-item">
+
+
+
                     <div><div style="font-weight:bold">${e.title}</div><div style="font-size:12px;opacity:0.5">${e.source || 'MAYA'}</div></div>
+
+
+
                     <div class="event-time">${e.time}</div>
+
+
+
                 </div>`).join('');
+
+
+
         }
+
+
+
+
+
+
 
         let tickerData = [];
+
+
+
         function updateTrading(data) {
+
+
+
             tickerData = data;
 
+
+
+
+
+
+
             // Populate ticker strip (duplicate items for seamless loop)
+
+
+
             const tickerTrack = document.getElementById('ticker-track');
+
+
+
             const tickerHTML = data.map(item => {
+
+
+
                 const chg = item.change_pct !== undefined ? item.change_pct : 0;
+
+
+
                 const isUp = chg >= 0;
+
+
+
                 const chgStr = `${isUp ? '+' : ''}${chg.toFixed(2)}%`;
+
+
+
                 return `<div class="ticker-item">
+
+
+
                     <span class="tk-symbol">${item.symbol.toUpperCase()}</span>
+
+
+
                     <span class="tk-price">${item.price_str}</span>
+
+
+
                     <span class="tk-change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${chgStr}</span>
+
+
+
                     <span class="tk-sep"></span>
+
+
+
                 </div>`;
+
+
+
             }).join('');
+
+
+
             tickerTrack.innerHTML = tickerHTML + tickerHTML;
 
+
+
+
+
+
+
             // Populate news feed / asset list
+
+
+
             const newsList = document.getElementById('trading-news-list');
+
+
+
             const newsItems = data.map(item => {
+
+
+
                 const chg = item.change_pct !== undefined ? item.change_pct : 0;
+
+
+
                 const isUp = chg >= 0;
+
+
+
                 const chgStr = `${isUp ? '+' : ''}${chg.toFixed(2)}%`;
+
+
+
                 const sym = item.symbol.toLowerCase();
+
+
+
                 const logoUrl = ASSET_LOGOS[sym];
+
+
+
                 const badge = `<div class="tn-logo-badge">${item.symbol.slice(0,3).toUpperCase()}</div>`;
+
+
+
                 const logoHtml = logoUrl
+
+
+
                     ? `<div class="tn-logo-wrap"><img class="tn-logo" src="${logoUrl}" alt="${sym}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${badge.replace('class="tn-logo-badge"', 'class="tn-logo-badge" style="display:none"')}</div>`
+
+
+
                     : badge;
+
+
+
                 return `<div class="trading-news-item" onclick="drawMainTradingGraph('${item.symbol}')">
+
+
+
                     ${logoHtml}
+
+
+
                     <div class="tn-body">
+
+
+
                         <div class="tn-title">${item.symbol.toUpperCase()} &nbsp;<span style="opacity:0.4;font-size:11px">${item.price_str}</span></div>
+
+
+
                         <div class="tn-meta"><span class="${isUp ? 'up' : 'down'}" style="font-size:13px;font-weight:300">${chgStr}</span><span>${item.asset_type?.toUpperCase() || 'ASSET'}</span></div>
+
+
+
                     </div>
+
+
+
                 </div>`;
+
+
+
             }).join('');
+
+
+
             newsList.innerHTML = newsItems || '<div style="padding:20px;opacity:0.2;font-size:11px">Caricamento dati...</div>';
 
+
+
+
+
+
+
             // Draw chart for first item
+
+
+
             const mainGraph = document.getElementById('main-trading-graph');
+
+
+
             if (data.length > 0 && !mainGraph.innerHTML.trim()) drawMainTradingGraph(data[0].symbol);
+
+
+
             document.getElementById('market-volume').innerText = (Math.random() * 100 + 50).toFixed(2) + "B";
+
+
+
         }
+
+
+
+
+
+
 
         const ASSET_LOGOS = {
+
+
+
             'btc':   'https://s3-symbol-logo.tradingview.com/crypto/XTVCBTC--big.svg',
+
+
+
             'xrp':   'https://s3-symbol-logo.tradingview.com/crypto/XTVCXRP--big.svg',
+
+
+
             'aapl':  'https://s3-symbol-logo.tradingview.com/apple--big.svg',
+
+
+
             'nvda':  'https://s3-symbol-logo.tradingview.com/nvidia--big.svg',
+
+
+
             'tsla':  'https://s3-symbol-logo.tradingview.com/tesla--big.svg',
+
+
+
             'msft':  'https://s3-symbol-logo.tradingview.com/microsoft--big.svg',
+
+
+
             'meta':  'https://s3-symbol-logo.tradingview.com/meta-platforms--big.svg',
+
+
+
             'amzn':  'https://s3-symbol-logo.tradingview.com/amazon--big.svg',
+
+
+
             'googl': 'https://s3-symbol-logo.tradingview.com/alphabet--big.svg',
+
+
+
             'jpm':   'https://s3-symbol-logo.tradingview.com/jpmorgan-chase--big.svg',
+
+
+
             'v':     'https://s3-symbol-logo.tradingview.com/visa--big.svg',
+
+
+
             'ma':    'https://s3-symbol-logo.tradingview.com/mastercard--big.svg',
+
+
+
             'nflx':  'https://s3-symbol-logo.tradingview.com/netflix--big.svg',
+
+
+
             'amd':   'https://s3-symbol-logo.tradingview.com/advanced-micro-devices--big.svg',
+
+
+
             'dis':   'https://s3-symbol-logo.tradingview.com/walt-disney--big.svg',
+
+
+
             'ba':    'https://s3-symbol-logo.tradingview.com/boeing--big.svg',
+
+
+
             'gs':    'https://s3-symbol-logo.tradingview.com/goldman-sachs--big.svg',
+
+
+
             'intc':  'https://s3-symbol-logo.tradingview.com/intel--big.svg',
+
+
+
             'uber':  'https://s3-symbol-logo.tradingview.com/uber--big.svg',
+
+
+
             'baba':  'https://s3-symbol-logo.tradingview.com/alibaba--big.svg',
+
+
+
             'spy':   'https://s3-symbol-logo.tradingview.com/amex/spy--big.svg',
+
+
+
             'qqq':   'https://s3-symbol-logo.tradingview.com/invesco--big.svg',
+
+
+
         };
+
+
+
+
+
+
 
         const TV_SYMBOLS = {
+
+
+
             'btc': 'BINANCE:BTCUSDT', 'bitcoin': 'BINANCE:BTCUSDT',
+
+
+
             'eth': 'BINANCE:ETHUSDT', 'ethereum': 'BINANCE:ETHUSDT',
+
+
+
             'sol': 'BINANCE:SOLUSDT', 'solana': 'BINANCE:SOLUSDT',
+
+
+
             'bnb': 'BINANCE:BNBUSDT', 'binancecoin': 'BINANCE:BNBUSDT',
+
+
+
             'xrp': 'BINANCE:XRPUSDT', 'ripple': 'BINANCE:XRPUSDT',
+
+
+
             'doge': 'BINANCE:DOGEUSDT', 'dogecoin': 'BINANCE:DOGEUSDT',
+
+
+
             'spy': 'AMEX:SPY', 'qqq': 'NASDAQ:QQQ',
+
+
+
             'aapl': 'NASDAQ:AAPL', 'nvda': 'NASDAQ:NVDA',
+
+
+
             'tsla': 'NASDAQ:TSLA', 'msft': 'NASDAQ:MSFT',
+
+
+
             'meta': 'NASDAQ:META', 'amzn': 'NASDAQ:AMZN',
+
+
+
             'googl': 'NASDAQ:GOOGL', 'goog': 'NASDAQ:GOOGL',
+
+
+
             'jpm': 'NYSE:JPM', 'v': 'NYSE:V', 'ma': 'NYSE:MA',
+
+
+
             'nflx': 'NASDAQ:NFLX', 'amd': 'NASDAQ:AMD',
+
+
+
             'dis': 'NYSE:DIS', 'ba': 'NYSE:BA', 'gs': 'NYSE:GS',
+
+
+
             'intc': 'NASDAQ:INTC', 'uber': 'NYSE:UBER', 'baba': 'NYSE:BABA',
+
+
+
             'brk-b': 'NYSE:BRK.B',
+
+
+
         };
+
+
+
+
+
+
 
         function drawMainTradingGraph(symbol) {
+
+
+
             const tvSym = TV_SYMBOLS[symbol.toLowerCase()] || symbol.toUpperCase();
+
+
+
             const el = document.getElementById('main-trading-graph');
+
+
+
             const params = new URLSearchParams({
+
+
+
                 symbol: tvSym, interval: '60', theme: 'dark', style: '3',
+
+
+
                 locale: 'it', hide_side_toolbar: '1', allow_symbol_change: '0',
+
+
+
                 hideideas: '1', saveimage: '0', calendar: '0',
+
+
+
                 withdateranges: '0', hidetoptoolbar: '1',
+
+
+
             });
+
+
+
             el.innerHTML = `<iframe src="https://www.tradingview.com/widgetembed/?${params}" allowtransparency="true" scrolling="no"></iframe>`;
+
+
+
         }
+
+
+
+
+
+
 
         const WEATHER_ICONS = {
+
+
+
             'sun': '☀️', 'cloud-sun': '⛅', 'cloud': '☁️', 'cloud-fog': '🌫️',
+
+
+
             'cloud-drizzle': '🌦️', 'cloud-rain': '🌧️', 'cloud-snow': '🌨️', 'cloud-lightning': '⛈️'
+
+
+
         };
+
+
+
+
+
+
 
         let weatherMiniMap;
+
+
+
         let lastWeatherLatLon = null;
+
+
+
         let rainViewerLoaded = false;
 
+
+
+
+
+
+
         function initWeatherMap(lat, lon) {
+
+
+
             if (!weatherMiniMap) {
+
+
+
                 weatherMiniMap = L.map('weather-mini-map', {
+
+
+
                     zoomControl: false, attributionControl: false,
+
+
+
                     dragging: true, touchZoom: false,
+
+
+
                     scrollWheelZoom: true, doubleClickZoom: false
+
+
+
                 }).setView([lat, lon], 6);
+
+
+
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(weatherMiniMap);
+
+
+
                 L.circleMarker([lat, lon], {
+
+
+
                     radius: 5, color: 'rgba(255,30,30,0.9)',
+
+
+
                     fillColor: 'rgba(255,30,30,0.9)', fillOpacity: 1, weight: 2
+
+
+
                 }).addTo(weatherMiniMap);
+
+
+
                 if (!rainViewerLoaded) { rainViewerLoaded = true; loadRainViewer(weatherMiniMap); }
+
+
+
             } else {
+
+
+
                 weatherMiniMap.setView([lat, lon], 6);
+
+
+
                 weatherMiniMap.invalidateSize();
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         async function loadRainViewer(map) {
+
+
+
             try {
+
+
+
                 const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+
+
+
                 const data = await res.json();
+
+
+
                 const frames = [...(data.radar.past || []), ...(data.radar.nowcast || [])];
+
+
+
                 if (!frames.length) return;
+
+
+
                 const layers = frames.map(f =>
+
+
+
                     L.tileLayer(`https://tilecache.rainviewer.com${f.path}/256/{z}/{x}/{y}/4/1_1.png`,
+
+
+
                         { opacity: 0, tileSize: 256, zIndex: 10 }).addTo(map)
+
+
+
                 );
+
+
+
                 let idx = layers.length - 1;
+
+
+
                 const show = i => layers.forEach((l, j) => l.setOpacity(j === i ? 0.6 : 0));
+
+
+
                 show(idx);
+
+
+
                 setInterval(() => { idx = (idx + 1) % layers.length; show(idx); }, 600);
+
+
+
             } catch(e) {}
+
+
+
         }
+
+
+
+
+
+
 
         function updateWeather(data) {
+
+
+
             document.getElementById('weather-city').innerText = data.location || '--';
+
+
+
             document.getElementById('weather-desc').innerText = (data.condition || '--').toUpperCase();
+
+
+
             document.getElementById('weather-wind').innerText = data.wind ? Math.round(data.wind) : '--';
+
+
+
             document.getElementById('weather-feels').innerText = data.feels_like ? Math.round(data.feels_like) : (data.temp ? Math.round(data.temp) : '--');
+
+
+
             const t = data.temp ? Math.round(data.temp) : null;
+
+
+
             const tempEl = document.getElementById('weather-temp');
+
+
+
             tempEl.innerText = t !== null ? t : '--';
+
+
+
             if (t !== null) {
+
+
+
                 tempEl.style.color = t > 28 ? '#ff8c42' : t > 18 ? '#ffe87c' : t > 8 ? '#ffffff' : '#7ee8ff';
+
+
+
                 const g = t > 28 ? 'rgba(255,140,66,0.25)' : t > 18 ? 'rgba(255,232,124,0.2)' : t > 8 ? 'rgba(255,255,255,0.08)' : 'rgba(126,232,255,0.25)';
+
+
+
                 tempEl.style.textShadow = `0 0 100px ${g}`;
+
+
+
             }
+
+
+
+
+
+
 
             const fc = document.getElementById('weather-forecast-col');
+
+
+
             if (fc && data.daily) {
+
+
+
                 fc.innerHTML = data.daily.slice(0, 5).map(day => {
+
+
+
                     const d = new Date(day.date).toLocaleDateString('it-IT', { weekday: 'short' }).toUpperCase();
+
+
+
                     const desc = (day.condition || day.description || '').toLowerCase();
+
+
+
                     return `<div class="wx-fc-row">
+
+
+
                         <span class="wx-fc-day">${d}</span>
+
+
+
                         <span class="wx-fc-desc">${desc}</span>
+
+
+
                         <span class="wx-fc-temps">${Math.round(day.max)}°<span class="wx-fc-min">${Math.round(day.min)}°</span></span>
+
+
+
                     </div>`;
+
+
+
                 }).join('');
+
+
+
             }
+
+
+
+
+
+
 
             if (data.lat && data.lon) {
+
+
+
                 lastWeatherLatLon = { lat: data.lat, lon: data.lon };
+
+
+
                 if (document.getElementById('panel-weather').classList.contains('active')) {
+
+
+
                     initWeatherMap(data.lat, data.lon);
+
+
+
                 }
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         // kind:'video'   → embed by video ID, oEmbed-checked for availability
+
+
+
         // kind:'channel' → embed via live_stream?channel=, no check needed
+
+
+
         const NEWS_STREAM_CONFIG = [
+
+
+
             { primary:  { src: 'UCLXo7UDZvByw2ixzpQCufnA',  label: 'BBC NEWS',  kind: 'channel' },
+
+
+
               fallback: { src: 'YBRbxDWLcl4',              label: 'CNBC',      kind: 'video' } },
+
+
+
             { primary:  { src: 'UCosnml68cGE8fzm8OLKJ8SQ', label: 'REUTERS',   kind: 'channel' },
+
+
+
               fallback: { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA',kind: 'channel' } },
+
+
+
             { primary:  { src: 'iEpJwprxDdk',              label: 'BLOOMBERG', kind: 'video' },
+
+
+
               fallback: { src: 'bFO_VVRAmCM',              label: 'SKY NEWS',  kind: 'video' } },
+
+
+
             { primary:  { src: 'UCupvZG-5ko_eiXAupbDfxWw', label: 'CNN',      kind: 'channel' },
+
+
+
               fallback: { src: 'pykpO5kQJ98',              label: 'EURONEWS',  kind: 'video' } },
+
+
+
         ];
 
+
+
+
+
+
+
         function streamEmbedUrl(s) {
+
+
+
             const p = 'autoplay=1&mute=1&controls=1&modestbranding=1&rel=0';
+
+
+
             return s.kind === 'video'
+
+
+
                 ? `https://www.youtube.com/embed/${s.src}?${p}`
+
+
+
                 : `https://www.youtube.com/embed/live_stream?channel=${s.src}&${p}`;
+
+
+
         }
+
+
+
+
+
+
 
         let newsStreamsInitialized = false;
+
+
+
         let newsStreamsInitTime = 0;
 
+
+
+
+
+
+
         async function initNewsStreams() {
+
+
+
             if (newsStreamsInitialized) return;
+
+
+
             newsStreamsInitialized = true;
+
+
+
             newsStreamsInitTime = Date.now();
+
+
+
             const grid = document.getElementById('news-live-grid');
 
+
+
+
+
+
+
             grid.innerHTML = NEWS_STREAM_CONFIG.map((_, i) => `
+
+
+
                 <div class="news-stream-tile" id="stream-tile-${i}">
+
+
+
                     <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>···</div>
+
+
+
                     <iframe id="stream-iframe-${i}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+
+
+
                 </div>`).join('');
 
+
+
+
+
+
+
             for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
+
+
+
                 const { primary, fallback } = NEWS_STREAM_CONFIG[i];
+
+
+
                 let stream = primary;
-                // oEmbed check for both types:
-                // video   → /watch?v=ID  returns 404 if video unavailable
-                // channel → /channel/ID/live  returns 404 if NOT currently live
+
+
+
                 const oembedUrl = primary.kind === 'video'
+
+
+
                     ? `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${primary.src}&format=json`
+
+
+
                     : `https://www.youtube.com/oembed?url=https://www.youtube.com/channel/${primary.src}/live&format=json`;
+
+
+
                 try {
+
+
+
                     const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(4000) });
+
+
+
                     if (!res.ok) stream = fallback;
+
+
+
                 } catch { stream = fallback; }
+
+
+
                 document.getElementById(`stream-iframe-${i}`).src = streamEmbedUrl(stream);
+
+
+
                 document.getElementById(`stream-label-${i}`).innerHTML =
+
+
+
                     `<span class="ns-live-dot"></span>${stream.label}`;
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         // Refresh streams every 20 min to prevent black screen
+
+
+
         setInterval(() => {
+
+
+
             if (!newsStreamsInitialized) return;
+
+
+
             if (!document.getElementById('panel-news').classList.contains('active')) return;
+
+
+
             for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
+
+
+
                 const iframe = document.getElementById(`stream-iframe-${i}`);
+
+
+
                 if (iframe && iframe.src) {
+
+
+
                     const src = iframe.src;
+
+
+
                     iframe.src = '';
+
+
+
                     setTimeout(() => { iframe.src = src; }, 300 * i);
+
+
+
                 }
+
+
+
             }
+
+
+
         }, 20 * 60 * 1000);
 
+
+
+
+
+
+
         function updateNews(articles) {
+
+
+
             if (!articles || articles.length === 0) return;
 
+
+
+
+
+
+
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
+
+
+
             document.getElementById('news-sidebar-list').innerHTML = articles.map((a, i) => `
+
+
+
                 <div class="ns-item" onclick="setLayout('browser',{url:'${a.link}'})">
+
+
+
                     <div class="ns-rank">${String(i + 1).padStart(2, '0')}</div>
+
+
+
                     <div class="ns-content">
+
+
+
                         <div class="ns-source">${a.source || 'MAYA FEED'}</div>
+
+
+
                         <div class="ns-title">${a.title}</div>
+
+
+
                     </div>
+
+
+
                 </div>`).join('');
 
+
+
+
+
+
+
             // Ticker — all headlines scrolling
+
+
+
             const tickerItems = articles.map(a =>
+
+
+
                 `<span class="ntk-label">${a.source || 'NEWS'}</span><span class="ntk-sep">//</span><span class="ntk-item">${a.title}</span><span class="ntk-sep">///</span>`
+
+
+
             ).join('');
+
+
+
             const track = document.getElementById('news-ticker-track');
+
+
+
             track.innerHTML = tickerItems + tickerItems;
+
+
+
         }
+
+
+
+
+
+
 
         // Stato locale dispositivi per la mappa casa
+
+
+
         const domState = {
-            light: false, relay: false, servo: false, alarm: false
+
+
+
+            light: false, relay: false, servo: false, alarm: false, rgb: false
+
+
+
         };
 
+
+
+
+
+
+
         function toggleDevice(dev) {
+
+
+
             const actionMap = {
+
+
+
                 light: () => ({ op: 'SET', target: 'light', value: domState.light ? 0 : 1 }),
+
+
+
                 relay: () => ({ op: 'SET', target: 'relay', value: domState.relay ? 0 : 1 }),
+
+
+
                 servo: () => ({ op: 'SET', target: 'servo', value: domState.servo ? 0 : 90 }),
+
+
+
                 alarm: () => ({ op: 'SET', target: 'buzzer', value: 1 }),
+                rgb:   () => ({ op: 'SET', target: 'rgb', value: domState.rgb ? 0 : 16711680 }),
+
+
+
             };
+
+
+
             const action = actionMap[dev]?.();
+
+
+
             if (!action) return;
+
+
+
             if (ws && ws.readyState === WebSocket.OPEN) {
+
+
+
                 ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', ...action } }));
+
+
+
             }
+
+
+
             if (dev !== 'alarm') {
+
+
+
                 domState[dev] = !domState[dev];
+
+
+
                 refreshDomUI();
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         function refreshDomUI() {
+
+
+
             const devMap = {
+
+
+
                 light: { onLabel: 'ON',     offLabel: 'OFF' },
+
+
+
                 relay: { onLabel: 'ON',     offLabel: 'OFF' },
+
+
+
                 servo: { onLabel: 'APERTA', offLabel: 'CHIUSA' },
-                alarm: { onLabel: 'ATTIVO', offLabel: 'OFF' },
+
+
+
+                alarm: { onLabel: 'ATTIVO', offLabel: 'STANDBY' },
+                rgb:   { onLabel: 'ON',     offLabel: 'OFF' },
+
+
+
             };
+
+
+
             for (const [dev, labels] of Object.entries(devMap)) {
+
+
+
                 const el = document.getElementById(`dev-${dev}`);
+
+
+
                 const stateEl = document.getElementById(`dev-${dev}-state`);
+
+
+
                 if (!el) continue;
+
+
+
                 if (domState[dev]) {
+
+
+
                     el.classList.add('active');
+
+
+
                     if (stateEl) stateEl.textContent = labels.onLabel;
+
+
+
                 } else {
+
+
+
                     el.classList.remove('active');
+
+
+
                     if (stateEl) stateEl.textContent = labels.offLabel;
+
+
+
                 }
+
+
+
             }
+
+
+
         }
+
+
+
+
+
+
 
         function updateArduino(d) {
+
+
+
             if (d.system && d.system.reset_storage) {
+
+
+
                 document.getElementById('debug-controls').style.display = 'flex';
+
+
+
             }
+
+
+
             if (d.led   !== undefined) domState.light = (d.led === 'on');
+
+
+
             if (d.relay !== undefined) domState.relay = (d.relay === 'on');
+
+
+
             if (d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90');
-            if (d.rgb   !== undefined) {
+
+
+
+            if (d.rgb   !== undefined) 
+
+
+
+            {
+
                 const rgb = Array.isArray(d.rgb) ? d.rgb : [0, 0, 0];
+
+
+
+                domState.rgb = rgb.some(v => v > 0);
+
+
+
                 const hex = '#' + rgb.map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
+
+
+
                 const sw = document.getElementById('casa-rgb-swatch');
+
+
+
                 if (sw) sw.style.background = hex;
+
+
+
             }
+
+
+
             if (d.buzzer !== undefined) {
+
+
+
                 const dot = document.getElementById('casa-buzzer-dot');
+
+
+
                 if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
+
+
+
             }
+
+
+
             const pill = document.getElementById('dom-arduino-pill');
+
+
+
             if (pill && (d.system || d.led || d.relay || d.servo)) pill.classList.add('online');
+
+
+
             refreshDomUI();
+
+
+
         }
 
+
+
+
+
+
+
         async function updateMap(query) {
+
+
+
             if (!map) {
+
+
+
                 map = L.map('map-container', { zoomControl: false }).setView([41.9, 12.5], 10);
+
+
+
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' }).addTo(map);
+
+
+
             }
+
+
+
             try {
+
+
+
                 const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
+
+
+
                 const data = await res.json();
+
+
+
                 if (data[0]) { map.setView([data[0].lat, data[0].lon], 13); L.marker([data[0].lat, data[0].lon]).addTo(map); }
+
+
+
             } catch (e) { console.error("Map error:", e); }
+
+
+
         }
+
+
+
     </script>
+
+
+
 </body>
+
+
+
 </html>

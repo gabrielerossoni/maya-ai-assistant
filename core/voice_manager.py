@@ -430,8 +430,17 @@ class VoiceManager:
             is_news_request = any(word in text.lower() for word in ["notizie", "news", "notiziario", "aggiornamenti"])
             
             full_reply = ""
-            async for token in self.agent.process(text):
-                full_reply += token
+            async def _collect():
+                result = ""
+                async for token in self.agent.process(text):
+                    result += token
+                return result
+
+            try:
+                full_reply = await asyncio.wait_for(_collect(), timeout=15.0)
+            except asyncio.TimeoutError:
+                print("[VOICE] Timeout agente (15s): risposta ignorata.")
+                return
             
             # Recupera dati finali (layout) salvati dall'agente
             layout_data = {"type": "orb", "params": {}}

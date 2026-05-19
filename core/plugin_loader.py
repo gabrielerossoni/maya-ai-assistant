@@ -22,6 +22,12 @@ class PluginHandler(FileSystemEventHandler):
         """Carica o ricarica un singolo plugin."""
         module_name = file_path.stem
         try:
+            # Rimuovi eventuali moduli orfani (vecchi nomi di plugin rinominati)
+            existing_plugin_files = {p.stem for p in self.plugins_dir.glob("*.py") if p.name != "__init__.py"}
+            stale_keys = [k for k in list(sys.modules.keys()) if k not in existing_plugin_files and k.startswith(module_name.split("_")[0])]
+            for k in stale_keys:
+                sys.modules.pop(k, None)
+
             # Caricamento dinamico del modulo
             spec = importlib.util.spec_from_file_location(module_name, file_path)
             module = importlib.util.module_from_spec(spec)

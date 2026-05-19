@@ -143,6 +143,50 @@ FILLER_MESSAGES = [
 #   {"tool": "arduino", "command": "BLIND_OPEN"}
 # ──────────────────────────────────────────────
 
+AUTOMATION_ALIASES: dict[str, str] = {
+    "buona notte":       "buonanotte",
+    "bonne nuit":        "buonanotte",
+    "notte":             "buonanotte",
+    "vado a dormire":    "buonanotte",
+    "va a dormire":      "buonanotte",
+    "buon giorno":       "buongiorno",
+    "morning":           "buongiorno",
+    "svegliami":         "sveglia",
+    "dammi la sveglia":  "sveglia",
+    "esco":              "vado fuori",
+    "me ne vado":        "vado fuori",
+    "vado via":          "vado fuori",
+    "sono tornato":      "sono rientrato",
+    "rientro":           "sono rientrato",
+    "torno":             "sono rientrato",
+    "dormo":             "ora di dormire",
+    "vado a letto":      "ora di dormire",
+    "a letto":           "ora di dormire",
+    "caffe":             "pausa caffè",
+    "caffe":             "pausa caffè",
+    "caffè":             "pausa caffè",
+    "faccio un caffè":   "pausa caffè",
+    "sta piovendo":      "piove",
+    "pioggia":           "piove",
+    "lavoro":            "modalità lavoro",
+    "work mode":         "modalità lavoro",
+    "studio":            "modalità studio",
+    "relax":             "modalità relax",
+    "film":              "modalità film",
+    "cinema":            "modalità film",
+    "guardo un film":    "modalità film",
+    "gaming":            "modalità gaming",
+    "gioco":             "modalità gaming",
+    "uscita":            "modalità uscita",
+    "ospite":            "modalità ospite",
+    "arrivano ospiti":   "ospiti in arrivo",
+    "stanno arrivando":  "ospiti in arrivo",
+    "bambini a letto":   "bambini dormono",
+    "weekend":           "weekend mattina",
+    "sabato mattina":    "weekend mattina",
+    "domenica mattina":  "weekend mattina",
+}
+
 AUTOMATIONS = {
     # ── Scene esistenti ──────────────────────────
     "buonanotte": [
@@ -317,8 +361,20 @@ class AgentCore:
 
     # ── FASE 1: PLANNER ──────────────────────────────────
     def _check_automation(self, user_input: str) -> list | None:
-        """Controlla se l'input corrisponde a un'automazione predefinita."""
-        lower = user_input.lower()
+        """Controlla se l'input corrisponde a un'automazione predefinita.
+        Normalizza spazi multipli e risolve gli alias prima del match."""
+        import re as _re
+        lower = _re.sub(r"\s+", " ", user_input.lower().strip())
+
+        # 1. Controlla prima gli alias (possono contenere varianti multi-parola)
+        for alias, canonical in AUTOMATION_ALIASES.items():
+            if alias in lower:
+                actions = AUTOMATIONS.get(canonical)
+                if actions:
+                    print(f"[PLANNER] Automazione (alias '{alias}' → '{canonical}') rilevata")
+                    return actions
+
+        # 2. Poi controlla i tasti canonici
         for keyword, actions in AUTOMATIONS.items():
             if keyword in lower:
                 print(f"[PLANNER] Automazione rilevata: '{keyword}'")
