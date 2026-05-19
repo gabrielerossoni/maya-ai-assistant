@@ -590,6 +590,9 @@ async def get_models_status():
         return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
 
 
+_last_models_check: float = 0.0
+_cached_models_status: dict = {}
+
 async def broadcast_state():
     """
     Trasmette lo stato del sistema alla dashboard, includendo:
@@ -597,8 +600,13 @@ async def broadcast_state():
     - Stato di Ollama
     - Informazioni di sistema
     """
+    global _last_models_check, _cached_models_status
     arduino_tool = agent.tool_manager.tools.get("arduino")
-    models_status = await get_models_status()
+    now = time.time()
+    if now - _last_models_check > 30:
+        _cached_models_status = await get_models_status()
+        _last_models_check = now
+    models_status = _cached_models_status
     ollama_online = any(m.get("online", False) for m in models_status.values())
 
     _debug_reset_client = os.environ.get(
@@ -753,7 +761,7 @@ async def interactive_console():
 
 
 if __name__ == "__main__":
-    from instance_guard import (
+    from core.instance_guard import (
         LOCK_PORT,
         InstanceGuard,
         install_signal_handlers,

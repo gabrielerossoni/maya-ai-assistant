@@ -59,6 +59,7 @@ function createWindow() {
         frame: false,
         transparent: true,
         alwaysOnTop: false,
+        icon: path.join(__dirname, '..', 'static', 'maya_logo_no_sfondo.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,

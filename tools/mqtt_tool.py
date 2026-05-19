@@ -136,7 +136,7 @@ class MqttTool:
         
         try:
             result = self.client.publish(topic, cmd_payload, qos=1, retain=False)
-            result.wait_for_publish(timeout=2.0)
+            await asyncio.to_thread(result.wait_for_publish, 2.0)
             return {
                 "status": "ok",
                 "message": f"Comando inviato a stanza '{room}' (QoS 1)",

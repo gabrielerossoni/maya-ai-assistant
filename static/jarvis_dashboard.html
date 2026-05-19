@@ -3062,8 +3062,7 @@
                     <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>···</div>
                     <iframe id="stream-iframe-${i}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                 </div>`).join('');
-            for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
-                const { primary, fallback } = NEWS_STREAM_CONFIG[i];
+            await Promise.all(NEWS_STREAM_CONFIG.map(async ({ primary, fallback }, i) => {
                 let stream = primary;
                 const oembedUrl = primary.kind === 'video'
                     ? `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${primary.src}&format=json`
@@ -3075,7 +3074,7 @@
                 document.getElementById(`stream-iframe-${i}`).src = streamEmbedUrl(stream);
                 document.getElementById(`stream-label-${i}`).innerHTML =
                     `<span class="ns-live-dot"></span>${stream.label}`;
-            }
+            }));
         }
         // Refresh streams every 20 min to prevent black screen
         setInterval(() => {

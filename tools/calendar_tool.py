@@ -15,7 +15,7 @@ from googleapiclient.discovery import build
 
 CALENDAR_FILE = "data/calendar.json"
 GOOGLE_TOKEN_FILE = "data/token.json"
-GOOGLE_CREDENTIALS_FILE = "credentials.json"
+GOOGLE_CREDENTIALS_FILE = "data/credentials.json"
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 # Imposta qui l'ID del calendario da usare.
@@ -150,13 +150,11 @@ class CalendarTool:
         if self.google_service:
             try:
                 cal_id = _get_calendar_id()
-                print(f"[CALENDAR] Fetching calendarId='{cal_id}'")
                 events_result = self.google_service.events().list(
                     calendarId=cal_id, timeMin=now_iso,
                     maxResults=50, singleEvents=True,
                     orderBy='startTime'
                 ).execute()
-                print(f"[CALENDAR] Ricevuti {len(events_result.get('items', []))} eventi")
                 g_events = events_result.get('items', [])
                 for ge in g_events:
                     start = ge['start'].get('dateTime', ge['start'].get('date'))

@@ -13,6 +13,8 @@
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
+> **Ultimo aggiornamento:** Maggio 2026 — Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop con icona MAYA, bug fixes pre-demo.
+
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
 ---
@@ -209,7 +211,9 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 - **Agentic ReAct Loop** — ciclo asincrono Ragiona → Agisci → Osserva con routing ibrido dell'intent
 - **Voice I/O Integrato** — STT via `faster-whisper` (tiny) e TTS via `Piper` (voce Paola) con VAD adattivo
 - **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window
-- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; pannelli live per Meteo, Notizie, Trading, Stato Casa, Calendario, Spotify
+- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; pannelli live per Meteo, Notizie, Trading, Stato Casa, Calendario (griglia mensile + prossimi eventi), Spotify
+- **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`
+- **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout
 - **Stato Casa Live** — pannello "STATO CASA // LIVE" aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
 - **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` pubblica ai client ogni 30 s
 - **Graceful Degradation** — senza Arduino → simulazione automatica; `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline
@@ -237,7 +241,7 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 | Voce | Faster-Whisper (STT) + Piper TTS |
 | Multi-stanza | MQTT — paho-mqtt (opzionale) |
 
-> **Opzionale:** Groq API (fallback cloud LLM), Electron (wrapper desktop), Ngrok (tunnel remoto), Spotify API.
+> **Opzionale:** Groq API (fallback cloud LLM), Electron (wrapper desktop — avvia con `MAYA_DESKTOP.bat`), Ngrok (tunnel remoto), Spotify API, Google Calendar API.
 
 ---
 
@@ -246,8 +250,8 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 ```
 maya/
 ├── main.py                    # Entrypoint: FastAPI, lifecycle, WS, broadcaster
-├── instance_guard.py          # Lock single-instance
-├── MAYA_DESKTOP.bat           # Launcher rapido Windows
+├── MAYA_DESKTOP.bat           # Launcher rapido Windows (Electron)
+├── package.json               # Electron / npm
 │
 ├── core/
 │   ├── agent_core.py          # Planner/Executor/Validator, routing, AUTOMATIONS
@@ -257,6 +261,7 @@ maya/
 │   ├── websocket_manager.py   # Broadcast manager WebSocket
 │   ├── plugin_loader.py       # Caricamento dinamico plugin
 │   ├── proactive_manager.py   # Monitor proattivo CPU/RAM/calendario
+│   ├── instance_guard.py      # Lock single-instance
 │   └── log_utils.py           # Filtro log per dashboard
 │
 ├── tools/
@@ -264,7 +269,7 @@ maya/
 │   ├── mqtt_tool.py           # Controllo multi-room via MQTT
 │   ├── network_tool.py        # TCP client + server (secondo PC)
 │   ├── system_tool.py         # Comandi OS (shutdown, browser, screenshot, volume)
-│   ├── calendar_tool.py       # Calendario locale JSON
+│   ├── calendar_tool.py       # Calendario locale JSON + Google Calendar OAuth2
 │   ├── weather_tool.py        # Open-Meteo geocoding + forecast
 │   ├── news_tool.py           # RSS reader (ANSA)
 │   ├── wikipedia_tool.py      # Wikipedia summary (IT)
@@ -295,9 +300,15 @@ maya/
 │
 ├── data/                      # Runtime data (gitignored)
 │   ├── chroma_db/
+│   ├── credentials.json       # Google OAuth2 (gitignored)
+│   ├── token.json             # Google token (gitignored)
 │   ├── memory_metadata.json
 │   ├── calendar.json
 │   └── notes.json
+│
+├── electron/
+│   ├── main.js                # Electron main process
+│   └── preload.js
 │
 ├── tests/
 ├── plugins/
@@ -587,19 +598,20 @@ maya/rooms/studio/state {"state":{"light":true,...}}
 
 ### Configurazione firmware Arduino
 
-Nel file `maya_controller.ino`, configura queste costanti (righe ~60):
+Le credenziali WiFi vanno in un file `secrets.h` separato (gitignored) nella stessa cartella dello sketch:
 
 ```cpp
-// Credenziali WiFi
-const char* SSID        = "TuoSSID";          // ← CONFIGURA IL TUO SSID
-const char* WIFI_PASS   = "TuaPassword";      // ← CONFIGURA LA PASSWORD
+// arduino/maya_controller/secrets.h  ← NON committare questo file
+#define WIFI_CASA_SSID "TuoSSID"
+#define WIFI_CASA_PASS "TuaPassword"
+```
 
-// MQTT Broker
-const char* MQTT_BROKER = "localhost";        // o "192.168.1.100" se remoto
-const int   MQTT_PORT   = 1883;
+Il broker e la stanza si configurano nel `.env`:
 
-// Stanza di default (topic: maya/rooms/studio/...)
-const char* MQTT_ROOM   = "studio";
+```env
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+MQTT_DEFAULT_ROOM=studio
 ```
 
 Dopo la configurazione:
@@ -783,12 +795,23 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **News broadcaster jitter** — sleep randomizzato all'avvio per evitare CPU spike
 - [x] **Instance Guard Linux fix** — SO_REUSEPORT=0 per compatibilità cross-platform
 
+- [x] **Google Calendar sync** — OAuth2, token locale, calendario selezionabile via `GOOGLE_CALENDAR_ID`
+- [x] **Dashboard calendario HUD** — griglia mensile + lista prossimi eventi, aggiornamento real-time
+- [x] **Electron desktop wrapper** — icona MAYA nella taskbar, F12 alwaysOnTop, Escape reset layout
+- [x] **`_send_sync` Arduino** — risposta reale da hardware (threading.Event, non sleep fisso)
+- [x] **`broadcast_state` throttle** — check modelli Ollama ogni 30s con cache
+- [x] **`mqtt_tool` non-blocking** — `wait_for_publish` in `asyncio.to_thread`
+- [x] **News streams paralleli** — `Promise.all` invece di await sequenziale (4s vs 16s)
+- [x] **Firmware `.ino` deduplicato** — rimosso blocco legacy serial-only
+- [x] **WiFi secrets** — credenziali in `secrets.h` separato (gitignored)
+- [x] **Struttura root pulita** — `instance_guard.py` in `core/`, `credentials.json` in `data/`
+
 ### 🔲 In corso / Prossimi
 
-- [ ] Verifica MVP in classe, 1° MILESTONE (15/05/2026)
+- [ ] Multi-room Arduino con più schede R4 WiFi
 - [ ] Streaming LLM token-by-token via WebSocket
-- [ ] Multi-room Arduino con broker MQTT
-- [ ] Google Calendar sync (OAuth2)
+- [ ] **Self-healing** — rilevamento e recovery automatico da errori hardware/rete (riconnessione Arduino, restart tool falliti, notifica su dashboard)
+- [ ] **Proattività avanzata** — suggerimenti contestuali basati su ora, meteo, calendario e abitudini rilevate (es. "Hai una riunione tra 30 min, accendo la scrivania?")
 
 ### 🔮 Futuro
 
