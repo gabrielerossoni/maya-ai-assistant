@@ -30,10 +30,11 @@
 #include <DHT.h>
 #include <WiFiS3.h>
 #include <PubSubClient.h>
+#include "secrets.h"
 
 // ── WiFi Credentials ──────────────────────────
-const char* SSID        = "";    // Configura il tuo SSID
-const char* WIFI_PASS   = "";    // Configura la password
+const char* SSID        = WIFI_CASA_SSID;    // Configura il tuo SSID
+const char* WIFI_PASS   = WIFI_CASA_PASS;    // Configura la password
 const char* MQTT_BROKER = "localhost";  // Broker locale (default)
 const int   MQTT_PORT   = 1883;
 const char* MQTT_ROOM   = "studio";     // Stanza di default

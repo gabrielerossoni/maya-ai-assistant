@@ -18,6 +18,12 @@ GOOGLE_TOKEN_FILE = "data/token.json"
 GOOGLE_CREDENTIALS_FILE = "credentials.json"
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+# Imposta qui l'ID del calendario da usare.
+# 'primary' = calendario principale dell'account.
+# Per trovare altri ID esegui: python -c "from tools.calendar_tool import CalendarTool; c=CalendarTool(); c.initialize(); c.list_google_calendars()"
+def _get_calendar_id():
+    return os.environ.get("GOOGLE_CALENDAR_ID", "primary")
+
 class CalendarTool:
     """Tool calendario unificato (Locale + Google)."""
 
@@ -109,7 +115,7 @@ class CalendarTool:
                     'start': {'dateTime': dt.isoformat(), 'timeZone': 'Europe/Rome'},
                     'end': {'dateTime': (dt + timedelta(hours=1)).isoformat(), 'timeZone': 'Europe/Rome'},
                 }
-                self.google_service.events().insert(calendarId='primary', body=event_body).execute()
+                self.google_service.events().insert(calendarId=_get_calendar_id(), body=event_body).execute()
                 google_msg = " (Sincronizzato con Google)"
             except Exception as e:
                 google_msg = f" (Errore Google: {e})"
@@ -143,18 +149,20 @@ class CalendarTool:
         # 1. Recupera da Google
         if self.google_service:
             try:
+                cal_id = _get_calendar_id()
+                print(f"[CALENDAR] Fetching calendarId='{cal_id}'")
                 events_result = self.google_service.events().list(
-                    calendarId='primary', timeMin=now_iso,
-                    maxResults=10, singleEvents=True,
+                    calendarId=cal_id, timeMin=now_iso,
+                    maxResults=50, singleEvents=True,
                     orderBy='startTime'
                 ).execute()
+                print(f"[CALENDAR] Ricevuti {len(events_result.get('items', []))} eventi")
                 g_events = events_result.get('items', [])
                 for ge in g_events:
                     start = ge['start'].get('dateTime', ge['start'].get('date'))
-                    # Normalizza formato per il parser locale
                     dt_g = datetime.fromisoformat(start.replace('Z', '+00:00'))
                     all_events.append({
-                        "title": f"[G] {ge.get('summary', 'Senza titolo')}",
+                        "title": ge.get('summary', 'Senza titolo'),
                         "time": dt_g.strftime("%Y-%m-%d %H:%M"),
                         "source": "google"
                     })
@@ -220,6 +228,15 @@ class CalendarTool:
             "message": f"Prossimo evento: '{e['title']}' il {dt.strftime('%d/%m alle %H:%M')}",
             "event": e
         }
+
+    def list_google_calendars(self):
+        """Stampa tutti i calendari disponibili con i loro ID."""
+        if not self.google_service:
+            print("[CALENDAR] Google Calendar non disponibile.")
+            return
+        result = self.google_service.calendarList().list().execute()
+        for cal in result.get('items', []):
+            print(f"  {cal['summary']:40s}  ID: {cal['id']}")
 
     # ── Helpers ───────────────────────────────
 

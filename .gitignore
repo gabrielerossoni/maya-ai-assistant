@@ -176,3 +176,10 @@ scratch/
 *.db
 *.sqlite3
 static/.prettierrc
+
+# Google OAuth
+credentials.json
+data/token.json
+
+# Arduino secrets
+arduino/*/secrets.h
