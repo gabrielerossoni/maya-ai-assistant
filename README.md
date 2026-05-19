@@ -359,12 +359,44 @@ ollama pull mistral-small
 ollama pull nomic-embed-text   # per memoria semantica
 ```
 
-### 4. Firmware Arduino *(opzionale)*
+### 4. Firmware Arduino — Classico o MQTT?
 
-1. Aprire `arduino/maya_controller/maya_controller.ino` con Arduino IDE
-2. Installare librerie: **ArduinoJson 6.x**, **DHT sensor library** (Adafruit), **Servo** (built-in)
-3. Caricare su Arduino Uno/Nano
-4. Impostare `ARDUINO_PORT=AUTO` nel `.env` (auto-discovery via USB)
+**Versione Classica (Seriale):**
+- Un solo Arduino su cavo USB
+- Comunicazione 115200 baud JSON
+- ✅ Semplice, niente dipendenze esterne
+- ❌ Distanza limitata, una sola stanza
+
+**Versione MQTT (WiFi) — CONSIGLIATA:**
+- Arduino R4 WiFi con WiFi integrato
+- Comunicazione via MQTT Broker
+- ✅ Multi-room, scalabile, wireless
+- ⚠️ Richiede WiFi e Mosquitto locale
+- **Consigliato per casa intelligente**, fallback a seriale sempre disponibile
+
+**Come scegliere?**
+
+```
+Ho un Arduino Uno classico?        → Usa versione Seriale (original)
+Ho un Arduino Uno R4 WiFi?         → Usa versione MQTT (nuovo firmware)
+Voglio entrambi disponibili?       → Usa MQTT, Seriale rimane fallback
+```
+
+Il firmware MQTT mantiene il path seriale attivo — se WiFi/MQTT fallisce, continua a funzionare via USB!
+
+### 4b. Aggiornamento da Seriale a MQTT
+
+Se hai già caricato il firmware classico:
+
+1. Apri `arduino/maya_controller/maya_controller.ino` (versione attuale nel repo)
+2. Sostituisci con il **nuovo firmware che include MQTT**
+3. Configura le 4 costanti WiFi/MQTT (vedi sezione sopra)
+4. Carica di nuovo il sketch
+5. **Seriale rimane disponibile** — zero perdita di funzionalità
+
+Niente codice Python da modificare — MAYA rileva automaticamente se Arduino risponde via MQTT o Seriale.
+
+
 
 ### 5. Avvio
 
@@ -410,7 +442,244 @@ Il frontend si connette a `ws://127.0.0.1:8000/ws`.
 
 ---
 
-## Aggiungere un Tool
+## MQTT — Controllo Multi-Room (Novo)
+
+A partire dalla versione 2.0, MAYA supporta il **controllo multi-stanza via MQTT** per scalare l'architettura oltre un singolo Arduino.
+
+### Cos'è MQTT? (Spiegazione semplice)
+
+**MQTT** = *Message Queuing Telemetry Transport* — è come una **centralina postale intelligente**:
+
+```
+Arduino Studio (pubblica):  "Ho acceso la luce" → BROKER (Mosquitto)
+                                                        ↓
+Dashboard (legge):  "Mi interessa le notizie dalla stanza studio" ← riceve in real-time
+```
+
+**Perché MQTT anziché Seriale?**
+
+| Seriale USB | MQTT |
+|---|---|
+| 1 Arduino ↔ 1 PC (cavo) | N Arduino ↔ 1 Broker (WiFi) |
+| Distanza: < 5 m | Distanza: illimitata (locale o cloud) |
+| Sinceramente: ogni casa | **Casa intelligente: più stanze** |
+
+### Schema di funzionamento
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Arduino R4 WiFi                       │
+│  Studio: luce accesa → pubblica su topic               │
+│  "maya/rooms/studio/state"                             │
+│                                                         │
+│  {"state": {"light": true, "relay": false, ...}}       │
+└────────────────────┬────────────────────────────────────┘
+                     │ WiFi
+                     ↓
+        ┌────────────────────────┐
+        │  Broker MQTT           │
+        │  (Mosquitto localhost) │
+        │  localhost:1883        │
+        └────────────┬───────────┘
+                     │
+      ┌──────────────┴──────────────┐
+      ↓                              ↓
+PC (MAYA Core)              WebSocket → Dashboard
+riceve state, applica          (client browser)
+comandi → ripubblica           mostra UI aggiornata
+```
+
+### Topic Schema
+
+Tutte le comunicazioni MQTT seguono questo pattern:
+
+```
+maya/rooms/<room>/<message_type>
+```
+
+| Topic | Direzione | Payload | Frequenza | Esempio |
+|---|---|---|---|---|
+| `maya/rooms/studio/cmd` | Arduino ← PC | `{"cmd":"SET","target":"light","value":1}` | On-demand | Comando da dashboard |
+| `maya/rooms/studio/state` | Arduino → PC | `{"state":{"light":true,"relay":false,...}}` | After cmd | Dopo esecuzione comando |
+| `maya/rooms/studio/telemetry` | Arduino → PC | `{"telemetry":{"temp":22.4,"humidity":58.1}}` | Ogni 5s | Sensori DHT11 periodici |
+
+**Spiegazione:**
+- **cmd**: comandi *in ingresso* → Arduino esegue
+- **state**: stato *in uscita* → cosa ha fatto Arduino
+- **telemetry**: misure *in uscita* → sensori DHT11
+
+### Workflow: "Accendi la luce da dashboard"
+
+```
+1. User click "Toggle LED" on dashboard
+                    ↓
+2. WebSocket → PC (MAYA):  { "tool": "mqtt", "op": "SET", "target": "light", "value": 1 }
+                    ↓
+3. MAYA mqtt_tool.execute():
+   Pubblica su MQTT:  "maya/rooms/studio/cmd"
+   Payload:          {"cmd":"SET","target":"light","value":1}
+                    ↓
+4. Arduino riceve su topic "maya/rooms/studio/cmd":
+   Parsing JSON → esegue → digitalWrite(LED_PIN, HIGH)
+                    ↓
+5. Arduino pubblica risposta su:  "maya/rooms/studio/state"
+   Payload:  {"state":{"light":true,"relay":false,...}}
+                    ↓
+6. MQTT Broker → PC riceve su topic con `on_message` callback
+   mqtt_tool._on_message() → estrae stato
+                    ↓
+7. Broadcast via WebSocket al client browser:
+   { "type": "arduino_state", "room": "studio", "led": "on", ... }
+                    ↓
+8. Dashboard UI aggiorna il LED indicator in tempo reale ✅
+```
+
+### Setup: Installazione Mosquitto (Broker MQTT)
+
+#### Windows
+
+1. Scarica installer da [mosquitto.org](https://mosquitto.org/download/#windows)
+2. Esegui installer → installa come **Windows Service**
+3. Verifica: apri PowerShell:
+   ```powershell
+   Get-Service mosquitto
+   # Dovresti vedere: Status=Running
+   ```
+4. Default: `localhost:1883`
+
+#### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt install mosquitto mosquitto-clients
+sudo systemctl enable mosquitto
+sudo systemctl start mosquitto
+```
+
+#### macOS
+
+```bash
+brew install mosquitto
+brew services start mosquitto
+```
+
+### Test della connessione MQTT
+
+#### Terminal 1: Monitor tutti i topic
+
+```bash
+mosquitto_sub -h localhost -t "maya/rooms/#" -v
+```
+
+Dovresti vedere messaggi in tempo reale mentre Arduino invia comandi.
+
+#### Terminal 2: Simula un comando manualmente
+
+```bash
+mosquitto_pub -h localhost \
+  -t "maya/rooms/studio/cmd" \
+  -m '{"cmd":"SET","target":"light","value":1}'
+```
+
+Arduino dovrebbe ricevere e rispondere con:
+```
+maya/rooms/studio/state {"state":{"light":true,...}}
+```
+
+### Configurazione firmware Arduino
+
+Nel file `maya_controller.ino`, configura queste costanti (righe ~60):
+
+```cpp
+// Credenziali WiFi
+const char* SSID        = "TuoSSID";          // ← CONFIGURA IL TUO SSID
+const char* WIFI_PASS   = "TuaPassword";      // ← CONFIGURA LA PASSWORD
+
+// MQTT Broker
+const char* MQTT_BROKER = "localhost";        // o "192.168.1.100" se remoto
+const int   MQTT_PORT   = 1883;
+
+// Stanza di default (topic: maya/rooms/studio/...)
+const char* MQTT_ROOM   = "studio";
+```
+
+Dopo la configurazione:
+1. Salva il file
+2. Carica sketch su Arduino via Arduino IDE
+3. Apri Serial Monitor (115200 baud) → dovresti vedere:
+   ```
+   [WiFi] Connessione a MioSSID
+   [WiFi] Connesso! IP: 192.168.1.X
+   [MQTT] Connesso a localhost:1883
+   [MQTT] Sottoscritto a: maya/rooms/studio/cmd
+   ```
+
+### Variabili d'Ambiente MQTT
+
+Nel `.env`:
+
+```env
+# MQTT Broker (default: localhost per setup locale)
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+MQTT_DEFAULT_ROOM=studio    # Stanza di default se non specificata
+
+# Archivio dati locale (fallback se MQTT down)
+ARCHIVE_INTERVAL=600        # Salva stato ogni 10 min
+```
+
+### Python: mqtt_tool.py
+
+La classe `MqttTool` gestisce:
+
+1. **Inizializzazione**: connessione al broker e registrazione callback
+2. **Ricezione**: callback `_on_message()` riceve state/telemetry
+3. **Broadcast**: trasforma messaggi MQTT in WebSocket per dashboard
+4. **Comando**: `execute()` pubblica su `maya/rooms/<room>/cmd`
+
+Flusso asincrono thread-safe:
+
+```python
+def _on_message(self, client, userdata, msg):
+    # Eseguito in thread MQTT (non l'event loop principale)
+    payload = json.loads(msg.payload)
+    
+    # Invia al loop asincrono in modo thread-safe:
+    asyncio.run_coroutine_threadsafe(
+        self._ws_manager.broadcast(payload),  # Broadcast a tutti i client WS
+        self._loop
+    )
+```
+
+Questo evita deadlock tra il thread MQTT e il loop FastAPI.
+
+### Multi-room: Aggiungere una seconda Arduino
+
+1. Crea una copia del firmware con stanza diversa:
+   ```cpp
+   const char* MQTT_ROOM = "cucina";  // Anziché "studio"
+   ```
+2. Carica su secondo Arduino R4 WiFi
+3. Dashboard riceve automaticamente da entrambe:
+   - `maya/rooms/studio/state` → card Studio
+   - `maya/rooms/cucina/state` → card Cucina
+4. Comandi vanno a stanza giusta: `maya/rooms/<room>/cmd`
+
+### Fallback se MQTT broker è down
+
+Se Mosquitto non è avviato:
+
+1. Arduino continua a ricevere via **Seriale** (fallback sempre attivo)
+2. Python mqtt_tool ritorna errore ma sistema non crasha
+3. Dashboard mostra "MQTT: Disconnected" ma funziona in modalità locale
+
+### Limitazioni e Notes
+
+- **QoS 1** su comandi (garantito almeno una volta)
+- **QoS 0** su telemetria (best effort, non critico)
+- **Retain**: disabilitato per stato (aggiornamenti costanti)
+- **Broker**: localhost (LAN). Per remoto/cloud usare certificate TLS (out-of-scope MVP)
+
+---
 
 1. Creare `tools/my_tool.py` con classe `MyTool` che implementa `initialize()` e `execute()`
 2. Registrarlo in `core/tool_manager.py`:
@@ -505,6 +774,14 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] Broadcast stato Arduino da comandi vocali — dashboard aggiorna i card in tempo reale
 - [x] Coroutine broadcast thread-safe — `call_soon_threadsafe` + `create_task` per zero RuntimeWarning
 - [x] Log cleanup — output console ridotto, errori Ollama soppressi dopo primo fallimento
+- [x] **MQTT multi-room support** — Arduino R4 WiFi + PubSubClient + broker Mosquitto
+- [x] **mqtt_tool bidirectional** — riceve state/telemetry, broadcast via WebSocket
+- [x] **Voice model upgrade** — `tiny` → `small` per accuratezza italiano
+- [x] **Font dashboard fix** — opacity +, font-weight + per visibilità LCD consumer
+- [x] **Agent init fix** — `_last_final_data` inicializzato per evitare AttributeError
+- [x] **Weather broadcaster location** — usa `DEFAULT_WEATHER_LOCATION` da .env
+- [x] **News broadcaster jitter** — sleep randomizzato all'avvio per evitare CPU spike
+- [x] **Instance Guard Linux fix** — SO_REUSEPORT=0 per compatibilità cross-platform
 
 ### 🔲 In corso / Prossimi
 
@@ -519,6 +796,131 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [ ] Plugin system hot-reload senza restart
 - [ ] Notifiche push su cambio stato casa
 - [ ] Memoria preferenze utente persistente
+
+---
+
+## Troubleshooting
+
+### Errori Comuni e Soluzioni
+
+#### Arduino non viene trovato (Seriale)
+
+```
+[ARDUINO] Porta non trovata → simulazione
+```
+
+**Cause:**
+- Arduino non connesso USB
+- Porta COM errata in `.env`
+
+**Fix:**
+```env
+ARDUINO_PORT=COM3          # Specifica porta manualmente
+# oppure
+ARDUINO_PORT=AUTO          # Auto-detection (default)
+```
+
+Controlla Device Manager (Windows) o `ls /dev/ttyACM*` (Linux).
+
+#### MQTT: Connection refused
+
+```
+[MQTT] Broker non raggiungibile
+```
+
+**Cause:**
+- Mosquitto non avviato
+- IP/porta sbagliati
+
+**Fix:**
+```bash
+# Controlla se Mosquitto è in ascolto:
+netstat -ano | findstr :1883      # Windows
+lsof -i :1883                     # macOS/Linux
+
+# Riavvia Mosquitto:
+net stop mosquitto && net start mosquitto    # Windows
+sudo systemctl restart mosquitto              # Linux
+```
+
+#### Voice STT non riconosce
+
+```
+[VOICE] Whisper timeout
+```
+
+**Cause:**
+- Modello non scaricato
+- Microfono non funziona
+
+**Fix:**
+```bash
+# Testa il microfono con PyAudio:
+python -c "import pyaudio; p=pyaudio.PyAudio(); print([p.get_device_info_by_index(i)['name'] for i in range(p.get_device_count())])"
+
+# Scarica modello Whisper:
+python -c "from faster_whisper import WhisperModel; WhisperModel('small')"
+```
+
+Assicurati che `MAYA_WHISPER_MODEL=small` nel `.env`.
+
+#### Dashboard non aggiorna stato Arduino
+
+```
+Lo stato dei dispositivi non cambia quando accendi/spegni via Arduino
+```
+
+**Cause:**
+- Arduino non invia telemetria
+- WebSocket non connesso
+- MQTT broker non attivo
+
+**Fix:**
+1. Controlla che Arduino invia su seriale o MQTT:
+   ```bash
+   # Via seriale:
+   python -c "import serial; s=serial.Serial('COM3', 115200); print(s.readline())"
+   
+   # Via MQTT:
+   mosquitto_sub -h localhost -t "maya/rooms/#" -v
+   ```
+2. Verifica WebSocket connessione nel browser:
+   ```javascript
+   // Apri DevTools → Console
+   WebSocket { url: "ws://127.0.0.1:8000/ws", ... }
+   ```
+
+#### Ollama non disponibile all'avvio
+
+```
+[LLM] Ollama non raggiungibile
+```
+
+**Fix:**
+```bash
+# Assicurati che Ollama è avviato:
+ollama serve
+
+# Oppure disabilitalo temporaneamente:
+# .env: OLLAMA_ENABLED=false
+# Usa fallback Groq o parser keyword
+```
+
+#### CPU spike all'avvio
+
+```
+MAYA consuma 100% CPU per 10 secondi dopo lo start
+```
+
+**Causa:**
+- Broadcaster non ha jitter iniziale
+
+**Fix:**
+Verificare che tutti i broadcaster (news, weather, stats) hanno `await asyncio.sleep()` iniziale.
+Controllare che `MAYA_CALIB_CHUNKS` non sia troppo alto:
+```env
+MAYA_CALIB_CHUNKS=36    # default, va bene
+```
 
 ---
 

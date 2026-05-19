@@ -43,6 +43,8 @@
         --bg-base: #0a0a0c;
         --bg-surface: rgba(255, 255, 255, 0.03);
         --border-color: rgba(255, 255, 255, 0.08);
+        --text-main: #ffffff;
+        --text-dim: rgba(255, 255, 255, 0.65);
         
         /* Glass Morphism Layers */
         --glass-blur-1: blur(16px);
@@ -56,7 +58,7 @@
         --font-size-h3: 20px;
         --font-size-base: 14px;
         --font-size-small: 11px;
-        --font-size-micro: 8px;
+        --font-size-micro: 9px;
 
         /* Nested Radii System */
         --radius-outer: 32px;
@@ -283,10 +285,10 @@
       }
 
       /* Typography Scale Helpers */
-      .text-hero { font-size: var(--font-size-hero); font-weight: 900; line-height: 1.1; }
-      .text-title { font-size: var(--font-size-title); font-weight: 800; }
-      .text-h3 { font-size: var(--font-size-h3); font-weight: 700; }
-      .text-micro { font-size: var(--font-size-micro); font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+      .text-hero { font-size: var(--font-size-hero); font-weight: 900; line-height: 1.1; color: var(--text-main); }
+      .text-title { font-size: var(--font-size-title); font-weight: 700; color: var(--text-main); }
+      .text-h3 { font-size: var(--font-size-h3); font-weight: 600; color: var(--text-main); }
+      .text-micro { font-size: var(--font-size-micro); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); opacity: 0.75; }
     </style>
   </head>
   <body class="text-white font-sans p-6">

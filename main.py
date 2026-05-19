@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import threading
 import webbrowser
+import random
 import ollama
 from core.agent_core import AgentCore, MODELS
 from core.plugin_loader import PluginLoader
@@ -260,7 +261,8 @@ async def weather_broadcaster():
             weather_tool = agent.tool_manager.tools.get("weather")
             if weather_tool:
                 # Wrap blocking requests call in a thread
-                result = await asyncio.to_thread(weather_tool.execute, {})
+                location = os.getenv("DEFAULT_WEATHER_LOCATION", "Roma")
+                result = await asyncio.to_thread(weather_tool.execute, {"location": location})
                 if result.get("status") == "ok":
                     user_log(f"Meteo aggiornato per {result['data']['location']}.")
                     await manager.broadcast(
@@ -279,6 +281,9 @@ async def news_broadcaster():
     # Aspetta che almeno un client sia connesso prima di caricare le notizie all'avvio
     while not manager.active_connections:
         await asyncio.sleep(1)
+    
+    # Jitter iniziale per non caricare tutto all'avvio (evita spike CPU/memoria)
+    await asyncio.sleep(random.uniform(3, 8))
 
     while True:
         try:
@@ -333,6 +338,11 @@ async def lifespan(app: FastAPI):
 
     proactive_manager = ProactiveManager(agent.tool_manager, manager)
     asyncio.create_task(proactive_manager.start_loop())
+
+    # Inietta WebSocketManager nel mqtt_tool per broadcast bidirezionale
+    mqtt_tool = agent.tool_manager.tools.get("mqtt")
+    if mqtt_tool and hasattr(mqtt_tool, "set_ws_manager"):
+        mqtt_tool.set_ws_manager(manager, agent.loop)
 
     print("[SYSTEM] Online.")
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
@@ -652,7 +662,7 @@ async def stats_broadcaster():
             await manager.broadcast(stats)
         except:
             pass
-        await asyncio.sleep(0.33)
+        await asyncio.sleep(1.0)
 
 
 async def sensor_broadcaster():
