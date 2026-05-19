@@ -10,22 +10,23 @@ const HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
 const DASHBOARD_URL = `http://127.0.0.1:${PORT}`;
 
 function startPython() {
-    console.log('Avvio Python process...');
     pythonProcess = spawn('python', ['main.py'], {
         cwd: path.join(__dirname, '..'),
         env: { ...process.env, MAYA_SKIP_BROWSER_OPEN: '1' }
     });
 
     pythonProcess.stdout.on('data', (data) => {
-        console.log(`[Python]: ${data}`);
+        process.stdout.write(data);
     });
 
     pythonProcess.stderr.on('data', (data) => {
-        console.error(`[Python Error]: ${data}`);
+        process.stderr.write(data);
     });
 
     pythonProcess.on('close', (code) => {
-        console.log(`Python process uscito con codice ${code}`);
+        if (code !== 0 && code !== null) {
+            console.log(`\n[SYSTEM] Processo terminato con codice ${code}`);
+        }
     });
 }
 

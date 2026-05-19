@@ -362,6 +362,8 @@ async def lifespan(app: FastAPI):
 
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
     def _open_browser():
+        if os.environ.get("MAYA_SKIP_BROWSER_OPEN") == "1":
+            return
         time.sleep(1.5)
         # Cache-buster per forzare il ricaricamento della dashboard
         webbrowser.open(f"http://127.0.0.1:{http_port}/?v={int(time.time())}")

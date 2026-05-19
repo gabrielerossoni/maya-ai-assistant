@@ -1085,7 +1085,7 @@
         .cal-upcoming {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 24px;
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: rgba(255,30,30,0.3) transparent;
@@ -1104,21 +1104,43 @@
             margin-bottom: 4px;
         }
         .cal-event-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
             background: rgba(255,255,255,0.03);
             border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 10px;
-            padding: 14px 16px;
-            transition: border-color 0.2s;
+            border-radius: 12px;
+            padding: 16px 20px;
+            transition: all 0.2s;
             flex-shrink: 0;
         }
         .cal-event-item:hover { border-color: rgba(255,30,30,0.3); }
         .cal-event-item.today { border-color: rgba(255,30,30,0.45); background: rgba(255,30,30,0.05); }
         .cal-event-date {
             font-family: 'Syncopate', sans-serif;
-            font-size: 7.5px;
-            letter-spacing: 2px;
+            font-size: 10.5px;
+            letter-spacing: 1px;
             color: var(--accent);
-            margin-bottom: 4px;
+            text-align: right;
+            flex-shrink: 0;
+            line-height: 1.4;
+        }
+        .cal-event-info {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .cal-date-sub {
+            font-size: 8px;
+            opacity: 0.5;
+            margin-bottom: 2px;
+        }
+        .cal-time-main {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
         }
         .cal-event-title {
             font-size: 13px;
@@ -2820,9 +2842,14 @@
                 const timeLabel = isNaN(dt) ? e.time : dt.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
                 const title = e.title || '';
                 return `<div class="cal-event-item${isToday ? ' today' : ''}">
-                    <div class="cal-event-date">${dateLabel} &nbsp;·&nbsp; ${timeLabel}</div>
-                    <div class="cal-event-title">${title}</div>
-                    <div class="cal-event-source">${e.source === 'google' ? 'GOOGLE' : 'MAYA'}</div>
+                    <div class="cal-event-info">
+                        <div class="cal-event-title">${title}</div>
+                        <div class="cal-event-source">${e.source === 'google' ? 'GOOGLE' : 'MAYA'}</div>
+                    </div>
+                    <div class="cal-event-date">
+                        <div class="cal-date-sub">${dateLabel}</div>
+                        <div class="cal-time-main">${timeLabel}</div>
+                    </div>
                 </div>`;
             }).join('');
         }
