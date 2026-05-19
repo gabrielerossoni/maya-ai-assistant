@@ -84,6 +84,14 @@ function createWindow() {
 
     mainWindow.loadURL(DASHBOARD_URL);
 
+    // Gestione link esterni nel browser predefinito
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith('http')) {
+            require('electron').shell.openExternal(url);
+        }
+        return { action: 'deny' };
+    });
+
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
