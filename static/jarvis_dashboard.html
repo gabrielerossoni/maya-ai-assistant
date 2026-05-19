@@ -2,9 +2,20 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>MAYA | Neural Interface</title>
     <link rel="icon" type="image/png" href="/static/maya_logo_no_sfondo.png">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MAYA">
+    <link rel="apple-touch-icon" href="/static/maya_logo.png">
+    <!-- Theme color (Android Chrome) -->
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- Prevent phone number detection -->
+    <meta name="format-detection" content="telephone=no">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1903,6 +1914,36 @@
             background: rgba(255, 255, 255, 0.06);
             margin: 2px 0;
         }
+        /* Mobile panel header — nascosto su desktop */
+        #mobile-panel-header {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 72px;
+            align-items: center;
+            padding: 0 14px 0 76px;
+            background: rgba(0,0,0,0.88);
+            border-bottom: 1px solid rgba(255,30,30,0.12);
+            backdrop-filter: blur(20px);
+            z-index: 50;
+            flex-shrink: 0;
+            gap: 10px;
+        }
+        #mobile-panel-header .mph-label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 3px;
+            color: var(--accent);
+            opacity: 0.8;
+        }
+        #mobile-panel-header .mph-title {
+            font-size: 16px;
+            font-weight: 200;
+            letter-spacing: -0.3px;
+            color: #fff;
+        }
         /* Keep debug-controls hidden — only shows on reset_storage event */
         #debug-controls {
             display: none !important;
@@ -1940,6 +1981,431 @@
         .casa-dot.on-red {
             background: #f44336;
             box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
+        }
+
+        /* =============================================
+           MOBILE — breakpoint ≤ 768px
+           Layout completamente ripensato per mobile:
+           - Idle: orb centrato, clock sotto, niente logo
+           - Work: header fisso top + panel scrollabile + bottom nav
+           ============================================= */
+        @media (max-width: 768px) {
+
+            /* ══════════════════════════════════════════
+               IDLE SCREEN
+               ══════════════════════════════════════════ */
+
+            /* Nasconde il logo — spazio prezioso su mobile */
+            #top-logo { display: none !important; }
+
+            /* Orb centrato più piccolo */
+            #maya-orb-container {
+                width: 220px;
+                height: 220px;
+                top: 38%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+            #orb-branding {
+                top: 38%;
+                font-size: 10px;
+                letter-spacing: 7px;
+            }
+
+            /* Clock spostato più in basso, sopra la bottom nav */
+            #idle-clock {
+                top: auto;
+                bottom: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            #idle-clock .time {
+                font-size: 42px;
+                letter-spacing: -1px;
+            }
+            #idle-clock .date {
+                font-size: 7px;
+                letter-spacing: 0.25em;
+                margin-top: 8px;
+            }
+
+            /* Input centrato sopra la bottom nav, visibile anche in idle */
+            #cmd-container {
+                bottom: 70px;
+                width: 88%;
+                left: 50%;
+                transform: translateX(-50%);
+                opacity: 1;
+                pointer-events: auto;
+            }
+            #cmd-input {
+                font-size: 15px;
+                padding: 15px 24px;
+                text-align: center;
+            }
+
+            /* ══════════════════════════════════════════
+               WORK MODE — orb angolo + header mobile
+               ══════════════════════════════════════════ */
+
+            /* Orb in angolo top-left */
+            #maya-orb-container.corner {
+                top: 10px;
+                left: 10px;
+                transform: none;
+                width: 52px;
+                height: 52px;
+            }
+            body.content-open #orb-branding {
+                top: 72px;
+                left: 0;
+                width: 72px;
+                font-size: 6px;
+                letter-spacing: 2px;
+                text-indent: 2px;
+                opacity: 0.35;
+            }
+
+            /* Content area: parte da top=0, occupa tutto il viewport
+               lasciando spazio in fondo alla bottom nav + cmd */
+            #content-area {
+                top: 0;
+                right: -100vw;
+            }
+            #content-area.open {
+                right: 0;
+                /* top: header mobile (72px) + piccolo gap */
+                padding: 72px 0 0 0;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* Header mobile fisso: striscia sottile con titolo panel */
+            #mobile-panel-header {
+                display: flex !important;
+            }
+
+            /* ══════════════════════════════════════════
+               BOTTOM NAV BAR (nav-rail)
+               ══════════════════════════════════════════ */
+            #nav-rail {
+                right: auto;
+                top: auto;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 58px;
+                flex-direction: row;
+                justify-content: space-evenly;
+                align-items: center;
+                transform: none;
+                gap: 0;
+                padding: 0 4px;
+                background: rgba(0, 0, 0, 0.96);
+                border-top: 1px solid rgba(255, 30, 30, 0.18);
+                backdrop-filter: blur(24px);
+                z-index: 600;
+            }
+            body.work-mode #nav-rail {
+                bottom: 0;
+                transform: none;
+            }
+            .nav-item {
+                width: 48px;
+                height: 48px;
+                border-radius: 12px;
+                background: transparent;
+                border: none;
+            }
+            .nav-item.active {
+                background: rgba(255, 30, 30, 0.1);
+                border: 1px solid rgba(255, 30, 30, 0.35);
+            }
+            body.work-mode .nav-item {
+                width: 48px;
+                height: 48px;
+                opacity: 1;
+            }
+            .nav-item svg,
+            body.work-mode .nav-item svg {
+                width: 20px;
+                height: 20px;
+            }
+            .nav-item .nav-tooltip { display: none; }
+            .nav-item:hover { transform: none; }
+            .nav-sep { display: none; }
+
+            /* ══════════════════════════════════════════
+               CMD INPUT — sopra la bottom nav in work mode
+               ══════════════════════════════════════════ */
+            #cmd-container.corner {
+                top: auto;
+                bottom: 66px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 88%;
+                justify-content: center;
+            }
+            #cmd-container.corner #cmd-input {
+                text-align: center;
+                padding: 13px 20px;
+                font-size: 14px;
+                border-radius: 50px;
+                opacity: 1 !important;
+                border: 1px solid rgba(255,255,255,0.1) !important;
+                background: rgba(0,0,0,0.85) !important;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+                backdrop-filter: blur(20px);
+            }
+            body.content-open #cmd-container {
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            /* Log strip sopra la bottom nav */
+            #log-strip {
+                bottom: 58px;
+                font-size: 9px;
+                padding: 4px 14px;
+                background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            }
+
+            /* ══════════════════════════════════════════
+               PANEL AREA — scorrevole tra header e bottom nav
+               ══════════════════════════════════════════ */
+
+            /* Tutti i panel occupano lo spazio restante con scroll interno */
+            .panel.active {
+                flex: 1;
+                min-height: 0;
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch;
+                display: flex;
+                flex-direction: column;
+                gap: 0;
+                /* spazio per cmd input + bottom nav */
+                padding-bottom: 128px;
+            }
+
+            /* ══════════════════════════════════════════
+               METEO
+               ══════════════════════════════════════════ */
+            #panel-weather,
+            #panel-weather.active {
+                height: auto;
+                flex-direction: column;
+                overflow: visible;
+            }
+            .wx-left { flex: none; }
+            .wx-topbar {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                grid-template-rows: auto auto;
+                gap: 0;
+                padding: 16px 16px 12px;
+                align-items: start;
+            }
+            /* City + condition a sinistra */
+            .wx-topbar > div:first-child { grid-column: 1; grid-row: 1; }
+            /* Temp al centro-destra */
+            .wx-temp-block { grid-column: 2; grid-row: 1; align-self: center; }
+            /* Wind + feels su riga intera */
+            .wx-wind {
+                grid-column: 1 / -1;
+                grid-row: 2;
+                display: flex;
+                gap: 24px;
+                border-left: none;
+                border-top: 1px solid rgba(255,255,255,0.06);
+                padding: 12px 0 0 0;
+                margin-top: 12px;
+            }
+            .wx-feels { margin-left: auto; text-align: right; }
+            .wx-city { font-size: 24px; }
+            .wx-temp { font-size: 56px; letter-spacing: -4px; }
+            .wx-wind-val { font-size: 24px; }
+            /* Mappa radar compatta */
+            .wx-radar { height: 200px; flex: none; }
+            /* Forecast a colonna intera */
+            .wx-forecast {
+                width: 100%;
+                border-left: none;
+                border-top: 1px solid rgba(255,255,255,0.06);
+                flex-shrink: 0;
+            }
+
+            /* ══════════════════════════════════════════
+               NEWS
+               ══════════════════════════════════════════ */
+            #panel-news,
+            #panel-news.active {
+                height: auto;
+                flex-direction: column;
+                overflow: visible;
+            }
+            .news-live-grid { display: none; }
+            .news-main-area {
+                grid-template-columns: 1fr;
+                padding: 0;
+                overflow: visible;
+            }
+            .news-sidebar {
+                border: none;
+                height: auto;
+                overflow: visible;
+            }
+            .news-sidebar-list {
+                overflow: visible;
+                height: auto;
+            }
+            .ns-item {
+                padding: 12px 14px;
+            }
+            .ns-title { font-size: 13px !important; }
+
+            /* ══════════════════════════════════════════
+               DOMOTICA
+               ══════════════════════════════════════════ */
+            #panel-dashboard,
+            #panel-dashboard.active {
+                height: auto;
+                overflow: visible;
+            }
+            .dom-header {
+                padding: 12px 14px;
+                gap: 10px;
+            }
+            .dom-header-title { font-size: 17px !important; }
+            /* Nasconde le status pill — prendono troppo spazio */
+            .dom-header-right { display: none; }
+            .dom-scene-strip { padding: 8px 12px; gap: 6px; }
+            .dom-scene-chip { padding: 6px 12px; font-size: 11px !important; }
+            /* Layout contenuto: dispositivi + sidebar in colonna */
+            .dom-content {
+                display: flex;
+                flex-direction: column;
+                overflow: visible;
+            }
+            .dom-devices-area { padding: 12px 12px 0; }
+            /* Grid 2 colonne per i device */
+            .dom-cards-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .dom-card { min-height: 90px; padding: 14px 12px 10px; gap: 10px; }
+            .dom-card-name { font-size: 12px !important; }
+            /* RGB span full width */
+            .dom-card[style*="span 2"] { grid-column: span 2; }
+            /* Sidebar sensori sotto i dispositivi, orizzontale */
+            .dom-sidebar-new {
+                border-left: none;
+                border-top: 1px solid rgba(255,255,255,0.05);
+                padding: 14px 12px;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0 16px;
+                overflow: visible;
+            }
+            .dom-sb-section { margin-bottom: 0; }
+            .dom-sb-label { font-size: 6px !important; margin-bottom: 10px; }
+            .dom-metric-val { font-size: 18px !important; }
+
+            /* ══════════════════════════════════════════
+               CALENDARIO
+               ══════════════════════════════════════════ */
+            #panel-calendar,
+            #panel-calendar.active {
+                height: auto;
+                overflow: visible;
+            }
+            .cal-layout {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 12px 12px 0;
+                height: auto;
+                overflow: visible;
+            }
+            /* Prima il calendario mensile, poi la lista eventi */
+            .cal-month { order: -1; height: auto; overflow: visible; }
+            .cal-upcoming { max-height: none; overflow: visible; }
+            .cal-event-item { padding: 12px 14px; }
+            .cal-event-title { font-size: 12px; }
+
+            /* ══════════════════════════════════════════
+               TRADING
+               ══════════════════════════════════════════ */
+            #panel-trading,
+            #panel-trading.active {
+                height: auto;
+                overflow: visible;
+            }
+            .trading-body {
+                grid-template-columns: 1fr;
+                gap: 0;
+                padding: 0;
+                overflow: visible;
+            }
+            /* Grafico in cima */
+            .trading-right-col { order: -1; gap: 0; }
+            .trading-chart-area {
+                height: 220px;
+                min-height: 220px;
+                border-left: none;
+                border-right: none;
+                border-top: none;
+            }
+            .trading-info-bottom {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0;
+                padding: 12px 16px;
+                border-left: none;
+                border-right: none;
+            }
+            /* News asset list sotto */
+            .trading-news-feed { border: none; border-top: 1px solid rgba(255,255,255,0.05); }
+            .trading-news-header { padding: 10px 14px; }
+            .trading-news-item { padding: 10px 12px; }
+            .trading-news-item .tn-title { font-size: 12px; }
+
+            /* ══════════════════════════════════════════
+               SPOTIFY
+               ══════════════════════════════════════════ */
+            #spotify-widget {
+                top: auto;
+                bottom: 140px;
+                left: 12px;
+                right: 12px;
+                width: auto;
+            }
+        }
+
+        /* ── iOS Safe Area (notch / Dynamic Island) ── */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            @media (max-width: 768px) {
+                #nav-rail {
+                    height: calc(58px + env(safe-area-inset-bottom));
+                    padding-bottom: env(safe-area-inset-bottom);
+                }
+                #log-strip {
+                    bottom: calc(58px + env(safe-area-inset-bottom));
+                }
+                #cmd-container,
+                #cmd-container.corner {
+                    bottom: calc(66px + env(safe-area-inset-bottom));
+                }
+                .panel.active {
+                    padding-bottom: calc(128px + env(safe-area-inset-bottom));
+                }
+            }
+        }
+
+        /* ── Extra small ≤ 400px ── */
+        @media (max-width: 400px) {
+            #idle-clock .time { font-size: 34px; }
+            .wx-temp { font-size: 46px; }
+            .dom-cards-grid { grid-template-columns: 1fr 1fr; }
+            .dom-sidebar-new { grid-template-columns: 1fr; }
+            #cmd-input { font-size: 13px; padding: 13px 16px; }
         }
     </style>
 </head>
@@ -1989,6 +2455,13 @@
         <!-- SCREEN 2: Work — sfondo-maya.png, content panels -->
         <div id="screen-work">
             <div id="content-area">
+                <!-- Header fisso mobile: orb + titolo panel corrente -->
+                <div id="mobile-panel-header">
+                    <div>
+                        <div class="mph-label" id="mph-label">MAYA</div>
+                        <div class="mph-title" id="mph-title">—</div>
+                    </div>
+                </div>
                 <div style="height:0"></div>
                 <!-- WEATHER PANEL -->
                 <div id="panel-weather" class="panel">
@@ -2384,10 +2857,28 @@
             document.body.classList.add('work-mode');
             clearInactivityTimer();
         }
+        const PANEL_TITLES = {
+            weather:   { label: 'ATMOSPHERIC_FEED', title: 'Meteo' },
+            news:      { label: 'NEURAL_FEED',      title: 'News' },
+            dashboard: { label: 'DOMOTICA // LIVE', title: 'Casa M.A.Y.A.' },
+            calendar:  { label: 'CALENDARIO',       title: 'Agenda' },
+            trading:   { label: 'MARKET_FEED',      title: 'Trading' },
+            map:       { label: 'GEO_LOCATOR',      title: 'Mappa' },
+            browser:   { label: 'NEURAL_BROWSER',   title: 'Browser' },
+        };
+
         function setActiveNav(layout) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             const target = document.getElementById(`nav-${layout}`);
             if (target) target.classList.add('active');
+            // Aggiorna header mobile
+            const info = PANEL_TITLES[layout];
+            if (info) {
+                const lbl = document.getElementById('mph-label');
+                const ttl = document.getElementById('mph-title');
+                if (lbl) lbl.textContent = info.label;
+                if (ttl) ttl.textContent = info.title;
+            }
         }
         function exitWorkMode() {
             if (!isWorkMode) return;
@@ -3205,6 +3696,17 @@
                 const data = await res.json();
                 if (data[0]) { map.setView([data[0].lat, data[0].lon], 13); L.marker([data[0].lat, data[0].lon]).addTo(map); }
             } catch (e) { console.error("Map error:", e); }
+        }
+
+        // =============================================
+        // PWA — Service Worker Registration
+        // =============================================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(reg => console.log('[MAYA] SW registered, scope:', reg.scope))
+                    .catch(err => console.warn('[MAYA] SW registration failed:', err));
+            });
         }
     </script>
 </body>

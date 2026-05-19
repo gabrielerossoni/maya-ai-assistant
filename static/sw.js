@@ -1,13 +1,18 @@
-const CACHE_NAME = 'maya-cache-v2';
+const CACHE_NAME = 'maya-cache-v3';
+
+// Asset statici da precachare all'installazione
 const STATIC_ASSETS = [
   '/static/maya_logo.png',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/lucide@latest',
-  'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js',
-  'https://cdn.jsdelivr.net/npm/chart.js'
+  '/static/maya_logo_no_sfondo.png',
+  '/static/manifest.json',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap'
 ];
 
-const NETWORK_FIRST_URLS = [
+// Pagine principali: network-first (sempre aggiornate se online)
+const NETWORK_FIRST_PATHS = [
   '/',
   '/static/jarvis_dashboard.html'
 ];
@@ -15,39 +20,53 @@ const NETWORK_FIRST_URLS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME)
-          .map(name => caches.delete(name))
-      );
-    })
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  
-  if (NETWORK_FIRST_URLS.includes(url.pathname)) {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // Non intercettare WebSocket, POST, o richieste cross-origin non statiche
+  if (req.method !== 'GET') return;
+  if (url.protocol === 'ws:' || url.protocol === 'wss:') return;
+  // Esclude le API dinamiche del backend
+  if (url.pathname.startsWith('/ws') || url.pathname.startsWith('/api')) return;
+
+  if (NETWORK_FIRST_PATHS.includes(url.pathname)) {
+    // Network-first: usa cache solo se offline
     event.respondWith(
-      fetch(event.request)
+      fetch(req)
         .then(response => {
-          const resClone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(req))
     );
   } else {
+    // Cache-first: serve da cache, aggiorna in background
     event.respondWith(
-      caches.match(event.request)
-        .then(response => response || fetch(event.request))
+      caches.match(req).then(cached => {
+        const networkFetch = fetch(req).then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+          }
+          return response;
+        }).catch(() => cached);
+        return cached || networkFetch;
+      })
     );
   }
 });

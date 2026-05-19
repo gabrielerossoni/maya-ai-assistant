@@ -433,6 +433,16 @@ async def get_dashboard():
     return FileResponse("static/jarvis_dashboard.html")
 
 
+@app.get("/sw.js")
+async def get_service_worker():
+    return FileResponse("static/sw.js", media_type="application/javascript")
+
+
+@app.get("/manifest.json")
+async def get_manifest():
+    return FileResponse("static/manifest.json", media_type="application/manifest+json")
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
