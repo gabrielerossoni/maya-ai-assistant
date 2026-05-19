@@ -47,6 +47,18 @@ class CalendarChecker(BaseChecker):
                     return f"📅 Promemoria: L'evento '{event['title']}' inizia tra poco ({event['time']})."
         return None
 
+class CalendarSyncChecker(BaseChecker):
+    def __init__(self, calendar_tool):
+        super().__init__("Calendar Sync")
+        self.calendar_tool = calendar_tool
+
+    async def check(self):
+        # Tenta la sincronizzazione in background
+        synced = self.calendar_tool.sync_local_to_google()
+        if synced > 0:
+            return f"Sincronizzati {synced} eventi locali su Google Calendar."
+        return None
+
 class ProactiveManager:
     def __init__(self, tool_manager, websocket_manager=None, interval=60):
         self.tool_manager = tool_manager
@@ -63,6 +75,7 @@ class ProactiveManager:
         calendar_tool = self.tool_manager.tools.get("calendar")
         if calendar_tool:
             self.checkers.append(CalendarChecker(calendar_tool))
+            self.checkers.append(CalendarSyncChecker(calendar_tool))
 
     async def start_loop(self):
         print("[PROACTIVE] Loop avviato.")

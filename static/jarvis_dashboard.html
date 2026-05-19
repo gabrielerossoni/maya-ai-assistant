@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MAYA | Neural Interface</title>
     <link rel="icon" type="image/png" href="/static/maya_logo_no_sfondo.png">
     <!-- PWA Manifest -->
@@ -212,21 +212,26 @@
             font-family: 'Sora', sans-serif;
             overflow: hidden;
             height: 100vh;
+            height: 100dvh;
             width: 100vw;
             margin: 0;
+            overscroll-behavior: none;
         }
         #screen-slider {
             width: 100vw;
             height: 200vh;
+            height: 200dvh;
             transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
             will-change: transform;
         }
         body.work-mode #screen-slider {
             transform: translateY(-100vh);
+            transform: translateY(-100dvh);
         }
         #screen-idle {
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             position: relative;
             background: #000000;
         }
@@ -240,6 +245,7 @@
         #screen-work {
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             position: relative;
             background-color: #0a0406;
         }
@@ -1450,6 +1456,23 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
+        #nav-rail {
+            position: fixed;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: rgba(10, 10, 12, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 20px 12px;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 1000;
+            transition: var(--transition);
+        }
         .trading-right-col {
             display: flex;
             flex-direction: column;
@@ -2050,14 +2073,14 @@
 
             /* Orb in angolo top-left */
             #maya-orb-container.corner {
-                top: 10px;
-                left: 10px;
+                top: calc(10px + env(safe-area-inset-top));
+                left: 15px;
                 transform: none;
                 width: 52px;
                 height: 52px;
             }
             body.content-open #orb-branding {
-                top: 72px;
+                top: calc(72px + env(safe-area-inset-top));
                 left: 0;
                 width: 72px;
                 font-size: 6px;
@@ -2074,8 +2097,8 @@
             }
             #content-area.open {
                 right: 0;
-                /* top: header mobile (72px) + piccolo gap */
-                padding: 72px 0 0 0;
+                /* top: header mobile + safe area */
+                padding: calc(72px + env(safe-area-inset-top)) 0 0 0;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -2095,7 +2118,7 @@
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 58px;
+                height: 50px;
                 flex-direction: row;
                 justify-content: space-evenly;
                 align-items: center;
@@ -2129,8 +2152,9 @@
             }
             .nav-item svg,
             body.work-mode .nav-item svg {
-                width: 20px;
-                height: 20px;
+                width: 22px;
+                height: 22px;
+                opacity: 0.7;
             }
             .nav-item .nav-tooltip { display: none; }
             .nav-item:hover { transform: none; }
@@ -2141,11 +2165,12 @@
                ══════════════════════════════════════════ */
             #cmd-container.corner {
                 top: auto;
-                bottom: 66px;
+                bottom: calc(56px + env(safe-area-inset-bottom));
                 left: 50%;
                 transform: translateX(-50%);
-                width: 88%;
+                width: 92%;
                 justify-content: center;
+                z-index: 1001;
             }
             #cmd-container.corner #cmd-input {
                 text-align: center;
@@ -2165,7 +2190,7 @@
 
             /* Log strip sopra la bottom nav */
             #log-strip {
-                bottom: 58px;
+                bottom: 50px;
                 font-size: 9px;
                 padding: 4px 14px;
                 background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
@@ -2383,18 +2408,18 @@
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
             @media (max-width: 768px) {
                 #nav-rail {
-                    height: calc(58px + env(safe-area-inset-bottom));
+                    height: calc(50px + env(safe-area-inset-bottom));
                     padding-bottom: env(safe-area-inset-bottom);
                 }
                 #log-strip {
-                    bottom: calc(58px + env(safe-area-inset-bottom));
+                    bottom: calc(50px + env(safe-area-inset-bottom));
                 }
                 #cmd-container,
                 #cmd-container.corner {
-                    bottom: calc(66px + env(safe-area-inset-bottom));
+                    bottom: calc(56px + env(safe-area-inset-bottom));
                 }
                 .panel.active {
-                    padding-bottom: calc(128px + env(safe-area-inset-bottom));
+                    padding-bottom: calc(90px + env(safe-area-inset-bottom));
                 }
             }
         }
@@ -2447,7 +2472,7 @@
         <!-- SCREEN 1: Idle — sfondo nero, orb centrato, clock -->
         <div id="screen-idle">
             <canvas id="bg-canvas"></canvas>
-            <div id="idle-clock">
+            <div id="idle-clock" style="padding-top: env(safe-area-inset-top); margin-top: 20px;">
                 <div class="time" id="clock-time">00:00</div>
                 <div class="date" id="clock-date">LUNEDÌ, 1 GENNAIO</div>
             </div>
@@ -2457,7 +2482,7 @@
             <div id="content-area">
                 <!-- Header fisso mobile: orb + titolo panel corrente -->
                 <div id="mobile-panel-header">
-                    <div>
+                    <div style="padding-top: env(safe-area-inset-top);">
                         <div class="mph-label" id="mph-label">MAYA</div>
                         <div class="mph-title" id="mph-title">—</div>
                     </div>

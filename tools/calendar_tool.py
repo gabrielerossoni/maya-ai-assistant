@@ -105,8 +105,23 @@ class CalendarTool:
         if dt is None:
             return {"status": "error", "message": f"Formato data non valido: '{time_str}'"}
 
-        # 1. Aggiungi a Google se disponibile
+        # 1. Salvataggio locale preventivo (Sicurezza)
+        events = self._load()
+        temp_id = len(events) + 1
+        event = {
+            "id":      temp_id,
+            "title":   title,
+            "time":    dt.strftime("%Y-%m-%d %H:%M"),
+            "notes":   notes,
+            "created": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        }
+        events.append(event)
+        self._save(events)
+        
+        google_success = False
         google_msg = ""
+
+        # 2. Tentativo Google
         if self.google_service:
             try:
                 event_body = {
@@ -116,24 +131,20 @@ class CalendarTool:
                     'end': {'dateTime': (dt + timedelta(hours=1)).isoformat(), 'timeZone': 'Europe/Rome'},
                 }
                 self.google_service.events().insert(calendarId=_get_calendar_id(), body=event_body).execute()
+                google_success = True
                 google_msg = " (Sincronizzato con Google)"
             except Exception as e:
-                google_msg = f" (Errore Google: {e})"
+                google_msg = f" (Errore Google, salvato solo in locale: {e})"
 
-        # 2. Aggiungi locale
-        events = self._load()
-        event = {
-            "id":      len(events) + 1,
-            "title":   title,
-            "time":    dt.strftime("%Y-%m-%d %H:%M"),
-            "notes":   notes,
-            "created": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        }
-        events.append(event)
-        events.sort(key=lambda e: e["time"])
-        self._save(events)
+        # 3. Se Google ha avuto successo, rimuovi dal locale
+        if google_success:
+            events = self._load()
+            # Rimuove l'evento appena aggiunto filtrando per titolo e tempo
+            events = [e for e in events if not (e["title"] == title and e["time"] == event["time"])]
+            self._save(events)
+            event["id"] = "google"
 
-        print(f"[CALENDAR] Evento aggiunto: '{title}' il {dt.strftime('%d/%m/%Y alle %H:%M')}{google_msg}")
+        print(f"[CALENDAR] {google_msg if google_success else '[LOCALE]'} Evento: '{title}' il {dt.strftime('%d/%m/%Y alle %H:%M')}")
         return {
             "status": "ok",
             "message": f"Evento '{title}' aggiunto per il {dt.strftime('%d/%m/%Y alle %H:%M')}{google_msg}",
@@ -226,6 +237,41 @@ class CalendarTool:
             "message": f"Prossimo evento: '{e['title']}' il {dt.strftime('%d/%m alle %H:%M')}",
             "event": e
         }
+
+    def sync_local_to_google(self) -> int:
+        """Prova a sincronizzare gli eventi locali su Google Calendar. Ritorna il numero di eventi sincronizzati."""
+        if not self.google_service:
+            return 0
+
+        local_events = self._load()
+        if not local_events:
+            return 0
+
+        synced_count = 0
+        remaining_events = []
+
+        for e in local_events:
+            try:
+                dt = self._parse_time(e["time"])
+                if dt is None: continue
+
+                event_body = {
+                    'summary': e["title"],
+                    'description': e.get("notes", ""),
+                    'start': {'dateTime': dt.isoformat(), 'timeZone': 'Europe/Rome'},
+                    'end': {'dateTime': (dt + timedelta(hours=1)).isoformat(), 'timeZone': 'Europe/Rome'},
+                }
+                self.google_service.events().insert(calendarId=_get_calendar_id(), body=event_body).execute()
+                synced_count += 1
+                print(f"[CALENDAR] Sincronizzato evento locale: '{e['title']}'")
+            except Exception as ex:
+                print(f"[CALENDAR] Errore sync evento '{e['title']}': {ex}")
+                remaining_events.append(e)
+
+        if synced_count > 0:
+            self._save(remaining_events)
+        
+        return synced_count
 
     def list_google_calendars(self):
         """Stampa tutti i calendari disponibili con i loro ID."""
