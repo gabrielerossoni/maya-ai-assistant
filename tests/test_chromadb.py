@@ -8,9 +8,11 @@ import os
 # Aggiungi la root del progetto al path per importare i moduli
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from memory_manager import MemoryManager
+import pytest
+from core.memory_manager import MemoryManager
 
 
+@pytest.mark.asyncio
 async def test():
     """Test ChromaDB initialization, add_turn, and semantic retrieval."""
     try:

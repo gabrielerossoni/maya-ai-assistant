@@ -8,8 +8,8 @@ from pathlib import Path
 # Aggiungi la root del progetto al path per gli import
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tool_manager import ToolManager
-from plugin_loader import PluginLoader
+from core.tool_manager import ToolManager
+from core.plugin_loader import PluginLoader
 
 class MockTool:
     def initialize(self):

@@ -5,8 +5,10 @@ import asyncio
 # Aggiungi la root del progetto al path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
 from core.agent_core import AgentCore
 
+@pytest.mark.asyncio
 async def test_routing():
     agent = AgentCore()
     await agent.initialize()
