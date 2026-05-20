@@ -23,20 +23,44 @@ class WeatherTool:
     }
 
     def execute(self, action: dict) -> dict:
-        location = action.get("location") or os.getenv("DEFAULT_WEATHER_LOCATION")
-        if not location:
-            return {"status": "error", "message": "Località non specificata. Fornire 'location' o impostare 'DEFAULT_WEATHER_LOCATION'."}
-        # Primo step: Geocoding
-        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=it&format=json"
-        try:
-            geo_res = requests.get(geo_url).json()
-            if "results" not in geo_res or len(geo_res["results"]) == 0:
-                return {"status": "error", "message": f"Località '{location}' non trovata."}
-            
-            res0 = geo_res["results"][0]
-            lat, lon, name = res0["latitude"], res0["longitude"], res0["name"]
+        lat = action.get("lat")
+        lon = action.get("lon")
+        name = None
 
-            # Secondo step: Meteo + Previsioni
+        if lat is not None and lon is not None:
+            # Fallback name if Nominatim fails
+            name = f"Lat {round(lat, 2)}, Lon {round(lon, 2)}"
+            try:
+                headers = {"User-Agent": "MAYA-AI-Assistant/1.0"}
+                geo_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=10"
+                geo_res = requests.get(geo_url, headers=headers, timeout=3).json()
+                address = geo_res.get("address", {})
+                city = address.get("city") or address.get("town") or address.get("village") or address.get("municipality") or address.get("county") or address.get("state")
+                if city:
+                    name = city
+                elif "display_name" in geo_res:
+                    parts = geo_res["display_name"].split(",")
+                    name = ", ".join(parts[:2]).strip()
+            except Exception:
+                pass
+        else:
+            location = action.get("location") or os.getenv("DEFAULT_WEATHER_LOCATION")
+            if not location:
+                return {"status": "error", "message": "Località non specificata. Fornire 'location' o impostare 'DEFAULT_WEATHER_LOCATION'."}
+            # Primo step: Geocoding
+            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=it&format=json"
+            try:
+                geo_res = requests.get(geo_url).json()
+                if "results" not in geo_res or len(geo_res["results"]) == 0:
+                    return {"status": "error", "message": f"Località '{location}' non trovata."}
+                
+                res0 = geo_res["results"][0]
+                lat, lon, name = res0["latitude"], res0["longitude"], res0["name"]
+            except Exception as e:
+                return {"status": "error", "message": f"Errore geocoding: {str(e)}"}
+
+        # Secondo step: Meteo + Previsioni
+        try:
             weather_url = (
                 f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                 "&current_weather=true"

@@ -711,6 +711,24 @@
         .news-sidebar-list {
             flex: 1;
             overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 42, 42, 0.25) rgba(0, 0, 0, 0.3);
+        }
+        .news-sidebar-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        .news-sidebar-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.02);
+        }
+        .news-sidebar-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 42, 42, 0.25);
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        .news-sidebar-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 42, 42, 0.55);
+            box-shadow: 0 0 8px rgba(255, 42, 42, 0.5);
         }
         .ns-item {
             padding: 14px 18px;
@@ -3144,6 +3162,44 @@
             }
         }
         // =============================================
+        // GEOLOCATION
+        // =============================================
+        function requestGeolocation() {
+            const isElectron = /electron/i.test(navigator.userAgent);
+            if (isElectron) {
+                console.log("[Geolocation] Ambiente Electron rilevato. Salto la geolocalizzazione ed utilizzerò il fallback del file .env.");
+                return;
+            }
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        console.log(`[Geolocation] Posizione browser acquisita: lat=${lat}, lon=${lon}`);
+                        sendCoords(lat, lon);
+                    },
+                    (error) => {
+                        console.warn("[Geolocation] Acquisizione browser fallita o negata. Verrà utilizzato il fallback del file .env.", error);
+                    },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 600000 }
+                );
+            } else {
+                console.warn("[Geolocation] API del browser non supportata. Verrà utilizzato il fallback del file .env.");
+            }
+        }
+
+        function sendCoords(lat, lon) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'geolocation',
+                    lat: lat,
+                    lon: lon
+                }));
+            }
+        }
+
+        // =============================================
         // WEBSOCKET
         // =============================================
         function initWS() {
@@ -3202,7 +3258,11 @@
                 if (d.type === 'spotify') updateSpotify(d);
                 if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
             };
-            ws.onopen = () => { document.getElementById('log-strip').innerText = "MAYA Neural Link Established."; initAudio(); };
+            ws.onopen = () => { 
+                document.getElementById('log-strip').innerText = "MAYA Neural Link Established."; 
+                initAudio(); 
+                requestGeolocation();
+            };
             ws.onclose = () => setTimeout(initWS, 3000);
         }
         // =============================================
@@ -3495,6 +3555,7 @@
             'cloud-drizzle': '🌦️', 'cloud-rain': '🌧️', 'cloud-snow': '🌨️', 'cloud-lightning': '⛈️'
         };
         let weatherMiniMap;
+        let weatherMarker;
         let lastWeatherLatLon = null;
         let rainViewerLoaded = false;
         function initWeatherMap(lat, lon) {
@@ -3505,13 +3566,21 @@
                     scrollWheelZoom: true, doubleClickZoom: false
                 }).setView([lat, lon], 6);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(weatherMiniMap);
-                L.circleMarker([lat, lon], {
+                weatherMarker = L.circleMarker([lat, lon], {
                     radius: 5, color: 'rgba(255,30,30,0.9)',
                     fillColor: 'rgba(255,30,30,0.9)', fillOpacity: 1, weight: 2
                 }).addTo(weatherMiniMap);
                 if (!rainViewerLoaded) { rainViewerLoaded = true; loadRainViewer(weatherMiniMap); }
             } else {
                 weatherMiniMap.setView([lat, lon], 6);
+                if (weatherMarker) {
+                    weatherMarker.setLatLng([lat, lon]);
+                } else {
+                    weatherMarker = L.circleMarker([lat, lon], {
+                        radius: 5, color: 'rgba(255,30,30,0.9)',
+                        fillColor: 'rgba(255,30,30,0.9)', fillOpacity: 1, weight: 2
+                    }).addTo(weatherMiniMap);
+                }
                 weatherMiniMap.invalidateSize();
             }
         }

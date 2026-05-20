@@ -26,6 +26,8 @@ from core.websocket_manager import manager
 # Variabili globali per i task in background
 _bg_tasks = []
 _log_filter_applied = False
+client_lat = None
+client_lon = None
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "127.0.0.1")
 OLLAMA_PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
@@ -254,6 +256,29 @@ def start_ngrok(port: int) -> str | None:
         return None
 
 
+async def broadcast_weather_update(lat=None, lon=None):
+    """Esegue l'aggiornamento meteo immediato per le coordinate o la località di fallback e lo trasmette."""
+    try:
+        weather_tool = agent.tool_manager.tools.get("weather")
+        if weather_tool:
+            if lat is not None and lon is not None:
+                action = {"lat": lat, "lon": lon}
+            else:
+                location = os.getenv("DEFAULT_WEATHER_LOCATION", "Roma")
+                action = {"location": location}
+            result = await asyncio.to_thread(weather_tool.execute, action)
+            if result.get("status") == "ok":
+                user_log(f"Meteo aggiornato per {result['data']['location']}.")
+                await manager.broadcast(
+                    {"type": "weather", "data": result.get("data")}
+                )
+            else:
+                await manager.broadcast({"type": "weather", "error": True})
+    except Exception as e:
+        print(f"[WebSocket] Errore meteo immediato: {e}")
+        await manager.broadcast({"type": "weather", "error": True})
+
+
 async def weather_broadcaster():
     """Trasmette il meteo alla dashboard ogni 30 minuti."""
     while True:
@@ -262,7 +287,12 @@ async def weather_broadcaster():
             if weather_tool:
                 # Wrap blocking requests call in a thread
                 location = os.getenv("DEFAULT_WEATHER_LOCATION", "Roma")
-                result = await asyncio.to_thread(weather_tool.execute, {"location": location})
+                action = {"location": location}
+                if os.environ.get("MAYA_SKIP_BROWSER_OPEN") != "1":
+                    global client_lat, client_lon
+                    if client_lat is not None and client_lon is not None:
+                        action = {"lat": client_lat, "lon": client_lon}
+                result = await asyncio.to_thread(weather_tool.execute, action)
                 if result.get("status") == "ok":
                     user_log(f"Meteo aggiornato per {result['data']['location']}.")
                     await manager.broadcast(
@@ -291,7 +321,7 @@ async def news_broadcaster():
             news_tool = agent.tool_manager.tools.get("news")
             if news_tool:
                 # Wrap blocking feedparser call in a thread
-                result = await asyncio.to_thread(news_tool.execute, {"limit": 5})
+                result = await asyncio.to_thread(news_tool.execute, {"limit": 10})
                 if result.get("status") == "ok":
                     user_log("Ultime notizie caricate.")
                     await manager.broadcast(
@@ -453,7 +483,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    global _log_filter_applied
+    global _log_filter_applied, client_lat, client_lon
     try:
         await manager.connect(websocket)
 
@@ -467,6 +497,9 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(voice_manager.voice_status_message())
         except Exception:
             pass
+        
+        # Invio immediato del meteo corrente (utilizzando le coordinate memorizzate o il fallback)
+        asyncio.create_task(broadcast_weather_update(client_lat, client_lon))
 
         while True:
             try:
@@ -477,6 +510,15 @@ async def websocket_endpoint(websocket: WebSocket):
                         # Invia la richiesta dell'utente alla dashboard tramite print (che passa dal filtro)
                         print(f"Richiesta: {cmd}")
                         asyncio.create_task(execute_and_broadcast(cmd))
+                elif data.get("type") == "geolocation":
+                    if os.environ.get("MAYA_SKIP_BROWSER_OPEN") != "1":
+                        lat = data.get("lat")
+                        lon = data.get("lon")
+                        if lat is not None and lon is not None:
+                            client_lat = lat
+                            client_lon = lon
+                            print(f"[WebSocket] Geolocalizzazione ricevuta: lat={lat}, lon={lon}")
+                            asyncio.create_task(broadcast_weather_update(lat, lon))
                 elif data.get("type") == "tool":
                     # Esecuzione diretta tool, bypassa LLM
                     action = data.get("action", {})
