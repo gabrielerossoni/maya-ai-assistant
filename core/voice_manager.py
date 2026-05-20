@@ -462,7 +462,7 @@ class VoiceManager:
                         if article.strip():
                             clean_text = article.strip().lstrip('-').lstrip('*').strip()
                             self.speak(clean_text)
-                            time.sleep(1.5)
+                            await asyncio.sleep(1.5)
                 else:
                     self.speak(full_reply)
             else:

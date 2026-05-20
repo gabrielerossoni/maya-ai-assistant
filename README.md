@@ -768,57 +768,59 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 
 ### ✅ Completati
 
-- [x] Architettura agentica ReAct con routing ibrido
-- [x] Voce bidirezionale (Whisper STT locale + Piper TTS)
-- [x] Memoria semantica (ChromaDB + embedding Ollama)
-- [x] Monitoraggio proattivo (CPU/RAM/calendario)
-- [x] Dashboard HUD bimodale con orb 3D e slider animato
-- [x] Panoramica trading live (CoinGecko + yfinance)
-- [x] Meteo HUD con mappa Leaflet e previsioni
-- [x] Notizie HUD con articolo in evidenza + ticker
-- [x] Firmware Arduino JSON 115200 baud (LED, relay, servo, RGB, buzzer, DHT11)
-- [x] Protocollo telemetria automatica da DHT11 ogni 5 s
-- [x] Pannello "STATO CASA // LIVE" con stato real-time di tutti i dispositivi
-- [x] 18 scene configurate con controllo RGB e buzzer (7 ambiente + 11 giornaliere)
-- [x] `sensor_broadcaster` — aggiornamento temperatura/umidità ogni 30 s
-- [x] `SPOTIFY_ENABLED` flag — Spotify disattivabile via `.env`
-- [x] `OLLAMA_ENABLED` flag — Ollama disabilitabile; sistema usa Groq o parser keyword
-- [x] Broadcast stato Arduino da comandi vocali — dashboard aggiorna i card in tempo reale
-- [x] Coroutine broadcast thread-safe — `call_soon_threadsafe` + `create_task` per zero RuntimeWarning
-- [x] Log cleanup — output console ridotto, errori Ollama soppressi dopo primo fallimento
-- [x] **MQTT multi-room support** — Arduino R4 WiFi + PubSubClient + broker Mosquitto
-- [x] **mqtt_tool bidirectional** — riceve state/telemetry, broadcast via WebSocket
-- [x] **Voice model upgrade** — `tiny` → `small` per accuratezza italiano
-- [x] **Font dashboard fix** — opacity +, font-weight + per visibilità LCD consumer
-- [x] **Agent init fix** — `_last_final_data` inicializzato per evitare AttributeError
-- [x] **Weather broadcaster location** — usa `DEFAULT_WEATHER_LOCATION` da .env
-- [x] **News broadcaster jitter** — sleep randomizzato all'avvio per evitare CPU spike
-- [x] **Instance Guard Linux fix** — SO_REUSEPORT=0 per compatibilità cross-platform
+- [x] **Architettura agentica ReAct con routing ibrido** — agenti e pianificazione locale basati su modelli LLM offline.
+- [x] **Voce bidirezionale (Whisper STT locale + Piper TTS)** — trascrizione e sintesi vocale ad altissima velocità.
+- [x] **Memoria semantica (ChromaDB + embedding Ollama)** — conservazione e richiamo intelligente dei turni passati.
+- [x] **Monitoraggio proattivo (CPU/RAM/calendario)** — agenti attivi che segnalano promemoria o eventi di sistema.
+- [x] **Dashboard HUD bimodale con orb 3D e slider animato** — interfaccia grafica responsive e animata per l'utente.
+- [x] **Panoramica trading live (CoinGecko + yfinance)** — tracciamento real-time di stock e crypto preferite.
+- [x] **Meteo HUD con mappa Leaflet e previsioni** — widget meteo interattivo e geolocalizzato.
+- [x] **Notizie HUD con articolo in evidenza + ticker** — feed aggregator con riepilogo vocale intelligente.
+- [x] **Firmware Arduino JSON 115200 baud** — controllo completo di LED, relay, servo, RGB, buzzer, DHT11.
+- [x] **Protocollo telemetria automatica da DHT11** — invio automatico dei dati sensore ogni 5 s.
+- [x] **Pannello "STATO CASA // LIVE"** — visualizzazione istantanea del funzionamento di ogni dispositivo.
+- [x] **18 scene configurate con controllo RGB e buzzer** — scenari domotici pronti all'uso per ogni momento della giornata.
+- [x] **`sensor_broadcaster`** — aggiornamento automatico temperatura/umidità ogni 30 s.
+- [x] **`SPOTIFY_ENABLED` flag** — abilitazione e disattivazione dinamica del controllo Spotify.
+- [x] **`OLLAMA_ENABLED` flag** — fallback sicuro su Groq o Keyword parser se Ollama locale è offline.
+- [x] **Broadcast stato Arduino da comandi vocali** — aggiornamento asincrono dello stato della casa.
+- [x] **Coroutine broadcast thread-safe** — impiego di `call_soon_threadsafe` + `create_task` per evitare RuntimeWarning.
+- [x] **Log cleanup** — eliminazione del rumore in console e log puliti per l'HUD.
+- [x] **MQTT multi-room support** — supporto nativo per Arduino R4 WiFi + PubSubClient + broker Mosquitto.
+- [x] **mqtt_tool bidirectional** — ricezione di state/telemetry e inoltro diretto via WebSocket.
+- [x] **Voice model upgrade** — utilizzo del modello Whisper `small` per un'accuratezza vocale italiana eccellente.
+- [x] **Font dashboard fix** — miglioramento del contrasto e del peso dei caratteri per display LCD consumer.
+- [x] **Agent init fix** — inizializzazione preventiva di `_last_final_data` per evitare AttributeError di runtime.
+- [x] **Weather broadcaster location** — localizzazione basata sulla variabile `DEFAULT_WEATHER_LOCATION` in `.env`.
+- [x] **News broadcaster jitter** — tempo di caricamento iniziale asimmetrico per evitare spike di CPU e memoria.
+- [x] **Instance Guard Linux fix** — integrazione di SO_REUSEPORT=0 per una stabilità cross-platform totale.
 
-- [x] **Google Calendar sync** — OAuth2, token locale, calendario selezionabile via `GOOGLE_CALENDAR_ID`
-- [x] **Dashboard calendario HUD** — griglia mensile + lista prossimi eventi, aggiornamento real-time
-- [x] **Electron desktop wrapper** — icona MAYA nella taskbar, F12 alwaysOnTop, Escape reset layout
-- [x] **`_send_sync` Arduino** — risposta reale da hardware (threading.Event, non sleep fisso)
-- [x] **`broadcast_state` throttle** — check modelli Ollama ogni 30s con cache
-- [x] **`mqtt_tool` non-blocking** — `wait_for_publish` in `asyncio.to_thread`
-- [x] **News streams paralleli** — `Promise.all` invece di await sequenziale (4s vs 16s)
-- [x] **Firmware `.ino` deduplicato** — rimosso blocco legacy serial-only
-- [x] **WiFi secrets** — credenziali in `secrets.h` separato (gitignored)
-- [x] **Struttura root pulita** — `instance_guard.py` in `core/`, `credentials.json` in `data/`
+- [x] **Google Calendar sync** — integrazione completa OAuth2 con token memorizzato e sincronizzazione bidirezionale.
+- [x] **Dashboard calendario HUD** — visualizzazione grafica mensile degli eventi e notifica dei prossimi appuntamenti.
+- [x] **Electron desktop wrapper** — pacchettizzazione nativa desktop con scorciatoie dedicate (F12, Escape) e avvio rapido.
+- [x] **`_send_sync` Arduino** — attesa della reale risposta fisica della scheda tramite eventi sincroni (zero sleep arbitrari).
+- [x] **`broadcast_state` throttle** — limitazione della frequenza dei controlli Ollama a 30s per preservare le prestazioni.
+- [x] **`mqtt_tool` non-blocking** — pubblicazione dei messaggi MQTT in thread paralleli non bloccanti.
+- [x] **News streams paralleli** — caricamento asincrono concorrente delle fonti di notizie per dimezzare la latenza.
+- [x] **Firmware `.ino` deduplicato** — rimozione del codice seriale legacy per un firmware R4 pulito ed efficiente.
+- [x] **WiFi secrets** — spostamento delle credenziali Wi-Fi sensibili in un file `secrets.h` dedicato ed escluso da git.
+- [x] **Struttura root pulita** — refactoring e riorganizzazione dei file per rispettare il design architetturale del progetto.
+- [x] **Self-Healing automatico (`self_healer.py`)** — modulo di auto-riparazione dei tool via LLM Groq (`llama-3.3-70b-versatile`) che scrive patch hot-reload in `plugins/` in caso di errori consecutivi senza fermare il sistema.
+- [x] **Proattività contestuale avanzata (`proactive_manager.py`)** — rilevamento attivo e suggerimenti intelligenti (LLM Groq `llama-3.1-8b-instant`) basati su anomalie fisiche dei sensori, promemoria, orario e memoria storica, controllati da filtri di cooldown a 10 minuti.
+- [x] **Apprendimento statistico delle preferenze utente (`preference_learner.py`)** — monitoraggio delle abitudini (frequenza scene, orari di maggiore attività, tool usati) con persistenza in `data/user_preferences.json` e iniezione automatica delle preferenze del profilo utente nel prompt di sistema di MAYA.
+- [x] **Risoluzione blocco asincrono Voice Manager (`voice_manager.py`)** — conversione della lettura vocale delle notizie da `time.sleep` sincrono e bloccante ad `await asyncio.sleep` asincrono non-bloccante, garantendo la fluidità della dashboard HUD.
 
 ### 🔲 In corso / Prossimi
 
-- [ ] Multi-room Arduino con più schede R4 WiFi
-- [ ] Streaming LLM token-by-token via WebSocket
-- [ ] **Self-healing** — rilevamento e recovery automatico da errori hardware/rete (riconnessione Arduino, restart tool falliti, notifica su dashboard)
-- [ ] **Proattività avanzata** — suggerimenti contestuali basati su ora, meteo, calendario e abitudini rilevate (es. "Hai una riunione tra 30 min, accendo la scrivania?")
+- [ ] **Multi-room multi-board MQTT** — Espansione del protocollo MQTT per gestire schede Arduino R4 WiFi multiple allocate in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
+- [ ] **Streaming token-by-token nativo** — Ottimizzazione della latenza dell'orb con il passaggio a streaming progressivo dei token dell'LLM tramite WebSocket direttamente sulla dashboard durante la generazione della risposta.
+- [ ] **Suite di test asincroni end-to-end** — Consolidamento e riscrittura dei test di integrazione per validare il comportamento dei moduli asincroni (`proactive_manager`, `self_healer`, `websocket_manager`) simulando risposte hardware e interruzioni di rete.
 
 ### 🔮 Futuro
 
-- [ ] Dashboard mobile (PWA)
-- [ ] Plugin system hot-reload senza restart
-- [ ] Notifiche push su cambio stato casa
-- [ ] Memoria preferenze utente persistente
+- [ ] **Dashboard Mobile (PWA)** — Creazione di una Progressive Web App ottimizzata per smartphone, dotata di service worker per caching offline e controllo rapido dei dispositivi via LAN locale.
+- [ ] **Plugin System avanzato** — Sviluppo di un SDK per plugin di terze parti con caricamento sandbox di moduli `.py` a runtime, con validazione automatica di sicurezza e compatibilità strutturale.
+- [ ] **Integrazione Standard Domotici (Zigbee/Home Assistant)** — Supporto per bridge hardware standard e integrazione diretta con Home Assistant via WebSocket API per estendere il controllo a dispositivi domotici commerciali (luci Philips Hue, prese smart, sensori Aqara).
 
 ---
 
