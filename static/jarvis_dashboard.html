@@ -2039,24 +2039,24 @@
             /* Nasconde il logo — spazio prezioso su mobile */
             #top-logo { display: none !important; }
 
-            /* Orb centrato più piccolo */
+            /* Orb centrato più grande */
             #maya-orb-container {
-                width: 220px;
-                height: 220px;
-                top: 38%;
+                width: 360px;
+                height: 360px;
+                top: 35%;
                 left: 50%;
                 transform: translate(-50%, -50%);
             }
             #orb-branding {
-                top: 38%;
+                top: 35%;
                 font-size: 10px;
                 letter-spacing: 7px;
             }
 
-            /* Clock spostato più in basso, sopra la bottom nav */
+            /* Clock spostato più in alto, esattamente sopra l'input */
             #idle-clock {
                 top: auto;
-                bottom: 80px;
+                bottom: calc(170px + env(safe-area-inset-bottom));
                 left: 50%;
                 transform: translateX(-50%);
             }
@@ -2070,9 +2070,9 @@
                 margin-top: 8px;
             }
 
-            /* Input centrato sopra la bottom nav, visibile anche in idle */
+            /* Input centrato sopra la bottom nav, visibile solo in idle (home) */
             #cmd-container {
-                bottom: 70px;
+                bottom: calc(110px + env(safe-area-inset-bottom));
                 width: 88%;
                 left: 50%;
                 transform: translateX(-50%);
@@ -2115,8 +2115,8 @@
             }
             #content-area.open {
                 right: 0;
-                /* top: header mobile + safe area */
-                padding: calc(72px + env(safe-area-inset-top)) 0 0 0;
+                /* top: header mobile + safe area + extra padding */
+                padding: calc(90px + env(safe-area-inset-top)) 0 0 0;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -2179,31 +2179,13 @@
             .nav-sep { display: none; }
 
             /* ══════════════════════════════════════════
-               CMD INPUT — sopra la bottom nav in work mode
+               CMD INPUT — nascosto nelle altre pagine
                ══════════════════════════════════════════ */
             #cmd-container.corner {
-                top: auto;
-                bottom: calc(56px + env(safe-area-inset-bottom));
-                left: 50%;
-                transform: translateX(-50%);
-                width: 92%;
-                justify-content: center;
-                z-index: 1001;
-            }
-            #cmd-container.corner #cmd-input {
-                text-align: center;
-                padding: 13px 20px;
-                font-size: 14px;
-                border-radius: 50px;
-                opacity: 1 !important;
-                border: 1px solid rgba(255,255,255,0.1) !important;
-                background: rgba(0,0,0,0.85) !important;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
-                backdrop-filter: blur(20px);
+                display: none !important;
             }
             body.content-open #cmd-container {
-                opacity: 1;
-                pointer-events: auto;
+                display: none !important;
             }
 
             /* Log strip sopra la bottom nav */
@@ -2237,178 +2219,149 @@
                ══════════════════════════════════════════ */
             #panel-weather,
             #panel-weather.active {
-                height: auto;
                 flex-direction: column;
-                overflow: visible;
+                justify-content: space-evenly; /* Distribuisce lo spazio vuoto */
             }
             .wx-left { flex: none; }
             .wx-topbar {
-                display: grid;
-                grid-template-columns: 1fr auto;
-                grid-template-rows: auto auto;
-                gap: 0;
-                padding: 16px 16px 12px;
-                align-items: start;
-            }
-            /* City + condition a sinistra */
-            .wx-topbar > div:first-child { grid-column: 1; grid-row: 1; }
-            /* Temp al centro-destra */
-            .wx-temp-block { grid-column: 2; grid-row: 1; align-self: center; }
-            /* Wind + feels su riga intera */
-            .wx-wind {
-                grid-column: 1 / -1;
-                grid-row: 2;
                 display: flex;
-                gap: 24px;
+                flex-direction: column;
+                gap: 10px;
+                padding: 40px 20px 20px;
+                align-items: center;
+                text-align: center;
+            }
+            /* Rendi tutto enorme e verticale */
+            .wx-city { font-size: 42px; }
+            .wx-temp { font-size: 96px; letter-spacing: -6px; line-height: 1; margin: 10px 0; }
+            .wx-wind {
+                display: flex;
+                justify-content: center;
+                gap: 40px;
                 border-left: none;
                 border-top: 1px solid rgba(255,255,255,0.06);
-                padding: 12px 0 0 0;
-                margin-top: 12px;
-            }
-            .wx-feels { margin-left: auto; text-align: right; }
-            .wx-city { font-size: 24px; }
-            .wx-temp { font-size: 56px; letter-spacing: -4px; }
-            .wx-wind-val { font-size: 24px; }
-            /* Mappa radar compatta */
-            .wx-radar { height: 200px; flex: none; }
-            /* Forecast a colonna intera */
-            .wx-forecast {
+                padding: 30px 0 0 0;
+                margin-top: 20px;
                 width: 100%;
-                border-left: none;
-                border-top: 1px solid rgba(255,255,255,0.06);
-                flex-shrink: 0;
             }
+            .wx-feels { margin-left: 0; text-align: center; }
+            .wx-wind-val { font-size: 32px; }
+            /* Nascondi radar e forecast */
+            .wx-radar, .wx-forecast { display: none !important; }
 
             /* ══════════════════════════════════════════
                NEWS
                ══════════════════════════════════════════ */
             #panel-news,
             #panel-news.active {
-                height: auto;
                 flex-direction: column;
-                overflow: visible;
             }
             .news-live-grid { display: none; }
             .news-main-area {
                 grid-template-columns: 1fr;
                 padding: 0;
-                overflow: visible;
             }
             .news-sidebar {
                 border: none;
-                height: auto;
-                overflow: visible;
-            }
-            .news-sidebar-list {
-                overflow: visible;
-                height: auto;
             }
             .ns-item {
-                padding: 12px 14px;
+                padding: 20px 24px;
             }
-            .ns-title { font-size: 13px !important; }
+            .ns-title { font-size: 16px !important; line-height: 1.5; }
 
             /* ══════════════════════════════════════════
                DOMOTICA
                ══════════════════════════════════════════ */
             #panel-dashboard,
             #panel-dashboard.active {
-                height: auto;
-                overflow: visible;
+                flex-direction: column;
+                display: flex;
             }
             .dom-header {
-                padding: 12px 14px;
+                padding: 20px 24px;
                 gap: 10px;
             }
-            .dom-header-title { font-size: 17px !important; }
-            /* Nasconde le status pill — prendono troppo spazio */
+            .dom-header-title { font-size: 24px !important; }
             .dom-header-right { display: none; }
-            .dom-scene-strip { padding: 8px 12px; gap: 6px; }
-            .dom-scene-chip { padding: 6px 12px; font-size: 11px !important; }
-            /* Layout contenuto: dispositivi + sidebar in colonna */
+            .dom-scene-strip { padding: 16px 24px; gap: 12px; }
+            .dom-scene-chip { padding: 12px 20px; font-size: 14px !important; flex: 1; text-align: center; } /* Chip espandibili */
             .dom-content {
                 display: flex;
                 flex-direction: column;
-                overflow: visible;
+                flex: 1; /* Prende tutto lo spazio in fondo */
             }
-            .dom-devices-area { padding: 12px 12px 0; }
-            /* Grid 2 colonne per i device */
-            .dom-cards-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-            .dom-card { min-height: 90px; padding: 14px 12px 10px; gap: 10px; }
-            .dom-card-name { font-size: 12px !important; }
-            /* RGB span full width */
-            .dom-card[style*="span 2"] { grid-column: span 2; }
-            /* Sidebar sensori sotto i dispositivi, orizzontale */
-            .dom-sidebar-new {
-                border-left: none;
-                border-top: 1px solid rgba(255,255,255,0.05);
-                padding: 14px 12px;
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 0 16px;
-                overflow: visible;
+            .dom-devices-area { 
+                padding: 24px; 
+                display: flex; 
+                flex-direction: column; 
+                flex: 1; 
             }
-            .dom-sb-section { margin-bottom: 0; }
-            .dom-sb-label { font-size: 6px !important; margin-bottom: 10px; }
-            .dom-metric-val { font-size: 18px !important; }
+            /* Grid 1 colonna gigante che si adatta in verticale */
+            .dom-cards-grid { 
+                grid-template-columns: 1fr; 
+                gap: 16px; 
+                flex: 1; 
+                grid-auto-rows: 1fr; /* Le card si allungano per riempire lo spazio */
+            }
+            .dom-card { min-height: 110px; padding: 24px; gap: 16px; border-radius: 20px; display: flex; flex-direction: column; justify-content: center; }
+            .dom-card-name { font-size: 18px !important; font-weight: 400; }
+            .dom-card-icon { font-size: 32px; }
+            .dom-card-state { font-size: 9px !important; letter-spacing: 2px; margin-top: auto; }
+            .dom-card[style*="span 2"] { grid-column: span 1; }
+            /* Nascondi metriche laterali */
+            .dom-sidebar-new { display: none !important; }
 
             /* ══════════════════════════════════════════
                CALENDARIO
                ══════════════════════════════════════════ */
             #panel-calendar,
             #panel-calendar.active {
-                height: auto;
-                overflow: visible;
+                flex-direction: column !important;
             }
             .cal-layout {
-                grid-template-columns: 1fr;
-                gap: 20px;
-                padding: 12px 12px 0;
-                height: auto;
-                overflow: visible;
+                display: block;
+                padding: 24px;
             }
-            /* Prima il calendario mensile, poi la lista eventi */
-            .cal-month { order: -1; height: auto; overflow: visible; }
-            .cal-upcoming { max-height: none; overflow: visible; }
-            .cal-event-item { padding: 12px 14px; }
-            .cal-event-title { font-size: 12px; }
+            /* Nascondi griglia mese */
+            .cal-month { display: none !important; }
+            .cal-upcoming { padding: 0; gap: 16px; }
+            .cal-upcoming-header { font-size: 11px; margin-bottom: 16px; letter-spacing: 4px; }
+            .cal-event-item { padding: 24px; border-radius: 16px; }
+            .cal-event-title { font-size: 16px; margin-bottom: 6px; }
+            .cal-time-main { font-size: 18px; }
+            .cal-event-date { font-size: 13px; }
 
             /* ══════════════════════════════════════════
                TRADING
                ══════════════════════════════════════════ */
             #panel-trading,
             #panel-trading.active {
-                height: auto;
-                overflow: visible;
+                flex-direction: column;
             }
             .trading-body {
-                grid-template-columns: 1fr;
-                gap: 0;
+                display: flex;
+                flex-direction: column;
                 padding: 0;
-                overflow: visible;
             }
-            /* Grafico in cima */
-            .trading-right-col { order: -1; gap: 0; }
-            .trading-chart-area {
-                height: 220px;
-                min-height: 220px;
-                border-left: none;
-                border-right: none;
-                border-top: none;
-            }
+            .trading-right-col { display: flex; flex-direction: column; }
+            /* Nascondi grafico a candele */
+            .trading-chart-area { display: none !important; }
+            
             .trading-info-bottom {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 0;
-                padding: 12px 16px;
-                border-left: none;
-                border-right: none;
+                padding: 24px;
+                gap: 24px;
             }
-            /* News asset list sotto */
-            .trading-news-feed { border: none; border-top: 1px solid rgba(255,255,255,0.05); }
-            .trading-news-header { padding: 10px 14px; }
-            .trading-news-item { padding: 10px 12px; }
-            .trading-news-item .tn-title { font-size: 12px; }
+            .trading-info-bottom .big-val { font-size: 32px; }
+            .trading-info-bottom .label { font-size: 10px; letter-spacing: 3px; }
+            
+            .trading-news-feed { border-top: 1px solid rgba(255,255,255,0.05); }
+            .trading-news-header { padding: 20px 24px; }
+            .trading-tag { font-size: 11px; }
+            .trading-news-item { padding: 20px 24px; gap: 16px; }
+            .trading-news-item .tn-title { font-size: 16px; line-height: 1.5; }
+            .tn-logo-wrap, .tn-logo, .tn-logo-badge { width: 34px; height: 34px; font-size: 9px; }
 
             /* ══════════════════════════════════════════
                SPOTIFY
