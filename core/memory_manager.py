@@ -11,12 +11,20 @@ from datetime import datetime
 from typing import Optional
 import chromadb
 from chromadb.config import Settings
+import httpx
 
 MEMORY_DIR = "data"
 METADATA_FILE = os.path.join(MEMORY_DIR, "memory_metadata.json")
 CHROMA_PERSIST_DIR = os.path.join(MEMORY_DIR, "chroma_db")
+SUMMARIES_FILE = os.path.join(MEMORY_DIR, "memory_summaries.json")
 EMBEDDING_MODEL = "nomic-embed-text"  # Via Ollama
 _ollama_available = True  # Set to False after first connection failure to suppress repeated errors
+
+_SUMMARY_TOPICS = {
+    "domotica": ["luce", "relay", "servo", "accendi", "spegni", "arduino", "mqtt", "rgb", "buzzer"],
+    "meteo": ["meteo", "temperatura", "piogge", "vento", "previsioni", "umidità", "clima"],
+    "calendario": ["evento", "riunione", "appuntamento", "calendario", "promemoria", "scadenza"],
+}
 
 
 class MemoryManager:
@@ -113,6 +121,10 @@ class MemoryManager:
             # Mantieni cache in-memory ragionevole (opzionale)
             if len(self.turns) > 1000:
                 self.turns = self.turns[-1000:]
+
+        # Trigger summary periodico (ogni 50 turni, non-blocking)
+        if len(self.turns) % 50 == 0:
+            asyncio.create_task(self.build_topic_summaries())
         
         # Calcola embedding e aggiungilo a ChromaDB
         if self.collection:
@@ -141,12 +153,93 @@ class MemoryManager:
         
         await self.save()
 
+    def _load_summaries(self) -> dict:
+        """Carica i summary per topic da disco."""
+        if not os.path.exists(SUMMARIES_FILE):
+            return {}
+        try:
+            with open(SUMMARIES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    async def _summarize_via_llm(self, topic: str, text: str) -> str:
+        """Chiama Groq per riassumere preferenze/abitudini dell'utente su un topic."""
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            return ""
+        prompt = (
+            f"Riassumi in massimo 3 frasi brevi le preferenze e abitudini dell'utente "
+            f"riguardo '{topic}', basandoti su questi messaggi:\n{text}"
+        )
+        messages = [
+            {"role": "system", "content": "Sei un assistente che sintetizza abitudini utente. Rispondi in italiano, massimo 3 frasi."},
+            {"role": "user", "content": prompt},
+        ]
+        try:
+            model = os.getenv("GROQ_ROUTER_MODEL", "llama-3.1-8b-instant")
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": 150},
+                )
+                response.raise_for_status()
+                return response.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"[MEMORY] Errore summary LLM ({topic}): {e}")
+            return ""
+
+    async def build_topic_summaries(self):
+        """Ogni 50 turni, crea summary per topic via LLM e li salva in data/memory_summaries.json."""
+        if not self.turns:
+            return
+
+        topics = {k: [] for k in _SUMMARY_TOPICS}
+        topics["altro"] = []
+
+        for turn in self.turns[-100:]:
+            text_lower = turn["text"].lower()
+            placed = False
+            for topic, keywords in _SUMMARY_TOPICS.items():
+                if any(k in text_lower for k in keywords):
+                    topics[topic].append(turn["text"])
+                    placed = True
+                    break
+            if not placed:
+                topics["altro"].append(turn["text"])
+
+        summaries = self._load_summaries()
+        for topic, texts in topics.items():
+            if texts:
+                combined = "\n".join(texts[-20:])
+                summary = await self._summarize_via_llm(topic, combined)
+                if summary:
+                    summaries[topic] = summary
+
+        try:
+            os.makedirs(MEMORY_DIR, exist_ok=True)
+            with open(SUMMARIES_FILE, "w", encoding="utf-8") as f:
+                json.dump(summaries, f, ensure_ascii=False, indent=2)
+            print(f"[MEMORY] Summary gerarchici aggiornati ({len(summaries)} topic).")
+        except Exception as e:
+            print(f"[MEMORY] Errore salvataggio summary: {e}")
+
     async def get_context(self, query: Optional[str] = None, top_k: int = 5) -> str:
         """
         Recupera contesto rilevante.
         Se query è fornita, usa retrieval semantico.
         Altrimenti torna gli ultimi messaggi (fallback).
         """
+        # Prepend profilo utente dai summary gerarchici
+        summaries = self._load_summaries()
+        profile_context = ""
+        if summaries:
+            profile_context = "=== PROFILO UTENTE (sintesi) ===\n"
+            for topic, summary in summaries.items():
+                profile_context += f"[{topic.upper()}]: {summary}\n"
+            profile_context += "\n"
+
         # Sempre includere gli ultimi 3 messaggi per la coerenza immediata
         recent_turns = self.turns[-3:] if self.turns else []
         recent_context = ""
@@ -157,7 +250,8 @@ class MemoryManager:
         
         # Se non c'è query o database, torniamo solo il recente
         if not query or not self.collection or self.collection.count() == 0:
-            return recent_context if recent_context else "Memoria vuota."
+            base = recent_context if recent_context else "Memoria vuota."
+            return f"{profile_context}{base}".strip()
         
         # Retrieval semantico per il passato remoto
         try:
@@ -183,11 +277,11 @@ class MemoryManager:
                     time = metadata.get("time", "unknown")
                     semantic_context += f"[{time}] {role}: {doc}\n"
             
-            return f"{semantic_context}\n{recent_context}".strip()
+            return f"{profile_context}{semantic_context}\n{recent_context}".strip()
             
         except Exception as e:
             print(f"[MEMORY] Errore retrieval semantico: {e}")
-            return recent_context
+            return f"{profile_context}{recent_context}".strip()
 
     async def migrate_json_to_chroma(self):
         """Reindicizza i turni JSON in ChromaDB se il database vettoriale è vuoto."""

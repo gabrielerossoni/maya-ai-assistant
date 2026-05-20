@@ -4,6 +4,9 @@ Riceve azioni dal planner e le instrada al tool corretto.
 """
 
 import asyncio
+import inspect
+from .token_juice import compress_tool_output
+from .self_healer import SelfHealer
 from tools.arduino_tool import ArduinoTool
 from tools.network_tool import NetworkTool
 from tools.system_tool import SystemTool
@@ -30,6 +33,7 @@ class ToolManager:
 
     def __init__(self):
         self.tools = {}
+        self.healer = SelfHealer(self)
 
     def register_tool(self, name: str, tool_instance: any):
         """Registra e inizializza un tool a runtime."""
@@ -102,8 +106,17 @@ class ToolManager:
                 result = await tool.execute(full_action)
             else:
                 result = tool.execute(full_action)
+            # Comprimi il campo message prima che arrivi al context LLM
+            if isinstance(result, dict) and "message" in result:
+                result["message"] = compress_tool_output(tool_name, result["message"])
+            self.healer.record_success(tool_name)
             return result
         except Exception as e:
+            try:
+                source_file = inspect.getfile(tool.__class__)
+            except (TypeError, OSError):
+                source_file = ""
+            self.healer.record_error(tool_name, e, source_file)
             return {"status": "error", "message": str(e)}
 
 

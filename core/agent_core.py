@@ -12,6 +12,7 @@ import asyncio
 import httpx
 from .tool_manager import ToolManager
 from .memory_manager import MemoryManager
+from .preference_learner import PreferenceLearner
 from dotenv import load_dotenv
 
 # Carica variabili d'ambiente da .env
@@ -348,6 +349,7 @@ class AgentCore:
     def __init__(self):
         self.tool_manager = ToolManager()
         self.memory = MemoryManager()
+        self.learner = PreferenceLearner()
         self.conversation_history = []
         self._last_layout = {"type": "orb", "params": {}}
         self._last_final_data = ("", {"type": "orb", "params": {}})
@@ -839,10 +841,15 @@ class AgentCore:
         context = await self.memory.get_context(query=user_input, top_k=5)
 
         # Inizializziamo la memoria di lavoro per il loop
+        base_system_prompt = SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)
+        pref_context = self.learner.get_context_injection()
+        if pref_context:
+            base_system_prompt = base_system_prompt + f"\n\nPROFILO UTENTE:\n{pref_context}"
+
         history = [
             {
                 "role": "system",
-                "content": SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT),
+                "content": base_system_prompt,
             },
             {
                 "role": "user",
@@ -922,6 +929,7 @@ class AgentCore:
                         await progress_cb(reply)
 
                     results = await self._execute_actions(actions)
+                    self.learner.observe_command(user_input, actions)
 
                     # 2d. Crea osservazione per il prossimo step
                     observation = ""
