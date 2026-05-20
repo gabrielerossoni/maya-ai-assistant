@@ -10,22 +10,23 @@ const HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
 const DASHBOARD_URL = `http://127.0.0.1:${PORT}`;
 
 function startPython() {
-    console.log('Avvio Python process...');
     pythonProcess = spawn('python', ['main.py'], {
         cwd: path.join(__dirname, '..'),
         env: { ...process.env, MAYA_SKIP_BROWSER_OPEN: '1' }
     });
 
     pythonProcess.stdout.on('data', (data) => {
-        console.log(`[Python]: ${data}`);
+        process.stdout.write(data);
     });
 
     pythonProcess.stderr.on('data', (data) => {
-        console.error(`[Python Error]: ${data}`);
+        process.stderr.write(data);
     });
 
     pythonProcess.on('close', (code) => {
-        console.log(`Python process uscito con codice ${code}`);
+        if (code !== 0 && code !== null) {
+            console.log(`\n[SYSTEM] Processo terminato con codice ${code}`);
+        }
     });
 }
 
@@ -59,6 +60,7 @@ function createWindow() {
         frame: false,
         transparent: true,
         alwaysOnTop: false,
+        icon: path.join(__dirname, '..', 'static', 'maya_logo_no_sfondo.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
@@ -81,6 +83,14 @@ function createWindow() {
     });
 
     mainWindow.loadURL(DASHBOARD_URL);
+
+    // Gestione link esterni nel browser predefinito
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith('http')) {
+            require('electron').shell.openExternal(url);
+        }
+        return { action: 'deny' };
+    });
 
     mainWindow.on('closed', () => {
         mainWindow = null;

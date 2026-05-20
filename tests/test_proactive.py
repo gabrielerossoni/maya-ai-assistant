@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 # Aggiungi la root del progetto al path per gli import
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from proactive_manager import ProactiveManager, SysMonitorChecker, CalendarChecker
+from core.proactive_manager import ProactiveManager, SysMonitorChecker, CalendarChecker
 
 @pytest.mark.asyncio
 async def test_sys_monitor_checker():
@@ -22,10 +22,11 @@ async def test_sys_monitor_checker():
 
 @pytest.mark.asyncio
 async def test_proactive_loop_broadcast():
+    from core.websocket_manager import manager
     mock_tm = MagicMock()
     # Mock del WebSocket manager
-    with patch("websocket_manager.manager.broadcast", new_callable=AsyncMock) as mock_broadcast:
-        pm = ProactiveManager(mock_tm, interval=0.1)
+    with patch("core.websocket_manager.manager.broadcast", new_callable=AsyncMock) as mock_broadcast:
+        pm = ProactiveManager(mock_tm, websocket_manager=manager, interval=0.1)
         
         # Mock di un checker che ritorna sempre un alert
         mock_checker = AsyncMock()

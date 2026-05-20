@@ -10,7 +10,8 @@ import asyncio
 # Aggiungi la root del progetto al path per importare i moduli
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from log_utils import DashboardLogFilter
+import pytest
+from core.log_utils import DashboardLogFilter
 
 class MockWebSocketManager:
     """Mock di manager per testare il broadcast dei messaggi."""
@@ -21,6 +22,7 @@ class MockWebSocketManager:
         self.messages.append(message)
         print(f"  [BROADCAST] {message['text']} (level: {message['level']})")
 
+@pytest.mark.asyncio
 async def test_log_filter():
     """Test del filtro log."""
     print("=" * 60)

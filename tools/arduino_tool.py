@@ -174,24 +174,35 @@ class ArduinoTool:
         if value is not None:
             payload["value"] = value
 
-        # Cleanup expired futures to prevent memory leaks
+        event  = threading.Event()
+        holder: list = [None]
         with self._lock:
-            expired = [mid for mid, fut in self._pending.items() if fut.done()]
-            for mid in expired:
-                self._pending.pop(mid)
+            self._sync_pending[msg_id] = (event, holder)
 
         try:
             self.connection.write((json.dumps(payload) + "\n").encode())
             self.connection.flush()
         except serial.SerialException as e:
+            with self._lock:
+                self._sync_pending.pop(msg_id, None)
             return {"status": "error", "message": str(e)}
 
-        time.sleep(0.2)
-        return {
-            "status": "ok",
-            "state": self.sim_state.copy(),
-            "note": "command_sent"
-        }
+        if event.wait(timeout=timeout):
+            data  = holder[0] or {}
+            state = data.get("state", {})
+            if state:
+                self.sim_state.update({
+                    "light":  state.get("light",  self.sim_state["light"]),
+                    "relay":  state.get("relay",  self.sim_state["relay"]),
+                    "servo":  state.get("servo",  self.sim_state["servo"]),
+                    "rgb":    state.get("rgb",    self.sim_state["rgb"]),
+                    "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
+                })
+            return {"status": "ok", "state": self.sim_state.copy()}
+        else:
+            with self._lock:
+                self._sync_pending.pop(msg_id, None)
+            return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
 
     def _simulate(self, op: str, target: str, value) -> dict:
         if op == "SET":
@@ -209,7 +220,6 @@ class ArduinoTool:
                     self.sim_state["rgb"] = [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
             elif target == "buzzer":
                 self.sim_state["buzzer"] = bool(value)
-            print(f"[ARDUINO SIM] {target} → {value}")
 
         if target == "sensor_read":
             return {"status": "ok", "simulated": True, "temp": 22.0, "humidity": 55.0}

@@ -336,7 +336,7 @@ async def lifespan(app: FastAPI):
     plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
     plugin_loader.start()
 
-    proactive_manager = ProactiveManager(agent.tool_manager, manager)
+    proactive_manager = ProactiveManager(agent.tool_manager, manager, memory_manager=agent.memory)
     asyncio.create_task(proactive_manager.start_loop())
 
     # Inietta WebSocketManager nel mqtt_tool per broadcast bidirezionale
@@ -362,6 +362,8 @@ async def lifespan(app: FastAPI):
 
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
     def _open_browser():
+        if os.environ.get("MAYA_SKIP_BROWSER_OPEN") == "1":
+            return
         time.sleep(1.5)
         # Cache-buster per forzare il ricaricamento della dashboard
         webbrowser.open(f"http://127.0.0.1:{http_port}/?v={int(time.time())}")
@@ -429,6 +431,16 @@ _log_filter_applied = False
 @app.get("/")
 async def get_dashboard():
     return FileResponse("static/jarvis_dashboard.html")
+
+
+@app.get("/sw.js")
+async def get_service_worker():
+    return FileResponse("static/sw.js", media_type="application/javascript")
+
+
+@app.get("/manifest.json")
+async def get_manifest():
+    return FileResponse("static/manifest.json", media_type="application/manifest+json")
 
 
 @app.get("/health")
@@ -590,6 +602,9 @@ async def get_models_status():
         return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
 
 
+_last_models_check: float = 0.0
+_cached_models_status: dict = {}
+
 async def broadcast_state():
     """
     Trasmette lo stato del sistema alla dashboard, includendo:
@@ -597,8 +612,13 @@ async def broadcast_state():
     - Stato di Ollama
     - Informazioni di sistema
     """
+    global _last_models_check, _cached_models_status
     arduino_tool = agent.tool_manager.tools.get("arduino")
-    models_status = await get_models_status()
+    now = time.time()
+    if now - _last_models_check > 30:
+        _cached_models_status = await get_models_status()
+        _last_models_check = now
+    models_status = _cached_models_status
     ollama_online = any(m.get("online", False) for m in models_status.values())
 
     _debug_reset_client = os.environ.get(
@@ -753,7 +773,7 @@ async def interactive_console():
 
 
 if __name__ == "__main__":
-    from instance_guard import (
+    from core.instance_guard import (
         LOCK_PORT,
         InstanceGuard,
         install_signal_handlers,

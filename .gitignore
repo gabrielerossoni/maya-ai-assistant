@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#AI
+.ai-rules/
+.antigravitycli/
+
 # C extensions
 *.so
 
@@ -176,3 +180,10 @@ scratch/
 *.db
 *.sqlite3
 static/.prettierrc
+
+# Google OAuth
+data/credentials.json
+data/token.json
+
+# Arduino secrets
+arduino/*/secrets.h

@@ -17,7 +17,9 @@ def agent():
 @pytest.mark.asyncio
 async def test_react_loop_logic(agent):
     # Mock dell'LLM (ollama)
-    with patch("ollama.AsyncClient.chat", new_callable=AsyncMock) as mock_chat, \
+    with patch("core.agent_core.is_ollama_enabled", return_value=True), \
+         patch.object(agent, "_call_groq", new_callable=AsyncMock, return_value=None), \
+         patch("ollama.AsyncClient.chat", new_callable=AsyncMock) as mock_chat, \
          patch.object(agent, "_route_intent", return_value="domotic"), \
          patch.object(agent.tool_manager, "execute", new_callable=AsyncMock) as mock_execute:
         
@@ -47,7 +49,10 @@ async def test_react_loop_logic(agent):
         
         mock_execute.return_value = {"status": "ok", "message": "Soleggiato, 20 gradi"}
         
-        response = await agent.process("Com'è il meteo a Milano?")
+        response_tokens = []
+        async for token in agent.process("Com'è il meteo a Milano?"):
+            response_tokens.append(token)
+        response = "".join(response_tokens)
         
         assert "A Milano c'è il sole" in response
         assert mock_execute.call_count == 1
