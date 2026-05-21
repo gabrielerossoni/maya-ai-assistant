@@ -33,8 +33,8 @@
 #include "secrets.h"
 
 // ── WiFi Credentials ──────────────────────────
-const char* SSID        = WIFI_CASA_SSID;    // Configura il tuo SSID
-const char* WIFI_PASS   = WIFI_CASA_PASS;    // Configura la password
+const char* SSID        = WIFI_HOTSPOT_SSID;    // Configura il tuo SSID
+const char* WIFI_PASS   = WIFI_HOTSPOT_PASS;    // Configura la password
 const char* MQTT_BROKER = "localhost";  // Broker locale (default)
 const int   MQTT_PORT   = 1883;
 const char* MQTT_ROOM   = "studio";     // Stanza di default
@@ -204,7 +204,7 @@ void setupWiFi() {
 
 // ── MQTT Connect ──────────────────────────────
 void connectMQTT() {
-  if (!WiFi.isConnected()) return;
+  if (WiFi.status() != WL_CONNECTED) return;
   
   if (mqttClient.connect(MQTT_CLIENT_ID)) {
     Serial.print("[MQTT] Connesso a ");
@@ -415,7 +415,7 @@ void publishState() {
   
   String payload;
   serializeJson(doc, payload);
-  mqttClient.publish(topic, payload.c_str(), 1, false);  // QoS 1, no retain
+  mqttClient.publish(topic, (const uint8_t*)payload.c_str(), payload.length(), false);
 }
 
 void publishTelemetry() {
@@ -435,6 +435,6 @@ void publishTelemetry() {
   
   String payload;
   serializeJson(doc, payload);
-  mqttClient.publish(topic, payload.c_str(), 0, false);  // QoS 0 for telemetry
+  mqttClient.publish(topic, (const uint8_t*)payload.c_str(), payload.length(), false);
 }
 
