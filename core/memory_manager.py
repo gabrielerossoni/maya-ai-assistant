@@ -117,41 +117,40 @@ class MemoryManager:
         
         async with self.turn_lock:
             self.turns.append(turn)
-            
-            # Mantieni cache in-memory ragionevole (opzionale)
-            if len(self.turns) > 1000:
-                self.turns = self.turns[-1000:]
 
-        # Trigger summary periodico (ogni 50 turni, non-blocking)
-        if len(self.turns) % 50 == 0:
-            asyncio.create_task(self.build_topic_summaries())
-        
-        # Calcola embedding e aggiungilo a ChromaDB
-        if self.collection:
-            import random
-            ts_ms = int(datetime.now().timestamp() * 1000)
-            rnd = random.randint(100, 999)
-            turn_id = f"{role}_{ts_ms}_{rnd}"
-            embedding = await self._get_embedding(text)
-            try:
-                if embedding:
-                    self.collection.add(
-                        ids=[turn_id],
-                        documents=[text],
-                        metadatas=[{"role": role, "time": timestamp}],
-                        embeddings=[embedding]
-                    )
-                else:
-                    # Ollama non disponibile: ChromaDB usa all-MiniLM-L6-v2 integrato
-                    self.collection.add(
-                        ids=[turn_id],
-                        documents=[text],
-                        metadatas=[{"role": role, "time": timestamp}]
-                    )
-            except Exception as e:
-                print(f"[MEMORY] Errore aggiunta a ChromaDB: {e}")
-        
-        await self.save()
+            if len(self.turns) > 200:   # ← era 1000, troppo per sessioni lunghe
+                self.turns = self.turns[-200:]
+
+            # Trigger summary periodico (ogni 50 turni, non-blocking)
+            if len(self.turns) % 50 == 0:
+                asyncio.create_task(self.build_topic_summaries())
+
+            # Calcola embedding e aggiungilo a ChromaDB
+            if self.collection:
+                import random
+                ts_ms = int(datetime.now().timestamp() * 1000)
+                rnd = random.randint(100, 999)
+                turn_id = f"{role}_{ts_ms}_{rnd}"
+                embedding = await self._get_embedding(text)
+                try:
+                    if embedding:
+                        self.collection.add(
+                            ids=[turn_id],
+                            documents=[text],
+                            metadatas=[{"role": role, "time": timestamp}],
+                            embeddings=[embedding]
+                        )
+                    else:
+                        # Ollama non disponibile: ChromaDB usa all-MiniLM-L6-v2 integrato
+                        self.collection.add(
+                            ids=[turn_id],
+                            documents=[text],
+                            metadatas=[{"role": role, "time": timestamp}]
+                        )
+                except Exception as e:
+                    print(f"[MEMORY] Errore aggiunta a ChromaDB: {e}")
+
+            await self.save()
 
     def _load_summaries(self) -> dict:
         """Carica i summary per topic da disco."""

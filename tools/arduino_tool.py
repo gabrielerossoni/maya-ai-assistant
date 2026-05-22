@@ -291,3 +291,37 @@ class ArduinoTool:
         self._running = False
         if self.connection and self.connection.is_open:
             self.connection.close()
+
+    def _find_port(self) -> Optional[str]:
+        for p in serial.tools.list_ports.comports():
+            desc = (p.description or "").lower()
+            if any(k in desc for k in ["arduino", "ch340", "atmega", "usb serial", "cp210"]):
+                return p.device
+        return None
+
+    def _reconnect(self):
+        if self.connection:
+            try:
+                self.connection.close()
+            except Exception:
+                pass
+        self.connection = None
+        
+        # Try to reconnect without spawning a new thread
+        port = self._find_port() if SERIAL_PORT == "AUTO" else SERIAL_PORT
+        if not port:
+            return False
+            
+        try:
+            self.connection = serial.Serial(port, BAUD_RATE, timeout=0.1)
+            time.sleep(2)
+            self.simulated = False
+            print(f"[ARDUINO] Riconnesso su {port} @ {BAUD_RATE}")
+            return True
+        except serial.SerialException:
+            return False
+
+    def close(self):
+        self._running = False
+        if self.connection and self.connection.is_open:
+            self.connection.close()
