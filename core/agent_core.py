@@ -70,7 +70,7 @@ NON aggiungere testo fuori dal JSON.
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
-- arduino: comandi hardware (op: SET/GET, target: light/relay/servo/rgb/buzzer, value: 0|1|int per servo|0xRRGGBB per rgb; scene: modalità notte/studio/relax/uscita/ospite/film, allarme)
+- arduino: (op: SET/GET, target: light/relay/servo/servo2/rgb/neopixel/buzzer/buzzer2/accel; servo=porta 0-180, servo2=cancello 0-180; neopixel: value=0xRRGGBB effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2: melody=beep/alarm/startup/ok)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: invia comandi al secondo PC (qualsiasi stringa)
 - system: comandi OS (shutdown, open_browser, screenshot)
@@ -228,11 +228,12 @@ AUTOMATIONS = {
         {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x440055},
     ],
     "modalità uscita": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "light",  "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay",  "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "neopixel","value": 0},
+        {"tool": "arduino", "op": "SET", "target": "servo",  "value": 0},   # porta
+        {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0},   # cancello
+        {"tool": "arduino", "op": "SET", "target": "buzzer2","melody": "ok"},
     ],
     "modalità ospite": [
         {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
@@ -247,8 +248,9 @@ AUTOMATIONS = {
         # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FF0044"},  # rosso gaming
     ],
     "allarme": [
-        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF0000},
+        {"tool": "arduino", "op": "SET", "target": "buzzer",  "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "buzzer2", "melody": "alarm"},
+        {"tool": "arduino", "op": "SET", "target": "neopixel","value": 0xFF0000, "effect": 3},
     ],
     "buongiorno": [
         {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
@@ -275,11 +277,10 @@ AUTOMATIONS = {
         {"tool": "spotify", "command": "search", "query": "cena romantica musica italiana"},
     ],
     "ospiti in arrivo": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},       # porta aperta
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFEECC},   # bianco caldo
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "spotify", "command": "search", "query": "house party background music"},
+        {"tool": "arduino", "op": "SET", "target": "servo2", "value": 90},  # apri cancello
+        {"tool": "arduino", "op": "SET", "target": "servo",  "value": 90},  # apri porta
+        {"tool": "arduino", "op": "SET", "target": "neopixel","value": 0xFFEECC, "effect": 1},
+        {"tool": "arduino", "op": "SET", "target": "buzzer2","melody": "startup"},
     ],
     "vado fuori": [
         {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
@@ -354,6 +355,9 @@ class AgentCore:
         self._last_layout = {"type": "orb", "params": {}}
         self._last_final_data = ("", {"type": "orb", "params": {}})
         self.socket_manager = None
+        self._intent_cache: dict[str, str] = {}
+        self._current_task_layout: dict = {}
+        self._current_task_final_data: dict = {}
 
     async def initialize(self):
         """Inizializza tutti i componenti."""
@@ -385,6 +389,20 @@ class AgentCore:
         return None
 
     async def _route_intent(self, user_input: str) -> str:
+        """Determina l'intent dell'utente con caching."""
+        cache_key = user_input.lower().strip()[:60]
+        if cache_key in self._intent_cache:
+            print(f"[ROUTER] Intent recuperato da cache: {self._intent_cache[cache_key]}")
+            return self._intent_cache[cache_key]
+
+        intent = await self._route_intent_uncached(user_input)
+
+        self._intent_cache[cache_key] = intent
+        if len(self._intent_cache) > 200:
+            self._intent_cache.pop(next(iter(self._intent_cache)))
+        return intent
+
+    async def _route_intent_uncached(self, user_input: str) -> str:
         """Determina l'intent dell'utente con logica ibrida: Hard Routing + LLM."""
         lower = user_input.lower()
         words = lower.split()
@@ -530,14 +548,24 @@ class AgentCore:
         try:
             result = json.loads(text)
             # Salvataggio layout per propagazione
-            self._last_layout = {
+            layout = {
                 "type": result.get("layout", "orb"),
                 "params": result.get("layout_params", {}),
             }
+            task = asyncio.current_task()
+            if task:
+                self._current_task_layout[task] = layout
+            else:
+                self._last_layout = layout
             return result
         except json.JSONDecodeError:
             result = self._fallback_parse(text)
-            self._last_layout = {"type": "orb", "params": {}}
+            layout = {"type": "orb", "params": {}}
+            task = asyncio.current_task()
+            if task:
+                self._current_task_layout[task] = layout
+            else:
+                self._last_layout = layout
             return result
 
     async def _call_groq(self, messages, json_mode=True):
@@ -564,6 +592,14 @@ class AgentCore:
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
+
+        # Fix 3: Groq token limit stretto per DOMOTIC
+        if not json_mode:
+            payload["max_tokens"] = 8   # router
+        elif len(messages) > 0 and "DOMOTIC" in str(messages[0]["content"])[:50]:
+            payload["max_tokens"] = 300  # domotic: risposta corta basta
+        else:
+            payload["max_tokens"] = 800
 
         try:
             async with httpx.AsyncClient(timeout=15) as client:
@@ -799,7 +835,7 @@ class AgentCore:
             return
 
         # 2. ReAct Loop
-        max_steps = 5
+        max_steps = 2 if intent == "DOMOTIC" else 4
         current_step = 0
 
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
@@ -991,7 +1027,10 @@ class AgentCore:
 
         # In un async generator non si può usare 'return value' prima di Python 3.10
         # o in contesti specifici. Usiamo un attributo per passare il layout finale.
-        self._last_final_data = (
-            final_reply,
-            getattr(self, "_last_layout", {"type": "orb", "params": {}}),
-        )
+        task = asyncio.current_task()
+        layout = self._current_task_layout.pop(task, getattr(self, "_last_layout", {"type": "orb", "params": {}}))
+        final_data = (final_reply, layout)
+        if task:
+            self._current_task_final_data[task] = final_data
+        else:
+            self._last_final_data = final_data

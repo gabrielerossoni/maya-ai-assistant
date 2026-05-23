@@ -71,7 +71,6 @@ class CalendarTool:
 
         try:
             self.google_service = build('calendar', 'v3', credentials=creds)
-            print("[CALENDAR] Google Calendar sincronizzato.")
         except Exception as e:
             print(f"[CALENDAR] Errore build service Google: {e}")
 
@@ -263,7 +262,6 @@ class CalendarTool:
                 }
                 self.google_service.events().insert(calendarId=_get_calendar_id(), body=event_body).execute()
                 synced_count += 1
-                print(f"[CALENDAR] Sincronizzato evento locale: '{e['title']}'")
             except Exception as ex:
                 print(f"[CALENDAR] Errore sync evento '{e['title']}': {ex}")
                 remaining_events.append(e)

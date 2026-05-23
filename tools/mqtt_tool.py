@@ -19,7 +19,6 @@ class MqttTool:
         """Chiamato in lifespan dopo che il loop è pronto."""
         self._ws_manager = ws_manager
         self._loop       = loop
-        print("[MQTT] WebSocketManager iniettato per broadcast.")
 
     def initialize(self):
         """Setup MQTT callbacks e connessione."""
@@ -29,7 +28,6 @@ class MqttTool:
         try:
             self.client.connect(MQTT_BROKER, MQTT_PORT, 60)
             self.client.loop_start()
-            print(f"[MQTT] Connesso al broker {MQTT_BROKER}:{MQTT_PORT}")
         except Exception as e:
             print(f"[MQTT] Errore connessione broker: {e}")
 
@@ -39,19 +37,16 @@ class MqttTool:
             # Subscribe a tutti i topic state e telemetry di tutte le stanze
             client.subscribe(f"{TOPIC_PREFIX}+/state",     qos=1)
             client.subscribe(f"{TOPIC_PREFIX}+/telemetry", qos=0)
-            print(f"[MQTT] Connesso, in ascolto su {TOPIC_PREFIX}+/state|telemetry")
         else:
             print(f"[MQTT] Connessione fallita, code {rc}")
 
-    def _on_disconnect(self, client, userdata, rc, props=None):
-        """Callback: disconnessione."""
-        if rc != 0:
-            print(f"[MQTT] Disconnessione non attesa, code {rc}")
+    def _on_disconnect(self, client, userdata, flags, rc=None, props=None):
+        """Callback: disconnessione (paho-mqtt v2 API)."""
+        pass
 
     def _on_message(self, client, userdata, msg):
         """Riceve stato/telemetria da Arduino e lo propaga via WebSocket."""
         if not self._ws_manager or not self._loop:
-            print("[MQTT] WebSocketManager non iniettato, ignoro messaggio")
             return
         
         try:
@@ -65,15 +60,15 @@ class MqttTool:
             kind = parts[3]   # "state" o "telemetry"
 
             if kind == "state":
-                # Payload: {"state": {"light": bool, "relay": bool, "servo": int, "rgb": [r,g,b], "buzzer": bool}}
                 state = payload.get("state", {})
                 broadcast_payload = {
                     "type": "arduino_state",
                     "room": room,
                     "led": "on" if state.get("light") else "off",
-                    "relay": "on" if state.get("relay") else "off",
                     "servo": state.get("servo", 0),
-                    "rgb": state.get("rgb", [0, 0, 0]),
+                    "rgb1": state.get("rgb1", [0, 0, 0]),
+                    "rgb2": state.get("rgb2", [0, 0, 0]),
+                    "rgb3": state.get("rgb3", [0, 0, 0]),
                     "buzzer": state.get("buzzer", False),
                 }
                 
@@ -92,7 +87,6 @@ class MqttTool:
                 self._ws_manager.broadcast(broadcast_payload),
                 self._loop
             )
-            print(f"[MQTT] Broadcast {kind} da stanza '{room}' via WebSocket")
             
         except json.JSONDecodeError:
             print(f"[MQTT] Errore parsing JSON: {msg.payload}")
@@ -136,10 +130,9 @@ class MqttTool:
         
         try:
             result = self.client.publish(topic, cmd_payload, qos=1, retain=False)
-            await asyncio.to_thread(result.wait_for_publish, 2.0)
             return {
                 "status": "ok",
-                "message": f"Comando inviato a stanza '{room}' (QoS 1)",
+                "message": f"Cmd → '{room}'",
                 "topic": topic
             }
         except Exception as e:
@@ -152,4 +145,3 @@ class MqttTool:
         """Chiudi connessione MQTT."""
         self.client.loop_stop()
         self.client.disconnect()
-        print("[MQTT] Disconnesso.")

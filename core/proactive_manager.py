@@ -74,7 +74,6 @@ class ContextualSensorChecker(BaseChecker):
         "temp_high":     lambda s: s.get("temp", 0) > 28,
         "temp_low":      lambda s: s.get("temp", 99) < 14,
         "humidity_high": lambda s: s.get("humidity", 0) > 75,
-        "dark_occupied": lambda s: not s.get("light") and s.get("occupied", False),
     }
 
     _PROACTIVE_PROMPT = """Sei il modulo di Ragionamento Proattivo di MAYA.
@@ -127,8 +126,7 @@ Rispondi SOLO con JSON:
         user_msg = (
             f"Stato sensori: temp={hw_state.get('temp')}°C, "
             f"umidità={hw_state.get('humidity')}%, "
-            f"luce={'ON' if hw_state.get('light') else 'OFF'}, "
-            f"relay={'ON' if hw_state.get('relay') else 'OFF'}.\n"
+            f"luce={'ON' if hw_state.get('light') else 'OFF'}.\n"
             f"Anomalie rilevate: {', '.join(triggered)}.\n"
             f"Memoria recente: {str(recent_context)[-500:]}"
         )
@@ -251,7 +249,6 @@ class ProactiveManager:
             self.checkers.append(ContextualSensorChecker(self.tool_manager, self.memory_manager))
 
     async def start_loop(self):
-        print("[PROACTIVE] Loop avviato.")
         while True:
             try:
                 for checker in self.checkers:

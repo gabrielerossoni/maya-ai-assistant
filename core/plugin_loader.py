@@ -77,7 +77,6 @@ class PluginLoader:
         """Avvia il monitoraggio della cartella plugins."""
         self.observer.schedule(self.event_handler, self.plugins_dir, recursive=False)
         self.observer.start()
-        print("[PLUGIN] Hot-reload attivo.")
 
     def stop(self):
         self.observer.stop()
