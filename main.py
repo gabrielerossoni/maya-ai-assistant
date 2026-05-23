@@ -413,38 +413,41 @@ async def lifespan(app: FastAPI):
     arduino_tool = agent.tool_manager.tools.get("arduino")
     if arduino_tool:
 
+        _main_loop = asyncio.get_running_loop()  # cattura il loop del lifespan
+
         def arduino_event_handler(event: dict):
-            evt_type = event.get("type", "")
-            if evt_type == "telemetry":
+            try:
                 payload = {
                     "type": "arduino_event",
-                    "telemetry": {k: v for k, v in event.items() if k != "type"},
+                    **event
                 }
-            else:
-                payload = {"type": "arduino_event", **event}
-            loop = getattr(manager, 'loop', None) or getattr(agent, 'loop', None)
-            if loop and loop.is_running():
-                loop.call_soon_threadsafe(
-                    lambda p=payload: loop.create_task(manager.broadcast(p))
+
+                asyncio.run_coroutine_threadsafe(
+                    manager.broadcast(payload),
+                    _main_loop,
                 )
+            except Exception as e:
+                print(f"[ARDUINO] Event handler error: {e}")
 
         arduino_tool.register_event_hook(arduino_event_handler)
 
-    yield
-    # Shutdown
-    print("\n[SYSTEM] Spegnimento in corso...")
-    display.stop()
-    # Cancella i task in background al termine
-    for task in _bg_tasks:
-        task.cancel()
+    try:
+        yield
+    finally:
+        # Shutdown
+        print("\n[SYSTEM] Spegnimento in corso...")
+        display.stop()
+        # Cancella i task in background al termine
+        for task in _bg_tasks:
+            task.cancel()
 
-    # Tool Cleanup
-    for name, tool in agent.tool_manager.tools.items():
-        if hasattr(tool, "close"):
-            try:
-                tool.close()
-            except Exception as e:
-                print(f"[SHUTDOWN] Errore in chiusura tool {name}: {e}")
+        # Tool Cleanup
+        for name, tool in agent.tool_manager.tools.items():
+            if hasattr(tool, "close"):
+                try:
+                    tool.close()
+                except Exception as e:
+                    print(f"[SHUTDOWN] Errore in chiusura tool {name}: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -705,7 +708,7 @@ async def stats_broadcaster():
 
     # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
     psutil.cpu_percent(interval=None)
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(2)
 
     while True:
         try:
@@ -724,7 +727,7 @@ async def stats_broadcaster():
             await manager.broadcast(stats)
         except:
             pass
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(2)
 
 
 async def sensor_broadcaster():
