@@ -17,13 +17,24 @@ BAUD_RATE   = 115200
 TIMEOUT_SEC = 3
 SERIAL_PORT = os.getenv("ARDUINO_PORT", "AUTO")
 
-VALID_TARGETS = {"light", "relay", "servo", "light_pwm", "rgb", "buzzer", "sensor_read"}
+VALID_TARGETS = {
+    "light", "servo", "servo2",
+    "rgb", "rgb1", "rgb2", "rgb3", "neopixel",
+    "buzzer", "buzzer2",
+    "sensor_read", "status"
+}
 
 class ArduinoTool:
     def __init__(self):
         self.connection  = None
         self.simulated   = not SERIAL_AVAILABLE
-        self.sim_state   = {"light": False, "relay": False, "servo": 0, "rgb": [0, 0, 0], "buzzer": False}
+        self.sim_state   = {
+            "light": False,
+            "servo": 0, "servo2": 0,
+            "rgb1": [0, 0, 0], "rgb2": [0, 0, 0], "rgb3": [0, 0, 0],
+            "neo_effect": 0,
+            "buzzer": False, "buzz2_playing": False,
+        }
         self._reader     = None
         self._running    = False
         self._msg_id     = 0
@@ -33,6 +44,7 @@ class ArduinoTool:
         self._event_hooks: list[Callable] = []
         self._sync_pending: dict[int, tuple[threading.Event, list]] = {}
         self._lock       = threading.Lock()
+        self._serial_lock = threading.Lock()
 
     def initialize(self):
         if not SERIAL_AVAILABLE:
@@ -70,7 +82,7 @@ class ArduinoTool:
                     continue
 
                 line = self.connection.readline().decode("utf-8", errors="ignore").strip()
-                if not line:
+                if not line or set(line) == {'.'}:  # Ignora linee vuote o solo puntini (WiFi waiting)
                     continue
 
                 try:
@@ -118,8 +130,14 @@ class ArduinoTool:
                 s = data["state"]
                 self.sim_state.update({
                     "light": s.get("light", self.sim_state["light"]),
-                    "relay": s.get("relay", self.sim_state["relay"]),
                     "servo": s.get("servo", self.sim_state["servo"]),
+                    "servo2": s.get("servo2", self.sim_state.get("servo2", 0)),
+                    "rgb1": s.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
+                    "rgb2": s.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
+                    "rgb3": s.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
+                    "neo_effect": s.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                    "buzzer": s.get("buzzer", self.sim_state["buzzer"]),
+                    "buzz2_playing": s.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
                 })
 
         elif "telemetry" in data:
@@ -146,8 +164,6 @@ class ArduinoTool:
         legacy_map = {
             "LIGHT_ON":    ("SET", "light",  1),
             "LIGHT_OFF":   ("SET", "light",  0),
-            "RELAY_ON":    ("SET", "relay",  1),
-            "RELAY_OFF":   ("SET", "relay",  0),
             "SERVO_OPEN":  ("SET", "servo",  90),
             "SERVO_CLOSE": ("SET", "servo",  0),
             "STATUS":      ("GET", "status", None),
@@ -180,8 +196,9 @@ class ArduinoTool:
             self._sync_pending[msg_id] = (event, holder)
 
         try:
-            self.connection.write((json.dumps(payload) + "\n").encode())
-            self.connection.flush()
+            with self._serial_lock:
+                self.connection.write((json.dumps(payload) + "\n").encode())
+                self.connection.flush()
         except serial.SerialException as e:
             with self._lock:
                 self._sync_pending.pop(msg_id, None)
@@ -193,10 +210,14 @@ class ArduinoTool:
             if state:
                 self.sim_state.update({
                     "light":  state.get("light",  self.sim_state["light"]),
-                    "relay":  state.get("relay",  self.sim_state["relay"]),
                     "servo":  state.get("servo",  self.sim_state["servo"]),
-                    "rgb":    state.get("rgb",    self.sim_state["rgb"]),
+                    "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
+                    "rgb1":   state.get("rgb1",   self.sim_state.get("rgb1", [0, 0, 0])),
+                    "rgb2":   state.get("rgb2",   self.sim_state.get("rgb2", [0, 0, 0])),
+                    "rgb3":   state.get("rgb3",   self.sim_state.get("rgb3", [0, 0, 0])),
+                    "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
                     "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
+                    "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
                 })
             return {"status": "ok", "state": self.sim_state.copy()}
         else:
@@ -208,18 +229,29 @@ class ArduinoTool:
         if op == "SET":
             if target == "light":
                 self.sim_state["light"] = bool(value)
-            elif target == "relay":
-                self.sim_state["relay"] = bool(value)
             elif target == "servo":
                 self.sim_state["servo"] = max(0, min(180, int(value)))
-            elif target == "rgb":
+            elif target == "servo2":
+                self.sim_state["servo2"] = max(0, min(180, int(value)))
+            elif target in ("rgb1", "rgb2", "rgb3"):
                 if isinstance(value, dict):
-                    self.sim_state["rgb"] = [value.get("r", 0), value.get("g", 0), value.get("b", 0)]
+                    self.sim_state[target] = [value.get("r", 0), value.get("g", 0), value.get("b", 0)]
                 else:
                     v = int(value)
-                    self.sim_state["rgb"] = [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
+                    self.sim_state[target] = [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
+            elif target in ("rgb", "neopixel"):
+                if isinstance(value, dict):
+                    c = [value.get("r", 0), value.get("g", 0), value.get("b", 0)]
+                else:
+                    v = int(value)
+                    c = [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
+                self.sim_state["rgb1"] = list(c)
+                self.sim_state["rgb2"] = list(c)
+                self.sim_state["rgb3"] = list(c)
             elif target == "buzzer":
                 self.sim_state["buzzer"] = bool(value)
+            elif target == "buzzer2":
+                self.sim_state["buzz2_playing"] = True
 
         if target == "sensor_read":
             return {"status": "ok", "simulated": True, "temp": 22.0, "humidity": 55.0}
@@ -239,8 +271,9 @@ class ArduinoTool:
             self._sync_pending[msg_id] = (event, holder)
 
         try:
-            self.connection.write((json.dumps(payload) + "\n").encode())
-            self.connection.flush()
+            with self._serial_lock:
+                self.connection.write((json.dumps(payload) + "\n").encode())
+                self.connection.flush()
         except Exception as e:
             with self._lock:
                 self._sync_pending.pop(msg_id, None)
@@ -250,47 +283,17 @@ class ArduinoTool:
             data = holder[0] or {}
             temp = data.get("temp")
             hum  = data.get("humidity")
-            if temp is not None and hum is not None:
-                return {"temp": float(temp), "humidity": float(hum)}
+            res = {}
+            if temp is not None:
+                res["temp"] = float(temp)
+            if hum is not None:
+                res["humidity"] = float(hum)
+            return res
         else:
             with self._lock:
                 self._sync_pending.pop(msg_id, None)
 
         return None
-
-    def _find_port(self) -> Optional[str]:
-        for p in serial.tools.list_ports.comports():
-            desc = (p.description or "").lower()
-            if any(k in desc for k in ["arduino", "ch340", "atmega", "usb serial", "cp210"]):
-                return p.device
-        return None
-
-    def _reconnect(self):
-        if self.connection:
-            try:
-                self.connection.close()
-            except Exception:
-                pass
-        self.connection = None
-        
-        # Try to reconnect without spawning a new thread
-        port = self._find_port() if SERIAL_PORT == "AUTO" else SERIAL_PORT
-        if not port:
-            return False
-            
-        try:
-            self.connection = serial.Serial(port, BAUD_RATE, timeout=0.1)
-            time.sleep(2)
-            self.simulated = False
-            print(f"[ARDUINO] Riconnesso su {port} @ {BAUD_RATE}")
-            return True
-        except serial.SerialException:
-            return False
-
-    def close(self):
-        self._running = False
-        if self.connection and self.connection.is_open:
-            self.connection.close()
 
     def _find_port(self) -> Optional[str]:
         for p in serial.tools.list_ports.comports():

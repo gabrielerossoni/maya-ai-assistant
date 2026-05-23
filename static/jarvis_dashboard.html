@@ -52,9 +52,6 @@
         .ns-title,
         .wx-fc-desc,
         .wx-feels-val,
-        .tn-title,
-        .tn-meta,
-        .trading-news-item,
         .news-sidebar-list,
         .ns-item,
         #log-strip,
@@ -88,8 +85,7 @@
         .ns-source,
         .ns-rank,
         .news-sidebar-header,
-        .dom-sidebar-hdr,
-        .trading-news-header {
+        .dom-sidebar-hdr {
             letter-spacing: 2.5px !important;
         }
 
@@ -171,11 +167,6 @@
             opacity: 0.5 !important;
         }
 
-        /* Ticker strip */
-        .tk-symbol {
-            opacity: 0.9 !important;
-        }
-
         /* Log strip */
         #log-strip {
             font-size: 11px !important;
@@ -218,7 +209,6 @@
         .dom-card-state.active,
         .dom-card.active .dom-card-state,
         .dom-status-pill.online,
-        .tk-symbol,
         #orb-branding,
         .corner {
             font-weight: 700 !important;
@@ -1512,218 +1502,6 @@
             margin-top: 3px;
         }
 
-        /* =============================================
-           TRADING PANEL — Redesigned
-           ============================================= */
-        #panel-trading {
-            display: none;
-            flex-direction: column;
-            height: calc(100vh - 100px);
-            padding: 0;
-            overflow: hidden;
-            gap: 0;
-        }
-
-        #panel-trading.active {
-            display: flex;
-            animation: fadeIn 0.5s ease forwards;
-        }
-
-        /* Ticker strip — top bar con asset e % change */
-        .trading-ticker-strip {
-            width: 100%;
-            height: 40px;
-            background: rgba(255, 30, 30, 0.04);
-            border-bottom: 1px solid rgba(255, 30, 30, 0.12);
-            overflow: hidden;
-            position: relative;
-            flex-shrink: 0;
-        }
-
-        .ticker-track {
-            display: flex;
-            gap: 40px;
-            align-items: center;
-            height: 100%;
-            padding: 0 20px;
-            white-space: nowrap;
-            animation: scroll-ticker 30s linear infinite;
-        }
-
-        @keyframes scroll-ticker {
-            0% {
-                transform: translateX(0);
-            }
-
-            100% {
-                transform: translateX(-50%);
-            }
-        }
-
-        .ticker-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 12px;
-            flex-shrink: 0;
-        }
-
-        .ticker-item .tk-symbol {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 10px;
-            letter-spacing: 2px;
-            opacity: 0.7;
-        }
-
-        .ticker-item .tk-price {
-            color: #fff;
-            font-weight: 400;
-        }
-
-        .ticker-item .tk-change {
-            font-size: 10px;
-            font-weight: 600;
-        }
-
-        .up {
-            color: #4CAF50;
-        }
-
-        .down {
-            color: #f44336;
-        }
-
-        .ticker-item .tk-change.up {
-            color: #4CAF50;
-        }
-
-        .ticker-item .tk-change.down {
-            color: #f44336;
-        }
-
-        .ticker-item .tk-sep {
-            width: 1px;
-            height: 16px;
-            background: rgba(255, 255, 255, 0.08);
-            margin-left: 10px;
-        }
-
-        /* Trading body — news left, chart+info right */
-        .trading-body {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            gap: 15px;
-            padding: 15px;
-            overflow: hidden;
-        }
-
-        .trading-news-feed {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .trading-news-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .trading-tag {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 8px;
-            letter-spacing: 2px;
-            color: var(--accent);
-            opacity: 0.9;
-        }
-
-        .trading-news-title {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 10px;
-            letter-spacing: 3px;
-            opacity: 0.4;
-            text-transform: uppercase;
-        }
-
-        .trading-news-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-        }
-
-        .trading-news-item {
-            padding: 12px 14px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border-left: 2px solid transparent;
-        }
-
-        .trading-news-item:hover {
-            background: rgba(255, 30, 30, 0.03);
-            border-left-color: rgba(255, 30, 30, 0.3);
-        }
-
-        .tn-logo-wrap {
-            width: 26px;
-            height: 26px;
-            flex-shrink: 0;
-            position: relative;
-        }
-
-        .tn-logo {
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            object-fit: contain;
-            background: rgba(255, 255, 255, 0.06);
-            flex-shrink: 0;
-        }
-
-        .tn-logo-badge {
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            background: rgba(255, 30, 30, 0.1);
-            border: 1px solid rgba(255, 30, 30, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Syncopate', sans-serif;
-            font-size: 6px;
-            letter-spacing: 0;
-            flex-shrink: 0;
-        }
-
-        .tn-body {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .trading-news-item .tn-title {
-            font-size: 12px;
-            font-weight: 500;
-            line-height: 1.3;
-            margin-bottom: 5px;
-        }
-
-        .trading-news-item .tn-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 9px;
-            opacity: 0.3;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
         #nav-rail {
             position: fixed;
             right: 40px;
@@ -1740,87 +1518,6 @@
             border: 1px solid rgba(255, 255, 255, 0.05);
             z-index: 1000;
             transition: var(--transition);
-        }
-
-        .trading-right-col {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .trading-chart-area {
-            flex: 1;
-            background: #000;
-            border: 1px solid rgba(255, 30, 30, 0.12);
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .trading-chart-area::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 28px;
-            height: 28px;
-            border-top: 1px solid rgba(255, 30, 30, 0.5);
-            border-left: 1px solid rgba(255, 30, 30, 0.5);
-            z-index: 5;
-            pointer-events: none;
-        }
-
-        .trading-chart-area::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 28px;
-            height: 28px;
-            border-bottom: 1px solid rgba(255, 30, 30, 0.5);
-            border-right: 1px solid rgba(255, 30, 30, 0.5);
-            z-index: 5;
-            pointer-events: none;
-        }
-
-        #main-trading-graph {
-            flex: 1;
-            width: 100%;
-            height: 100%;
-            min-height: 0;
-            overflow: hidden;
-        }
-
-        #main-trading-graph iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: block;
-        }
-
-        .trading-info-bottom {
-            background: rgba(255, 30, 30, 0.02);
-            border: 1px solid rgba(255, 30, 30, 0.08);
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .trading-info-bottom .label {
-            font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
-            letter-spacing: 2px;
-            opacity: 0.3;
-        }
-
-        .trading-info-bottom .big-val {
-            font-size: 22px;
-            color: #fff;
-            margin-top: 6px;
         }
 
         /* =============================================
@@ -2827,63 +2524,6 @@
             }
 
             /* ══════════════════════════════════════════
-               TRADING
-               ══════════════════════════════════════════ */
-            #panel-trading,
-            #panel-trading.active {
-                height: auto;
-                overflow: visible;
-            }
-
-            .trading-body {
-                grid-template-columns: 1fr;
-                gap: 0;
-                padding: 0;
-                overflow: visible;
-            }
-
-            /* Grafico in cima */
-            .trading-right-col {
-                order: -1;
-                gap: 0;
-            }
-
-            .trading-chart-area {
-                height: 220px;
-                min-height: 220px;
-                border-left: none;
-                border-right: none;
-                border-top: none;
-            }
-
-            .trading-info-bottom {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 0;
-                padding: 12px 16px;
-                border-left: none;
-                border-right: none;
-            }
-
-            /* News asset list sotto */
-            .trading-news-feed {
-                border: none;
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
-            }
-
-            .trading-news-header {
-                padding: 10px 14px;
-            }
-
-            .trading-news-item {
-                padding: 10px 12px;
-            }
-
-            .trading-news-item .tn-title {
-                font-size: 12px;
-            }
-
-            /* ══════════════════════════════════════════
                SPOTIFY
                ══════════════════════════════════════════ */
             #spotify-widget {
@@ -3101,7 +2741,7 @@
                         <div class="dom-devices-area">
                             <span class="dom-section-label">DISPOSITIVI</span>
                             <div class="dom-cards-grid">
-                                <!-- Luce -->
+                                <!-- Luce Indicatore -->
                                 <div class="dom-card" id="dev-light" onclick="toggleDevice('light')">
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">💡</span>
@@ -3112,18 +2752,7 @@
                                         <div class="dom-card-state" id="dev-light-state">OFF</div>
                                     </div>
                                 </div>
-                                <!-- Relay -->
-                                <div class="dom-card" id="dev-relay" onclick="toggleDevice('relay')">
-                                    <div class="dom-card-top">
-                                        <span class="dom-card-icon">⚡</span>
-                                        <div class="dom-toggle"></div>
-                                    </div>
-                                    <div>
-                                        <div class="dom-card-name">Relay</div>
-                                        <div class="dom-card-state" id="dev-relay-state">OFF</div>
-                                    </div>
-                                </div>
-                                <!-- Porta -->
+                                <!-- Porta (Servo1) -->
                                 <div class="dom-card" id="dev-servo" onclick="toggleDevice('servo')">
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">🔒</span>
@@ -3134,7 +2763,18 @@
                                         <div class="dom-card-state" id="dev-servo-state">CHIUSA</div>
                                     </div>
                                 </div>
-                                <!-- Buzzer -->
+                                <!-- Cancello (Servo2) -->
+                                <div class="dom-card" id="dev-servo2" onclick="toggleDevice('servo2')">
+                                  <div class="dom-card-top">
+                                    <span class="dom-card-icon">🚪</span>
+                                    <div class="dom-toggle"></div>
+                                  </div>
+                                  <div>
+                                    <div class="dom-card-name">Cancello</div>
+                                    <div class="dom-card-state" id="dev-servo2-state">CHIUSO</div>
+                                  </div>
+                                </div>
+                                <!-- Buzzer (Allarme) -->
                                 <div class="dom-card dom-card-buzzer" id="dev-alarm" onclick="toggleDevice('alarm')">
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">🔔</span>
@@ -3145,17 +2785,50 @@
                                     </div>
                                     <div class="casa-dot" id="casa-buzzer-dot"></div>
                                 </div>
-                                <!-- RGB — spans 2 columns -->
-                                <div class="dom-card" style="grid-column: span 2;" id="dev-rgb"
-                                    onclick="toggleDevice('rgb')">
+                                <!-- Buzzer2 / Audio -->
+                                <div class="dom-card dom-card-buzzer" id="dev-buzz2" onclick="toggleDevice('buzz2')">
+                                  <div class="dom-card-top">
+                                    <span class="dom-card-icon">🎵</span>
+                                  </div>
+                                  <div>
+                                    <div class="dom-card-name">Audio</div>
+                                    <div class="dom-card-state" id="dev-buzz2-state">IDLE</div>
+                                  </div>
+                                </div>
+                                <!-- RGB Soggiorno -->
+                                <div class="dom-card" id="dev-rgb1" onclick="toggleDevice('rgb1')">
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">🌈</span>
-                                        <div class="dom-rgb-bar" id="casa-rgb-swatch"
+                                        <div class="dom-rgb-bar" id="casa-rgb1-swatch"
                                             style="flex:1; margin-left:12px; align-self:center;"></div>
                                     </div>
                                     <div>
-                                        <div class="dom-card-name">LED RGB</div>
-                                        <div class="dom-card-state">COLORE CORRENTE</div>
+                                        <div class="dom-card-name">Soggiorno</div>
+                                        <div class="dom-card-state" id="dev-rgb1-state">OFF</div>
+                                    </div>
+                                </div>
+                                <!-- RGB Camera -->
+                                <div class="dom-card" id="dev-rgb2" onclick="toggleDevice('rgb2')">
+                                    <div class="dom-card-top">
+                                        <span class="dom-card-icon">🌈</span>
+                                        <div class="dom-rgb-bar" id="casa-rgb2-swatch"
+                                            style="flex:1; margin-left:12px; align-self:center;"></div>
+                                    </div>
+                                    <div>
+                                        <div class="dom-card-name">Camera</div>
+                                        <div class="dom-card-state" id="dev-rgb2-state">OFF</div>
+                                    </div>
+                                </div>
+                                <!-- RGB Studio -->
+                                <div class="dom-card" id="dev-rgb3" onclick="toggleDevice('rgb3')">
+                                    <div class="dom-card-top">
+                                        <span class="dom-card-icon">🌈</span>
+                                        <div class="dom-rgb-bar" id="casa-rgb3-swatch"
+                                            style="flex:1; margin-left:12px; align-self:center;"></div>
+                                    </div>
+                                    <div>
+                                        <div class="dom-card-name">Studio</div>
+                                        <div class="dom-card-state" id="dev-rgb3-state">OFF</div>
                                     </div>
                                 </div>
                             </div>
@@ -3246,60 +2919,7 @@
                         </div>
                     </div>
                 </div>
-                <!-- TRADING PANEL — Redesigned -->
-                <div id="panel-trading" class="panel">
-                    <div class="trading-ticker-strip" id="ticker-strip">
-                        <div class="ticker-track" id="ticker-track">
-                            <div class="ticker-item"><span class="tk-symbol">BTC</span><span
-                                    class="tk-price">--</span><span class="tk-change">· · ·</span><span
-                                    class="tk-sep"></span></div>
-                            <div class="ticker-item"><span class="tk-symbol">ETH</span><span
-                                    class="tk-price">--</span><span class="tk-change">· · ·</span><span
-                                    class="tk-sep"></span></div>
-                            <div class="ticker-item"><span class="tk-symbol">SPY</span><span
-                                    class="tk-price">--</span><span class="tk-change">· · ·</span><span
-                                    class="tk-sep"></span></div>
-                            <div class="ticker-item"><span class="tk-symbol">AAPL</span><span
-                                    class="tk-price">--</span><span class="tk-change">· · ·</span><span
-                                    class="tk-sep"></span></div>
-                            <div class="ticker-item"><span class="tk-symbol">NVDA</span><span
-                                    class="tk-price">--</span><span class="tk-change">· · ·</span><span
-                                    class="tk-sep"></span></div>
-                            <div class="ticker-item"><span class="tk-symbol">TSLA</span><span
-                                    class="tk-price">--</span><span class="tk-change">· · ·</span><span
-                                    class="tk-sep"></span></div>
-                        </div>
-                    </div>
-                    <div class="trading-body">
-                        <div class="trading-news-feed">
-                            <div class="trading-news-header">
-                                <span class="trading-tag">LIVE_FEED</span>
-                                <span class="trading-news-title">Financial News</span>
-                            </div>
-                            <div class="trading-news-list" id="trading-news-list">
-                                <div
-                                    style="padding:32px 20px;opacity:0.2;font-family:'Syncopate',sans-serif;font-size:8px;letter-spacing:3px;">
-                                    NEURAL_FEED IN ATTESA<br><br>Chiedi a Maya il prezzo<br>di un asset per
-                                    attivare<br>il feed in tempo reale.</div>
-                            </div>
-                        </div>
-                        <div class="trading-right-col">
-                            <div class="trading-chart-area">
-                                <div id="main-trading-graph"></div>
-                            </div>
-                            <div class="trading-info-bottom">
-                                <div>
-                                    <div class="label">Sentiment</div>
-                                    <div class="big-val" id="market-sentiment">NEUTRALE</div>
-                                </div>
-                                <div>
-                                    <div class="label">Volume 24h</div>
-                                    <div class="big-val" id="market-volume">--</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Trading panel removed -->
             </div>
         </div>
     </div>
@@ -3371,14 +2991,6 @@
             </svg>
             <span class="nav-tooltip">CALENDARIO</span>
         </div>
-        <!-- Trading -->
-        <div class="nav-item" id="nav-trading" onclick="enterWorkMode(); setLayout('trading'); setActiveNav('trading')">
-            <svg viewBox="0 0 24 24">
-                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-                <polyline points="16 7 22 7 22 13" />
-            </svg>
-            <span class="nav-tooltip">TRADING</span>
-        </div>
     </nav>
     <div id="log-strip">MAYA System Online...</div>
     <script>
@@ -3386,8 +2998,6 @@
         let map;
         let audioContext, analyser, dataArray;
         let orbState = 'idle';
-        let tradingAccum = [];
-        let _tradingFetchInProgress = false;
         // Three.js globals
         let scene, camera, renderer, mainOrb, originalPositions;
         // =============================================
@@ -3408,7 +3018,6 @@
             news: { label: 'NEURAL_FEED', title: 'News' },
             dashboard: { label: 'DOMOTICA // LIVE', title: 'Casa M.A.Y.A.' },
             calendar: { label: 'CALENDARIO', title: 'Agenda' },
-            trading: { label: 'MARKET_FEED', title: 'Trading' },
             map: { label: 'GEO_LOCATOR', title: 'Mappa' },
             browser: { label: 'NEURAL_BROWSER', title: 'Browser' },
         };
@@ -3718,18 +3327,6 @@
                     if (wData.location) updateWeather(wData);
                 }
                 if (d.type === 'calendar_data' && d.events) updateCalendar(d.events);
-                if (d.type === 'trading') {
-                    if (d.data && Array.isArray(d.data)) {
-                        updateTrading(d.data);
-                    } else if (d.symbol) {
-                        // Single item from backend — accumulate
-                        const exists = tradingAccum.findIndex(x => x.symbol === d.symbol);
-                        if (exists >= 0) tradingAccum[exists] = d;
-                        else tradingAccum.push(d);
-                        updateTrading(tradingAccum);
-                        _tradingFetchInProgress = false;
-                    }
-                }
                 if (d.type === 'state') updateArduino(d);
                 if (d.type === 'arduino_event' && d.telemetry) {
                     const t = d.telemetry;
@@ -3826,14 +3423,6 @@
                 if (lastWeatherLatLon) initWeatherMap(lastWeatherLatLon.lat, lastWeatherLatLon.lon);
                 else if (weatherMiniMap) weatherMiniMap.invalidateSize();
             }, 800);
-            if (layout === 'trading') {
-                if (tradingAccum.length > 0) updateTrading(tradingAccum);
-                if (ws && ws.readyState === WebSocket.OPEN && !_tradingFetchInProgress) {
-                    _tradingFetchInProgress = true;
-                    tradingAccum = [];
-                    ws.send(JSON.stringify({ type: 'tool', action: { tool: 'trading', operation: 'overview' } }));
-                }
-            }
             if (layout === 'calendar') {
                 _calViewYear = new Date().getFullYear();
                 _calViewMonth = new Date().getMonth();
@@ -3956,102 +3545,6 @@
             if (_calViewMonth > 11) { _calViewMonth = 0; _calViewYear++; }
             if (_calViewMonth < 0) { _calViewMonth = 11; _calViewYear--; }
             renderCalGrid();
-        }
-        let tickerData = [];
-        function updateTrading(data) {
-            tickerData = data;
-            // Populate ticker strip (duplicate items for seamless loop)
-            const tickerTrack = document.getElementById('ticker-track');
-            const tickerHTML = data.map(item => {
-                const chg = item.change_pct !== undefined ? item.change_pct : 0;
-                const isUp = chg >= 0;
-                const chgStr = `${isUp ? '+' : ''}${chg.toFixed(2)}%`;
-                return `<div class="ticker-item">
-                    <span class="tk-symbol">${item.symbol.toUpperCase()}</span>
-                    <span class="tk-price">${item.price_str}</span>
-                    <span class="tk-change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${chgStr}</span>
-                    <span class="tk-sep"></span>
-                </div>`;
-            }).join('');
-            tickerTrack.innerHTML = tickerHTML + tickerHTML;
-            // Populate news feed / asset list
-            const newsList = document.getElementById('trading-news-list');
-            const newsItems = data.map(item => {
-                const chg = item.change_pct !== undefined ? item.change_pct : 0;
-                const isUp = chg >= 0;
-                const chgStr = `${isUp ? '+' : ''}${chg.toFixed(2)}%`;
-                const sym = item.symbol.toLowerCase();
-                const logoUrl = ASSET_LOGOS[sym];
-                const badge = `<div class="tn-logo-badge">${item.symbol.slice(0, 3).toUpperCase()}</div>`;
-                const logoHtml = logoUrl
-                    ? `<div class="tn-logo-wrap"><img class="tn-logo" src="${logoUrl}" alt="${sym}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${badge.replace('class="tn-logo-badge"', 'class="tn-logo-badge" style="display:none"')}</div>`
-                    : badge;
-                return `<div class="trading-news-item" onclick="drawMainTradingGraph('${item.symbol}')">
-                    ${logoHtml}
-                    <div class="tn-body">
-                        <div class="tn-title">${item.symbol.toUpperCase()} &nbsp;<span style="opacity:0.4;font-size:11px">${item.price_str}</span></div>
-                        <div class="tn-meta"><span class="${isUp ? 'up' : 'down'}" style="font-size:13px;font-weight:300">${chgStr}</span><span>${item.asset_type?.toUpperCase() || 'ASSET'}</span></div>
-                    </div>
-                </div>`;
-            }).join('');
-            newsList.innerHTML = newsItems || '<div style="padding:20px;opacity:0.2;font-size:11px">Caricamento dati...</div>';
-            // Draw chart for first item
-            const mainGraph = document.getElementById('main-trading-graph');
-            if (data.length > 0 && !mainGraph.innerHTML.trim()) drawMainTradingGraph(data[0].symbol);
-            document.getElementById('market-volume').innerText = (Math.random() * 100 + 50).toFixed(2) + "B";
-        }
-        const ASSET_LOGOS = {
-            'btc': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCBTC--big.svg',
-            'xrp': 'https://s3-symbol-logo.tradingview.com/crypto/XTVCXRP--big.svg',
-            'aapl': 'https://s3-symbol-logo.tradingview.com/apple--big.svg',
-            'nvda': 'https://s3-symbol-logo.tradingview.com/nvidia--big.svg',
-            'tsla': 'https://s3-symbol-logo.tradingview.com/tesla--big.svg',
-            'msft': 'https://s3-symbol-logo.tradingview.com/microsoft--big.svg',
-            'meta': 'https://s3-symbol-logo.tradingview.com/meta-platforms--big.svg',
-            'amzn': 'https://s3-symbol-logo.tradingview.com/amazon--big.svg',
-            'googl': 'https://s3-symbol-logo.tradingview.com/alphabet--big.svg',
-            'jpm': 'https://s3-symbol-logo.tradingview.com/jpmorgan-chase--big.svg',
-            'v': 'https://s3-symbol-logo.tradingview.com/visa--big.svg',
-            'ma': 'https://s3-symbol-logo.tradingview.com/mastercard--big.svg',
-            'nflx': 'https://s3-symbol-logo.tradingview.com/netflix--big.svg',
-            'amd': 'https://s3-symbol-logo.tradingview.com/advanced-micro-devices--big.svg',
-            'dis': 'https://s3-symbol-logo.tradingview.com/walt-disney--big.svg',
-            'ba': 'https://s3-symbol-logo.tradingview.com/boeing--big.svg',
-            'gs': 'https://s3-symbol-logo.tradingview.com/goldman-sachs--big.svg',
-            'intc': 'https://s3-symbol-logo.tradingview.com/intel--big.svg',
-            'uber': 'https://s3-symbol-logo.tradingview.com/uber--big.svg',
-            'baba': 'https://s3-symbol-logo.tradingview.com/alibaba--big.svg',
-            'spy': 'https://s3-symbol-logo.tradingview.com/amex/spy--big.svg',
-            'qqq': 'https://s3-symbol-logo.tradingview.com/invesco--big.svg',
-        };
-        const TV_SYMBOLS = {
-            'btc': 'BINANCE:BTCUSDT', 'bitcoin': 'BINANCE:BTCUSDT',
-            'eth': 'BINANCE:ETHUSDT', 'ethereum': 'BINANCE:ETHUSDT',
-            'sol': 'BINANCE:SOLUSDT', 'solana': 'BINANCE:SOLUSDT',
-            'bnb': 'BINANCE:BNBUSDT', 'binancecoin': 'BINANCE:BNBUSDT',
-            'xrp': 'BINANCE:XRPUSDT', 'ripple': 'BINANCE:XRPUSDT',
-            'doge': 'BINANCE:DOGEUSDT', 'dogecoin': 'BINANCE:DOGEUSDT',
-            'spy': 'AMEX:SPY', 'qqq': 'NASDAQ:QQQ',
-            'aapl': 'NASDAQ:AAPL', 'nvda': 'NASDAQ:NVDA',
-            'tsla': 'NASDAQ:TSLA', 'msft': 'NASDAQ:MSFT',
-            'meta': 'NASDAQ:META', 'amzn': 'NASDAQ:AMZN',
-            'googl': 'NASDAQ:GOOGL', 'goog': 'NASDAQ:GOOGL',
-            'jpm': 'NYSE:JPM', 'v': 'NYSE:V', 'ma': 'NYSE:MA',
-            'nflx': 'NASDAQ:NFLX', 'amd': 'NASDAQ:AMD',
-            'dis': 'NYSE:DIS', 'ba': 'NYSE:BA', 'gs': 'NYSE:GS',
-            'intc': 'NASDAQ:INTC', 'uber': 'NYSE:UBER', 'baba': 'NYSE:BABA',
-            'brk-b': 'NYSE:BRK.B',
-        };
-        function drawMainTradingGraph(symbol) {
-            const tvSym = TV_SYMBOLS[symbol.toLowerCase()] || symbol.toUpperCase();
-            const el = document.getElementById('main-trading-graph');
-            const params = new URLSearchParams({
-                symbol: tvSym, interval: '60', theme: 'dark', style: '3',
-                locale: 'it', hide_side_toolbar: '1', allow_symbol_change: '0',
-                hideideas: '1', saveimage: '0', calendar: '0',
-                withdateranges: '0', hidetoptoolbar: '1',
-            });
-            el.innerHTML = `<iframe src="https://www.tradingview.com/widgetembed/?${params}" allowtransparency="true" scrolling="no"></iframe>`;
         }
         const WEATHER_ICONS = {
             'sun': '☀️', 'cloud-sun': '⛅', 'cloud': '☁️', 'cloud-fog': '🌫️',
@@ -4220,15 +3713,21 @@
         }
         // Stato locale dispositivi per la mappa casa
         const domState = {
-            light: false, relay: false, servo: false, alarm: false, rgb: false
+            light: false,
+            servo: false, servo2: false,
+            alarm: false, buzz2: false,
+            rgb1: false, rgb2: false, rgb3: false
         };
         function toggleDevice(dev) {
             const actionMap = {
                 light: () => ({ op: 'SET', target: 'light', value: domState.light ? 0 : 1 }),
-                relay: () => ({ op: 'SET', target: 'relay', value: domState.relay ? 0 : 1 }),
                 servo: () => ({ op: 'SET', target: 'servo', value: domState.servo ? 0 : 90 }),
+                servo2: () => ({ op: 'SET', target: 'servo2', value: domState.servo2 ? 0 : 90 }),
+                buzz2:  () => ({ op: 'SET', target: 'buzzer2', melody: 'beep' }),
                 alarm: () => ({ op: 'SET', target: 'buzzer', value: 1 }),
-                rgb: () => ({ op: 'SET', target: 'rgb', value: domState.rgb ? 0 : 16711680 }),
+                rgb1: () => ({ op: 'SET', target: 'rgb1', value: domState.rgb1 ? 0 : 16711680 }),
+                rgb2: () => ({ op: 'SET', target: 'rgb2', value: domState.rgb2 ? 0 : 65280 }),
+                rgb3: () => ({ op: 'SET', target: 'rgb3', value: domState.rgb3 ? 0 : 255 }),
             };
             const action = actionMap[dev]?.();
             if (!action) return;
@@ -4243,10 +3742,13 @@
         function refreshDomUI() {
             const devMap = {
                 light: { onLabel: 'ON', offLabel: 'OFF' },
-                relay: { onLabel: 'ON', offLabel: 'OFF' },
                 servo: { onLabel: 'APERTA', offLabel: 'CHIUSA' },
+                servo2: { onLabel: 'APERTO', offLabel: 'CHIUSO' },
+                buzz2:  { onLabel: 'PLAY',   offLabel: 'IDLE'   },
                 alarm: { onLabel: 'ATTIVO', offLabel: 'STANDBY' },
-                rgb: { onLabel: 'ON', offLabel: 'OFF' },
+                rgb1: { onLabel: 'ON', offLabel: 'OFF' },
+                rgb2: { onLabel: 'ON', offLabel: 'OFF' },
+                rgb3: { onLabel: 'ON', offLabel: 'OFF' },
             };
             for (const [dev, labels] of Object.entries(devMap)) {
                 const el = document.getElementById(`dev-${dev}`);
@@ -4261,26 +3763,37 @@
                 }
             }
         }
+        function _updateRgbSwatch(key, swatchId) {
+            // key = 'rgb1'|'rgb2'|'rgb3', d[key] = [r,g,b]
+            return function(d) {
+                if (d[key] !== undefined) {
+                    const rgb = Array.isArray(d[key]) ? d[key] : [0, 0, 0];
+                    domState[key] = rgb.some(v => v > 0);
+                    const hex = '#' + rgb.map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
+                    const sw = document.getElementById(swatchId);
+                    if (sw) sw.style.background = hex;
+                }
+            };
+        }
+        const _rgb1Update = _updateRgbSwatch('rgb1', 'casa-rgb1-swatch');
+        const _rgb2Update = _updateRgbSwatch('rgb2', 'casa-rgb2-swatch');
+        const _rgb3Update = _updateRgbSwatch('rgb3', 'casa-rgb3-swatch');
         function updateArduino(d) {
             if (d.system && d.system.reset_storage) {
                 document.getElementById('debug-controls').style.display = 'flex';
             }
             if (d.led !== undefined) domState.light = (d.led === 'on');
-            if (d.relay !== undefined) domState.relay = (d.relay === 'on');
-            if (d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90');
-            if (d.rgb !== undefined) {
-                const rgb = Array.isArray(d.rgb) ? d.rgb : [0, 0, 0];
-                domState.rgb = rgb.some(v => v > 0);
-                const hex = '#' + rgb.map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
-                const sw = document.getElementById('casa-rgb-swatch');
-                if (sw) sw.style.background = hex;
-            }
+            if (d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90' || parseInt(d.servo) > 0);
+            if (d.servo2 !== undefined) domState.servo2 = (d.servo2 === 'open' || d.servo2 === '90' || parseInt(d.servo2) > 0);
+            _rgb1Update(d);
+            _rgb2Update(d);
+            _rgb3Update(d);
             if (d.buzzer !== undefined) {
                 const dot = document.getElementById('casa-buzzer-dot');
                 if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
             }
             const pill = document.getElementById('dom-arduino-pill');
-            if (pill && (d.system || d.led || d.relay || d.servo)) pill.classList.add('online');
+            if (pill && (d.system || d.led || d.servo)) pill.classList.add('online');
             refreshDomUI();
         }
         async function updateMap(query) {

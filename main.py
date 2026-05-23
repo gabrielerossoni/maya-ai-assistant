@@ -268,7 +268,6 @@ async def broadcast_weather_update(lat=None, lon=None):
                 action = {"location": location}
             result = await asyncio.to_thread(weather_tool.execute, action)
             if result.get("status") == "ok":
-                user_log(f"Meteo aggiornato per {result['data']['location']}.")
                 await manager.broadcast(
                     {"type": "weather", "data": result.get("data")}
                 )
@@ -294,7 +293,6 @@ async def weather_broadcaster():
                         action = {"lat": client_lat, "lon": client_lon}
                 result = await asyncio.to_thread(weather_tool.execute, action)
                 if result.get("status") == "ok":
-                    user_log(f"Meteo aggiornato per {result['data']['location']}.")
                     await manager.broadcast(
                         {"type": "weather", "data": result.get("data")}
                     )
@@ -323,7 +321,6 @@ async def news_broadcaster():
                 # Wrap blocking feedparser call in a thread
                 result = await asyncio.to_thread(news_tool.execute, {"limit": 10})
                 if result.get("status") == "ok":
-                    user_log("Ultime notizie caricate.")
                     await manager.broadcast(
                         {"type": "news", "articles": result.get("news", [])}
                     )
@@ -374,7 +371,6 @@ async def lifespan(app: FastAPI):
     if mqtt_tool and hasattr(mqtt_tool, "set_ws_manager"):
         mqtt_tool.set_ws_manager(manager, agent.loop)
 
-    print("[SYSTEM] Online.")
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
 
     dashboard_path = os.path.abspath("static/jarvis_dashboard.html")
@@ -417,10 +413,18 @@ async def lifespan(app: FastAPI):
 
         def arduino_event_handler(event: dict):
             try:
-                payload = {
-                    "type": "arduino_event",
-                    **event
-                }
+                if "telemetry" in event or event.get("type") == "telemetry":
+                    telemetry_data = event.copy()
+                    telemetry_data.pop("type", None)
+                    payload = {
+                        "type": "arduino_event",
+                        "telemetry": telemetry_data
+                    }
+                else:
+                    payload = {
+                        "type": "arduino_event",
+                        **event
+                    }
 
                 asyncio.run_coroutine_threadsafe(
                     manager.broadcast(payload),
@@ -520,7 +524,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         if lat is not None and lon is not None:
                             client_lat = lat
                             client_lon = lon
-                            print(f"[WebSocket] Geolocalizzazione ricevuta: lat={lat}, lon={lon}")
                             asyncio.create_task(broadcast_weather_update(lat, lon))
                 elif data.get("type") == "tool":
                     # Esecuzione diretta tool, bypassa LLM
@@ -598,7 +601,10 @@ async def execute_and_broadcast(cmd: str):
             )
 
         # Dopo la fine del generatore, recuperiamo i dati finali dall'attributo dell'agente
-        if hasattr(agent, "_last_final_data"):
+        task = asyncio.current_task()
+        if task and task in agent._current_task_final_data:
+            _, layout_data = agent._current_task_final_data.pop(task)
+        elif hasattr(agent, "_last_final_data"):
             _, layout_data = agent._last_final_data
 
     except Exception as e:
@@ -681,17 +687,19 @@ async def broadcast_state():
             if isinstance(arduino_tool.sim_state.get("light"), str)
             else ("ON" if arduino_tool.sim_state.get("light") else "OFF")
         ).lower(),
-        "relay": (
-            arduino_tool.sim_state.get("relay", "OFF")
-            if isinstance(arduino_tool.sim_state.get("relay"), str)
-            else ("ON" if arduino_tool.sim_state.get("relay") else "OFF")
-        ).lower(),
         "servo": (
             arduino_tool.sim_state.get("servo", "CLOSED")
             if isinstance(arduino_tool.sim_state.get("servo"), str)
             else str(arduino_tool.sim_state.get("servo"))
         ).lower(),
-        "rgb":    list(arduino_tool.sim_state.get("rgb", [0, 0, 0])),
+        "servo2": (
+            arduino_tool.sim_state.get("servo2", 0)
+            if isinstance(arduino_tool.sim_state.get("servo2"), int)
+            else 0
+        ),
+        "rgb1":   list(arduino_tool.sim_state.get("rgb1", [0, 0, 0])),
+        "rgb2":   list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])),
+        "rgb3":   list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])),
         "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)),
         "system": {
             "model": MODELS.get("router", "llama3.2").upper(),
@@ -796,7 +804,10 @@ async def interactive_console():
                 async for token in agent.process(user_input):
                     full_reply += token
 
-                if hasattr(agent, "_last_final_data"):
+                task = asyncio.current_task()
+                if task and task in agent._current_task_final_data:
+                    _, layout_data = agent._current_task_final_data.pop(task)
+                elif hasattr(agent, "_last_final_data"):
                     _, layout_data = agent._last_final_data
             except Exception as e:
                 print(f"[CONSOLE] Errore: {e}")

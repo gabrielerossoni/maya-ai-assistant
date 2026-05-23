@@ -37,7 +37,6 @@ class SpotifyTool:
             )
             self.sp = spotipy.Spotify(auth_manager=auth_manager)
             user = self.sp.current_user()
-            print(f"[SPOTIFY] Connesso come: {user['display_name']}")
         except Exception as e:
             print(f"[SPOTIFY] Errore init: {e}")
             self.sp = None

@@ -65,8 +65,7 @@ class MemoryManager:
                 with open(METADATA_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.turns = data.get("turns", [])
-                    if len(self.turns) > 0:
-                        print(f"[MEMORY] {len(self.turns)} turni in memoria.")
+                    pass
             except Exception as e:
                 print(f"[MEMORY] Errore caricamento metadati: {e}")
                 self.turns = []
@@ -103,7 +102,6 @@ class MemoryManager:
             return None
         except Exception:
             _ollama_available = False
-            print(f"[MEMORY] Ollama non disponibile — embedding semantici disabilitati.")
             return None
 
     async def add_turn(self, role: str, text: str):

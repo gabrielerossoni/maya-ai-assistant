@@ -127,11 +127,6 @@ class VoiceManager:
         self._noise_floor = noise
         self._vad_speech = speech
         self._vad_silence = silence
-        print(
-            f"[VOICE] VAD effettivo: fondo rumore≈{noise:.0f} "
-            f"→ soglia parlato≥{speech:.0f}, fine frase quando RMS<{silence:.0f} "
-            f"per ~{self.silence_chunks_for_end * (self.CHUNK / self.RATE):.1f}s"
-        )
 
     @staticmethod
     def _pcm_rms(audio_int16: np.ndarray) -> float:
@@ -294,7 +289,6 @@ class VoiceManager:
         self.is_running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
-        print("[VOICE] Thread vocale avviato (caricamento modelli in background).")
 
     def _run_loop(self):
         try:
@@ -314,7 +308,6 @@ class VoiceManager:
 
             self._calibrate_vad_from_stream(stream)
 
-            print("[VOICE] Microfono pronto.")
             self._broadcast("IDLE")
 
             while self.is_running:
@@ -342,16 +335,10 @@ class VoiceManager:
                 if cmd is None:
                     if os.environ.get("MAYA_VOICE_DEBUG"):
                         print(f"[VOICE] (debug) Ignorato, nessuna wake phrase in: {text!r}")
-                    else:
-                        print(
-                            "[VOICE] Trascrizione senza wake (serve «Ehi Maya»… o «Maya» in testa): "
-                            f"{text!r}"
-                        )
                     self._broadcast("IDLE")
                     continue
 
-                print(f"[VOICE] Attivazione riconosciuta. Trascrizione: {text!r}")
-
+        
                 # LISTENING è già emesso dentro _record_utterance_*; dopo wake + comando inline va in PROCESSING
                 if cmd:
                     # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
@@ -376,24 +363,18 @@ class VoiceManager:
         """Dopo solo «Ehi Maya»: attendi che l'utente inizi a parlare, poi registra fino alla pausa."""
         self.is_listening = True
         w = self.followup_wait_sec
-        print(
-            f"[VOICE] Dimmi il comando quando vuoi (hai ~{w:.0f} s per iniziare, poi parla e fai una pausa)."
-        )
 
         pcm = self._record_utterance_pcm(stream, max_leading_silence_sec=w)
         self.is_listening = False
 
         if not pcm:
-            print("[VOICE] Timeout: non ho sentito il comando.")
             self._broadcast("IDLE")
             return
 
         if len(pcm) < self.CHUNK * self.followup_min_chunks:
-            print("[VOICE] Audio troppo breve dopo l'attivazione, ignoro.")
             self._broadcast("IDLE")
             return
 
-        print("[VOICE] Elaborazione comando...")
         self._broadcast("TRANSCRIBING")
         try:
             text = self._transcribe_pcm(pcm)
@@ -402,7 +383,6 @@ class VoiceManager:
             self._broadcast("IDLE")
             return
         if not text:
-            print("[VOICE] Nessun comando rilevato.")
             self._broadcast("IDLE")
             return
 
@@ -413,11 +393,9 @@ class VoiceManager:
             cmd_text = text
 
         if not cmd_text.strip():
-            print("[VOICE] Nessun comando dopo l'attivazione (solo wake phrase?).")
             self._broadcast("IDLE")
             return
 
-        print(f"[VOICE] Trascrizione: {cmd_text}")
         # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
         loop = self._voice_event_loop()
         if loop:
@@ -481,7 +459,6 @@ class VoiceManager:
             self._broadcast("IDLE")
             return
             
-        print(f"[VOICE] Sintesi vocale: {text[:80]}...")
         self.is_speaking = True
         self._broadcast("SPEAKING")
         
