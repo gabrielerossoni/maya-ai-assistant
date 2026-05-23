@@ -835,11 +835,11 @@ class AgentCore:
             return
 
         # 2. ReAct Loop
-        max_steps = 2 if intent == "DOMOTIC" else 4
-        current_step = 0
-
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
         intent = await self._route_intent(user_input)
+        
+        max_steps = 2 if intent == "DOMOTIC" else 4
+        current_step = 0
 
         # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
         if intent == "CHITCHAT":
