@@ -989,7 +989,7 @@ class AgentCore:
             result = self._clean_json(res_text)
             final_reply = result.get("reply", "")
             if final_reply:
-                for token in re.findall(r".*?\s|.*$", final_reply):
+                for token in (w + " " for w in final_reply.split()):
                     yield token
                 await self.memory.add_turn("jarvis", final_reply)
                 return
@@ -1117,7 +1117,7 @@ class AgentCore:
 
                     if not is_error and not has_rephrase_tool and len(reply) > 15:
                         final_reply = reply
-                        for token in re.findall(r".*?\s|.*$", final_reply):
+                        for token in (w + " " for w in final_reply.split()):
                             yield token
                         break
 
