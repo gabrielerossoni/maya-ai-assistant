@@ -51,9 +51,13 @@ class SpotifyTool:
             if command == "play_pause":
                 return self._toggle_play_pause()
             elif command == "play":
+                if not self.current_device_id and not self._has_active_device():
+                    return {"status": "ok", "message": "Nessun dispositivo Spotify attivo."}
                 self.sp.start_playback(device_id=self.current_device_id)
                 return {"status": "ok", "message": "Play."}
             elif command == "pause":
+                if not self.current_device_id and not self._has_active_device():
+                    return {"status": "ok", "message": "Nessun dispositivo Spotify attivo."}
                 self.sp.pause_playback(device_id=self.current_device_id)
                 return {"status": "ok", "message": "Pausa."}
             elif command == "next":
@@ -85,7 +89,17 @@ class SpotifyTool:
 
         except spotipy.exceptions.SpotifyException as e:
             if e.http_status == 403:
-                return {"status": "error", "message": "Nessun dispositivo Spotify attivo. Apri Spotify sul PC o telefono."}
+                reason = str(e).lower()
+                if "restriction" in reason:
+                    return {"status": "ok", "message": "Comando già eseguito o restrizione temporanea Spotify."}
+                if "no_active_device" in reason or "no active device" in reason:
+                    return {"status": "ok", "message": "Nessun dispositivo Spotify attivo."}
+                return {"status": "ok", "message": "Spotify occupato, riprova tra poco."}
+            if e.http_status == 404:
+                reason = str(e).lower()
+                if "no_active_device" in reason or "no active device" in reason:
+                    return {"status": "ok", "message": "Nessun dispositivo Spotify attivo."}
+                return {"status": "error", "message": str(e)}
             if e.http_status == 401:
                 return {"status": "error", "message": "Token scaduto. Riavvia MAYA."}
             return {"status": "error", "message": str(e)}
@@ -94,7 +108,17 @@ class SpotifyTool:
 
     # ── Helpers ───────────────────────────────────
 
+    def _has_active_device(self) -> bool:
+        """Controlla se esiste almeno un dispositivo Spotify attivo."""
+        try:
+            devices = self.sp.devices()
+            return any(d.get("is_active") for d in devices.get("devices", []))
+        except Exception:
+            return False
+
     def _toggle_play_pause(self) -> dict:
+        if not self.current_device_id and not self._has_active_device():
+            return {"status": "ok", "message": "Nessun dispositivo Spotify attivo."}
         pb = self.sp.current_playback()
         if pb and pb.get("is_playing"):
             self.sp.pause_playback(device_id=self.current_device_id)
@@ -158,13 +182,25 @@ class SpotifyTool:
     def _search_and_play(self, query: str) -> dict:
         if not query:
             return {"status": "error", "message": "Query vuota."}
-        results = self.sp.search(q=query, type="track", limit=1)
+        if not self.current_device_id and not self._has_active_device():
+            return {"status": "ok", "message": "Nessun dispositivo Spotify attivo. Apri Spotify su un device."}
+        results = self.sp.search(q=query, type="track", limit=10)
         tracks = results.get("tracks", {}).get("items", [])
         if not tracks:
             return {"status": "error", "message": f"Nessun brano trovato per '{query}'."}
-        uri = tracks[0]["uri"]
-        name = tracks[0]["name"]
-        artist = tracks[0]["artists"][0]["name"]
+        # Scegli il miglior match: più parole della query nel titolo+artista = miglior punteggio
+        q_words = set(query.lower().split())
+        best = tracks[0]
+        best_score = 0
+        for t in tracks:
+            haystack = (t["name"] + " " + t["artists"][0]["name"]).lower()
+            score = sum(1 for w in q_words if w in haystack)
+            if score > best_score:
+                best_score = score
+                best = t
+        uri = best["uri"]
+        name = best["name"]
+        artist = best["artists"][0]["name"]
         self.sp.start_playback(uris=[uri], device_id=self.current_device_id)
         return {"status": "ok", "message": f"▶ {name} — {artist}"}
 

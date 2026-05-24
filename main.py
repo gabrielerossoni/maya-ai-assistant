@@ -548,6 +548,18 @@ async def websocket_endpoint(websocket: WebSocket):
                                     await manager.broadcast({"type": "trading", **item})
                             else:
                                 await manager.broadcast({"type": "trading", **rdata})
+                        elif action.get("tool") == "spotify":
+                            # Dopo next/prev/play_pause, aggiorna widget con brano corrente
+                            import asyncio as _aio
+                            await _aio.sleep(0.5)  # attendi che Spotify aggiorni lo stato
+                            current = await agent.tool_manager.execute({"tool": "spotify", "command": "current"})
+                            await manager.broadcast({
+                                "type": "spotify",
+                                "track": current.get("track", ""),
+                                "artist": current.get("artist", ""),
+                                "album_art": current.get("album_art", ""),
+                                "is_playing": current.get("is_playing", False),
+                            })
                         else:
                             await manager.broadcast(
                                 {

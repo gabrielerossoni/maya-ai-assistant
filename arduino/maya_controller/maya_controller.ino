@@ -6,7 +6,7 @@
  *
  * Pin map:
  *   WS2812B DATA (NeoPixel) →  2  (Freenove 8-LED module, 3 zone: Soggiorno/Camera/Studio)
- *   Buzzer 2 (Melodies)     →  3
+ *   Speaker 8Ω Gikfun 2W   →  3  (melodie & notifiche, sostituisce buzzer2)
  *   DHT11                   →  4
  *   Buzzer 1 (Alarm)        →  8
  *   Servo 1 (Porta)         →  9
@@ -38,7 +38,7 @@ char MQTT_CLIENT_ID[32];
 
 // ── Pin definitions ───────────────────────────
 const int NEOPIXEL_PIN = 2;
-const int BUZZ2_PIN = 3;
+const int SPEAKER_PIN = 3;   // Speaker 8Ω 2W Gikfun (ex buzzer2)
 const int DHT_PIN = 4;
 const int BUZZ_PIN = 8;
 const int SERVO_PIN = 9;
@@ -109,7 +109,7 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZ_PIN, OUTPUT);
-  pinMode(BUZZ2_PIN, OUTPUT);
+  pinMode(SPEAKER_PIN, OUTPUT);
 
   digitalWrite(LED_PIN, LOW);
   digitalWrite(BUZZ_PIN, LOW);
@@ -539,15 +539,16 @@ void updateMelody() {
   if (now - noteStartMs < noteDuration)
     return;
 
-  noTone(BUZZ2_PIN);
+  noTone(SPEAKER_PIN);
 
   // Load next note in melody
+  // Melodie ottimizzate per speaker Gikfun 8Ω 2W (range 200Hz–4kHz)
   if (strcmp(currentMelody, "beep") == 0) {
-    int freqs[] = {2000};
-    int durs[] = {150};
+    int freqs[] = {1800};
+    int durs[] = {120};
     int size = 1;
     if (melodyNoteIndex < size) {
-      tone(BUZZ2_PIN, freqs[melodyNoteIndex]);
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
       noteDuration = durs[melodyNoteIndex];
       noteStartMs = now;
       melodyNoteIndex++;
@@ -559,7 +560,7 @@ void updateMelody() {
     int durs[] = {200, 200, 200, 200, 200, 200};
     int size = 6;
     if (melodyNoteIndex < size) {
-      tone(BUZZ2_PIN, freqs[melodyNoteIndex]);
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
       noteDuration = durs[melodyNoteIndex];
       noteStartMs = now;
       melodyNoteIndex++;
@@ -571,7 +572,7 @@ void updateMelody() {
     int durs[] = {100, 100, 100, 200};
     int size = 4;
     if (melodyNoteIndex < size) {
-      tone(BUZZ2_PIN, freqs[melodyNoteIndex]);
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
       noteDuration = durs[melodyNoteIndex];
       noteStartMs = now;
       melodyNoteIndex++;
@@ -583,7 +584,46 @@ void updateMelody() {
     int durs[] = {100, 150};
     int size = 2;
     if (melodyNoteIndex < size) {
-      tone(BUZZ2_PIN, freqs[melodyNoteIndex]);
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
+      noteDuration = durs[melodyNoteIndex];
+      noteStartMs = now;
+      melodyNoteIndex++;
+    } else {
+      melodyNoteIndex = -1;
+    }
+  } else if (strcmp(currentMelody, "notify") == 0) {
+    // Notifica dolce — 2 note morbide (speaker 8Ω)
+    int freqs[] = {880, 1109};  // A5, C#6
+    int durs[] = {120, 180};
+    int size = 2;
+    if (melodyNoteIndex < size) {
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
+      noteDuration = durs[melodyNoteIndex];
+      noteStartMs = now;
+      melodyNoteIndex++;
+    } else {
+      melodyNoteIndex = -1;
+    }
+  } else if (strcmp(currentMelody, "error") == 0) {
+    // Errore — tono discendente
+    int freqs[] = {880, 440, 220}; // A5, A4, A3
+    int durs[] = {150, 150, 300};
+    int size = 3;
+    if (melodyNoteIndex < size) {
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
+      noteDuration = durs[melodyNoteIndex];
+      noteStartMs = now;
+      melodyNoteIndex++;
+    } else {
+      melodyNoteIndex = -1;
+    }
+  } else if (strcmp(currentMelody, "welcome") == 0) {
+    // Benvenuto — melodia calda e piacevole (sfrutta qualità speaker)
+    int freqs[] = {523, 659, 784, 880, 1047, 1319}; // C5 E5 G5 A5 C6 E6
+    int durs[] = {120, 120, 120, 120, 150, 250};
+    int size = 6;
+    if (melodyNoteIndex < size) {
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
       noteDuration = durs[melodyNoteIndex];
       noteStartMs = now;
       melodyNoteIndex++;

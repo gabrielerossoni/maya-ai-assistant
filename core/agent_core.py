@@ -13,6 +13,8 @@ import httpx
 from .tool_manager import ToolManager
 from .memory_manager import MemoryManager
 from .preference_learner import PreferenceLearner
+from .automation_engine import AutomationEngine, build_default_automations, engine as automation_engine
+from .context_manager import context as home_context
 from dotenv import load_dotenv
 
 # Carica variabili d'ambiente da .env
@@ -70,7 +72,7 @@ NON aggiungere testo fuori dal JSON.
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
-- arduino: (op: SET/GET, target: light/relay/servo/servo2/rgb/neopixel/buzzer/buzzer2/accel; servo=porta 0-180, servo2=cancello 0-180; neopixel: value=0xRRGGBB effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2: melody=beep/alarm/startup/ok)
+- arduino: (op: SET/GET, target: light/relay/servo/servo2/rgb/neopixel/buzzer/buzzer2/speaker/accel; servo=porta 0-180, servo2=cancello 0-180; neopixel: value=0xRRGGBB effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/startup/ok/notify/error/welcome)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: invia comandi al secondo PC (qualsiasi stringa)
 - system: comandi OS (shutdown, open_browser, screenshot)
@@ -351,6 +353,7 @@ class AgentCore:
         self.tool_manager = ToolManager()
         self.memory = MemoryManager()
         self.learner = PreferenceLearner()
+        self.automation_engine: AutomationEngine = automation_engine
         self.conversation_history = []
         self._last_layout = {"type": "orb", "params": {}}
         self._last_final_data = ("", {"type": "orb", "params": {}})
@@ -364,27 +367,54 @@ class AgentCore:
         self.tool_manager.initialize()
         self.memory.load()
         await self.memory.migrate_json_to_chroma()
+
+        # Pre-popola la cache intent con pattern comuni (zero latenza routing)
+        _warm = {
+            "accendi la luce": "DOMOTIC", "spegni la luce": "DOMOTIC",
+            "apri la porta": "DOMOTIC", "chiudi la porta": "DOMOTIC",
+            "che tempo fa": "DOMOTIC", "meteo": "DOMOTIC",
+            "ultime notizie": "DOMOTIC", "notizie": "DOMOTIC",
+            "quanto vale bitcoin": "DOMOTIC", "prezzo btc": "DOMOTIC",
+            "spotify next": "DOMOTIC", "spotify prev": "DOMOTIC",
+            "spotify play": "DOMOTIC", "spotify pause": "DOMOTIC",
+            "spotify current": "DOMOTIC", "spotify volume": "DOMOTIC",
+            "ciao": "CHITCHAT", "ciao maya": "CHITCHAT",
+            "come stai": "CHITCHAT", "hey": "CHITCHAT",
+            "buongiorno": "CHITCHAT", "grazie": "CHITCHAT",
+        }
+        for k, v in _warm.items():
+            self._intent_cache[k] = v
+
+        # Inizializza il nuovo AutomationEngine
+        self.automation_engine._tool_manager = self.tool_manager
+        self.automation_engine.register_all(build_default_automations())
+        asyncio.create_task(self.automation_engine.start_scheduler())
+        print("[AGENT] AutomationEngine pronto con", len(self.automation_engine.list_automations()), "automazioni.")
+
         print("[AGENT] AgentCore pronto.\n")
 
     # ── FASE 1: PLANNER ──────────────────────────────────
     def _check_automation(self, user_input: str) -> list | None:
         """Controlla se l'input corrisponde a un'automazione predefinita.
-        Normalizza spazi multipli e risolve gli alias prima del match."""
+        Prima usa il nuovo AutomationEngine OO, poi fallback al dizionario statico."""
+        # 1. Nuovo engine (priorità, condizioni, alias)
+        automation = self.automation_engine.resolve(user_input)
+        if automation:
+            print(f"[PLANNER] Engine: automazione '{automation.name}' rilevata")
+            return automation  # ritorna l'oggetto Automation, gestito in process()
+
+        # 2. Fallback: dizionario statico (retrocompatibilità)
         import re as _re
         lower = _re.sub(r"\s+", " ", user_input.lower().strip())
-
-        # 1. Controlla prima gli alias (possono contenere varianti multi-parola)
         for alias, canonical in AUTOMATION_ALIASES.items():
             if alias in lower:
                 actions = AUTOMATIONS.get(canonical)
                 if actions:
-                    print(f"[PLANNER] Automazione (alias '{alias}' → '{canonical}') rilevata")
+                    print(f"[PLANNER] Fallback (alias '{alias}' → '{canonical}') rilevata")
                     return actions
-
-        # 2. Poi controlla i tasti canonici
         for keyword, actions in AUTOMATIONS.items():
             if keyword in lower:
-                print(f"[PLANNER] Automazione rilevata: '{keyword}'")
+                print(f"[PLANNER] Fallback automazione: '{keyword}'")
                 return actions
         return None
 
@@ -398,7 +428,7 @@ class AgentCore:
         intent = await self._route_intent_uncached(user_input)
 
         self._intent_cache[cache_key] = intent
-        if len(self._intent_cache) > 200:
+        if len(self._intent_cache) > 500:
             self._intent_cache.pop(next(iter(self._intent_cache)))
         return intent
 
@@ -459,6 +489,15 @@ class AgentCore:
         if any(
             x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]
         ):
+            return "DOMOTIC"
+
+        # Spotify: comandi diretti (es. "spotify next", "spotify play")
+        spotify_direct = [
+            "spotify next", "spotify prev", "spotify play", "spotify pause",
+            "spotify stop", "spotify volume", "spotify current", "spotify devices",
+            "spotify set_device", "spotify set_device_pc", "spotify search",
+        ]
+        if any(lower.startswith(cmd) for cmd in spotify_direct):
             return "DOMOTIC"
 
         # Spotify: VERBO + OGGETTO
@@ -598,11 +637,13 @@ class AgentCore:
             payload["max_tokens"] = 8   # router
         elif len(messages) > 0 and "DOMOTIC" in str(messages[0]["content"])[:50]:
             payload["max_tokens"] = 300  # domotic: risposta corta basta
+        elif len(messages) > 0 and "CHITCHAT" in str(messages[0].get("content", ""))[:60]:
+            payload["max_tokens"] = 300  # chitchat: risposte brevi
         else:
             payload["max_tokens"] = 800
 
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with httpx.AsyncClient(timeout=8) as client:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -633,7 +674,7 @@ class AgentCore:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=12.0) as client:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -819,18 +860,81 @@ class AgentCore:
                 return False
         return True
 
+    def _set_final_layout(self, reply: str, layout: dict):
+        """Setta il layout finale per il task corrente (usato dai fast path)."""
+        task = asyncio.current_task()
+        final_data = (reply, layout)
+        if task:
+            self._current_task_final_data[task] = final_data
+        else:
+            self._last_final_data = final_data
+
     # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
     async def process(self, user_input: str, progress_cb=None):
         """Pipeline completa ReAct: Ragiona → Agisci → Osserva."""
         # Salva input nella memoria
         await self.memory.add_turn("user", user_input)
 
-        # 1. Controlla automazioni (fast path)
-        auto_actions = self._check_automation(user_input)
-        if auto_actions:
-            await self._execute_actions(auto_actions)
-            reply = f"Automazione '{user_input}' eseguita."
+        # 0. Fast path: comandi Spotify diretti (bypass routing)
+        lower_input = user_input.strip().lower()
+        # Rimuovi prefissi vocali comuni
+        _clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower_input).strip()
+
+        spotify_action = None
+
+        # 0a. Comando esplicito: "spotify next", "spotify play", ecc.
+        if _clean.startswith("spotify "):
+            parts = _clean.split(None, 2)
+            command = parts[1] if len(parts) > 1 else "current"
+            extra = parts[2] if len(parts) > 2 else ""
+            spotify_action = {"tool": "spotify", "command": command}
+            if command == "search" and extra:
+                spotify_action["query"] = extra
+            elif command == "volume" and extra:
+                spotify_action["level"] = extra
+
+        # 0b. Linguaggio naturale: "metti X su spotify", "riproduci X", "play X"
+        if not spotify_action:
+            import re as _re
+            m = _re.match(
+                r"(?:metti|riproduci|play|fammi sentire|cerca)\s+(.+?)(?:\s+(?:su|on)\s+spotify)?$",
+                _clean,
+            )
+            if m and ("spotify" in _clean or any(w in _clean for w in ["metti", "riproduci", "fammi sentire"])):
+                query = m.group(1).strip()
+                # Rimuovi "di" come separatore artista (es. "ferrari di lilcr")
+                query = re.sub(r"\s+di\s+", " ", query)
+                spotify_action = {"tool": "spotify", "command": "search", "query": query}
+
+        if spotify_action:
+            result = await self.tool_manager.execute(spotify_action)
+            reply = result.get("message", str(result))
+            if self.socket_manager:
+                await self.socket_manager.broadcast({"type": "spotify", "data": result})
             await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            yield reply
+            return
+
+        # 1. Controlla automazioni (fast path)
+        auto_result = self._check_automation(user_input)
+        if auto_result is not None:
+            from .automation_engine import Automation as _Automation
+            if isinstance(auto_result, _Automation):
+                # Nuovo engine OO
+                exec_result = await self.automation_engine.execute(auto_result, source="voice")
+                scene_name = auto_result.name
+                status = exec_result.get("status", "ok")
+                reply = f"Scena '{scene_name}' eseguita." if status == "ok" else f"Scena '{scene_name}' completata con avvisi."
+                # Broadcast WebSocket se disponibile
+                if self.socket_manager:
+                    await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
+            else:
+                # Fallback lista azioni statiche
+                await self._execute_actions(auto_result)
+                reply = f"Automazione '{user_input}' eseguita."
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "orb", "params": {}})
             yield reply
             return
 
@@ -947,16 +1051,12 @@ class AgentCore:
                         # Stream the final reply token by token
                         for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token
-                            await asyncio.sleep(
-                                0.02
-                            )  # Piccola pausa per effetto streaming
                     else:
                         print(f"[ReAct] Reply vuota — richiamo pipeline specialistica.")
                         fallback = await self._call_llm(user_input, progress_cb)
                         final_reply = fallback.get("reply") or "Come posso aiutarti?"
                         for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token
-                            await asyncio.sleep(0.01)
                     break
 
                 # 2c. Eseguire azioni
@@ -984,7 +1084,6 @@ class AgentCore:
                         res.get("result", {}).get("status") == "error"
                         for res in results
                     )
-                    is_short_q_reply = "?" in user_input and len(reply) < 30
 
                     critical_tools = ["none", "code_generator"]
                     has_critical_tool = any(
@@ -993,10 +1092,8 @@ class AgentCore:
 
                     if (
                         not is_error
-                        and len(actions) == 1
                         and not has_critical_tool
                         and len(reply) > 15
-                        and not is_short_q_reply
                     ):
                         final_reply = reply
                         for token in re.findall(r".*?\s|.*$", final_reply):
