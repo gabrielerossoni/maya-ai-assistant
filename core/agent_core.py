@@ -1061,8 +1061,12 @@ class AgentCore:
 
                 # 2c. Eseguire azioni
                 if actions:
-                    if progress_cb and reply:
-                        await progress_cb(reply)
+                    # Streamma la frase "pre" (es. "Controllo il meteo...")
+                    # come primo token visibile all'utente
+                    if reply:
+                        yield reply + "\n"
+                        if progress_cb:
+                            await progress_cb(reply)
 
                     results = await self._execute_actions(actions)
                     self.learner.observe_command(user_input, actions)
@@ -1085,14 +1089,17 @@ class AgentCore:
                         for res in results
                     )
 
-                    critical_tools = ["none", "code_generator"]
-                    has_critical_tool = any(
-                        res["tool"] in critical_tools for res in results
+                    # Tool che richiedono riformulazione: i dati grezzi vanno
+                    # rielaborati dall'LLM in una risposta naturale (secondo step).
+                    needs_rephrase = ["none", "code_generator", "weather", "news",
+                                      "trading", "search", "wikipedia", "calendar"]
+                    has_rephrase_tool = any(
+                        res["tool"] in needs_rephrase for res in results
                     )
 
                     if (
                         not is_error
-                        and not has_critical_tool
+                        and not has_rephrase_tool
                         and len(reply) > 15
                     ):
                         final_reply = reply

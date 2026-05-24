@@ -1,334 +1,59 @@
 """
 MAYA - Sistema AI Agentico Locale
 Punto di ingresso principale
+
+Questo file contiene solo il wiring: crea le istanze, registra le route,
+definisce il lifespan e avvia uvicorn.
+La logica è nei moduli core/*.py.
 """
 
 import asyncio
-import sys
 import os
-import time
-import socket
-import shutil
-import subprocess
+import sys
 import threading
+import time
 import webbrowser
-import random
-import ollama
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, WebSocket
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+
 from core.agent_core import AgentCore, MODELS
 from core.plugin_loader import PluginLoader
 from core.proactive_manager import ProactiveManager
 from tools.display_tool import DisplayTool
-from core.websocket_manager import WebSocketManager
-from core.log_utils import setup_dashboard_log_filter, user_log
-from core.voice_manager import VoiceManager
 from core.websocket_manager import manager
+from core.voice_manager import VoiceManager
+from core.ollama_manager import ensure_ollama_running
+from core.ngrok_manager import start_ngrok
+from core.server_utils import pick_http_port, print_banner
+from core.broadcasters import (
+    interactive_console,
+    stats_broadcaster,
+    spotify_broadcaster,
+    news_broadcaster,
+    weather_broadcaster,
+    sensor_broadcaster,
+    broadcast_state,
+)
+from core.routes import (
+    get_dashboard,
+    get_service_worker,
+    get_manifest,
+    health_check,
+    websocket_endpoint,
+)
 
+# ---------------------------------------------------------------------------
 # Variabili globali per i task in background
+# ---------------------------------------------------------------------------
 _bg_tasks = []
-_log_filter_applied = False
-client_lat = None
-client_lon = None
-
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "127.0.0.1")
-OLLAMA_PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
-SPOTIFY_ENABLED = os.environ.get("SPOTIFY_ENABLED", "true").strip().lower() not in ("0", "false", "no")
 
 
-def _ollama_addr() -> tuple[str, int]:
-    host = OLLAMA_HOST
-    if host.startswith("http://"):
-        host = host[7:]
-    elif host.startswith("https://"):
-        host = host[8:]
-    host = host.split("/")[0]
-    if ":" in host:
-        h, _, p = host.partition(":")
-        try:
-            return h, int(p)
-        except ValueError:
-            return h, OLLAMA_PORT
-    return host, OLLAMA_PORT
-
-
-async def _ollama_api_reachable(timeout: float = 0.75) -> bool:
-    """Versione non-bloccante del check raggiungibilità Ollama."""
-
-    def _check():
-        host, port = _ollama_addr()
-        try:
-            with socket.create_connection((host, port), timeout=timeout):
-                return True
-        except OSError:
-            return False
-
-    return await asyncio.to_thread(_check)
-
-
-def _resolve_ollama_executable() -> str | None:
-    exe = shutil.which("ollama")
-    if exe:
-        return exe
-    if sys.platform == "win32":
-        local = os.path.join(
-            os.environ.get("LOCALAPPDATA", ""),
-            "Programs",
-            "Ollama",
-            "ollama.exe",
-        )
-        if os.path.isfile(local):
-            return local
-    return None
-
-
-def ensure_ollama_running(max_wait_sec: int = 45) -> None:
-    """
-    Se l'API Ollama non risponde, prova ad avviare `ollama serve` in background.
-    Disabilita con MAYA_SKIP_OLLAMA_AUTOSTART=1 oppure se OLLAMA_HOST punta a un host remoto.
-    """
-    if os.environ.get("OLLAMA_ENABLED", "true").strip().lower() not in (
-        "1",
-        "true",
-        "yes",
-    ):
-        print("[OLLAMA] Disabilitato tramite OLLAMA_ENABLED=false")
-        return
-
-    if os.environ.get("MAYA_SKIP_OLLAMA_AUTOSTART", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    ):
-        return
-
-    host, _ = _ollama_addr()
-    if host not in ("127.0.0.1", "localhost", "::1"):
-        return
-
-    # Check sync reachable (using socket directly)
-    def _check_sync():
-        host, port = _ollama_addr()
-        try:
-            with socket.create_connection((host, port), timeout=0.75):
-                return True
-        except OSError:
-            return False
-
-    if _check_sync():
-        return
-
-    ollama_exe = _resolve_ollama_executable()
-    if not ollama_exe:
-        print(
-            "[OLLAMA] Eseguibile non trovato. Installa Ollama da https://ollama.com "
-            "oppure avvialo manualmente."
-        )
-        return
-
-    print("[OLLAMA] Avvio del server locale in background...")
-    popen_kw: dict = {
-        "args": [ollama_exe, "serve"],
-        "stdin": subprocess.DEVNULL,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-    }
-    if sys.platform == "win32":
-        popen_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-    try:
-        subprocess.Popen(**popen_kw)
-    except OSError as e:
-        print(f"[OLLAMA] Impossibile avviare ollama serve: {e}")
-        return
-
-    for i in range(max_wait_sec):
-        if _check_sync():
-            print("[OLLAMA] Server pronto.")
-            return
-        time.sleep(1)
-        if i in (4, 14) and i > 0:
-            print("[OLLAMA] Ancora in attesa del servizio...")
-
-    print(
-        "[OLLAMA] Timeout: il servizio non risponde. Avvia l'app Ollama o "
-        "`ollama serve` da terminale, poi rilancia MAYA."
-    )
-
-
-def _pick_http_port(
-    host: str = "127.0.0.1",
-    *,
-    max_attempts: int = 24,
-) -> int:
-    """
-    Sceglie una porta TCP libera. Parte da MAYA_PORT (default 8000).
-    Con MAYA_PORT_STRICT=1 usa solo quella e non prova altre (uvicorn fallirà se occupata).
-    """
-    first = int(os.environ.get("MAYA_PORT", "8000"))
-    strict = os.environ.get("MAYA_PORT_STRICT", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
-    if strict:
-        return first
-    for port in range(first, first + max_attempts):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind((host, port))
-            return port
-        except OSError:
-            continue
-    return first
-
-
-def print_banner():
-    PEACH = "\033[38;5;203m"
-    GRAY = "\033[90m"
-    RESET = "\033[0m"
-    BOLD = "\033[1m"
-
-    if hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:
-            pass
-
-    print(f"\n{PEACH}╭───────────────────────────────────────────────────╮")
-    print(
-        f"│ {RESET}✷ Welcome to the {BOLD}MAYA{RESET} research preview!            {PEACH}│"
-    )
-    print(f"╰───────────────────────────────────────────────────╯\n")
-
-    print(f"{PEACH}{BOLD}")
-    print(r" ███╗   ███╗  █████╗  ██╗   ██╗  █████╗ ")
-    print(r" ████╗ ████║ ██╔══██╗ ╚██╗ ██╔╝ ██╔══██╗")
-    print(r" ██╔████╔██║ ███████║  ╚████╔╝  ███████║")
-    print(r" ██║╚██╔╝██║ ██╔══██║   ╚██╔╝   ██╔══██║")
-    print(r" ██║ ╚═╝ ██║ ██║  ██║    ██║    ██║  ██║")
-    print(r" ╚═╝     ╚═╝ ╚═╝  ╚═╝    ╚═╝    ╚═╝  ╚═╝")
-    print(f"{RESET}")
-    print(f" {GRAY}M.A.Y.A. - Multitask Advanced Yielding Assistant{RESET}")
-    print(f" {GRAY}Sistema Agentico Locale - Offline First v1.0{RESET}\n")
-
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-import uvicorn
-import requests
-from contextlib import asynccontextmanager
-
-
-def start_ngrok(port: int) -> str | None:
-    """Avvia ngrok in background e ritorna l'URL pubblico."""
-    try:
-        # Avvia ngrok
-        popen_kw: dict = {
-            "args": ["ngrok", "http", str(port)],
-            "stdin": subprocess.DEVNULL,
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-        }
-        if sys.platform == "win32":
-            popen_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-        subprocess.Popen(**popen_kw)
-
-        # Aspetta che ngrok sia pronto (max 5s)
-        for _ in range(10):
-            time.sleep(0.5)
-            try:
-                res = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=1)
-                tunnels = res.json().get("tunnels", [])
-                for t in tunnels:
-                    if t.get("proto") == "https":
-                        return t["public_url"]
-            except Exception:
-                continue
-
-        return None
-    except FileNotFoundError:
-        print("[NGROK] ngrok non trovato nel PATH")
-        return None
-    except Exception as e:
-        print(f"[NGROK] Errore: {e}")
-        return None
-
-
-async def broadcast_weather_update(lat=None, lon=None):
-    """Esegue l'aggiornamento meteo immediato per le coordinate o la località di fallback e lo trasmette."""
-    try:
-        weather_tool = agent.tool_manager.tools.get("weather")
-        if weather_tool:
-            if lat is not None and lon is not None:
-                action = {"lat": lat, "lon": lon}
-            else:
-                location = os.getenv("DEFAULT_WEATHER_LOCATION", "Roma")
-                action = {"location": location}
-            result = await asyncio.to_thread(weather_tool.execute, action)
-            if result.get("status") == "ok":
-                await manager.broadcast(
-                    {"type": "weather", "data": result.get("data")}
-                )
-            else:
-                await manager.broadcast({"type": "weather", "error": True})
-    except Exception as e:
-        print(f"[WebSocket] Errore meteo immediato: {e}")
-        await manager.broadcast({"type": "weather", "error": True})
-
-
-async def weather_broadcaster():
-    """Trasmette il meteo alla dashboard ogni 30 minuti."""
-    while True:
-        try:
-            weather_tool = agent.tool_manager.tools.get("weather")
-            if weather_tool:
-                # Wrap blocking requests call in a thread
-                location = os.getenv("DEFAULT_WEATHER_LOCATION", "Roma")
-                action = {"location": location}
-                if os.environ.get("MAYA_SKIP_BROWSER_OPEN") != "1":
-                    global client_lat, client_lon
-                    if client_lat is not None and client_lon is not None:
-                        action = {"lat": client_lat, "lon": client_lon}
-                result = await asyncio.to_thread(weather_tool.execute, action)
-                if result.get("status") == "ok":
-                    await manager.broadcast(
-                        {"type": "weather", "data": result.get("data")}
-                    )
-                else:
-                    await manager.broadcast({"type": "weather", "error": True})
-        except Exception as e:
-            print(f"[BROADCASTER] Errore meteo: {e}")
-            await manager.broadcast({"type": "weather", "error": True})
-        await asyncio.sleep(1800)
-
-
-async def news_broadcaster():
-    """Trasmette le ultime notizie alla dashboard ogni 10 minuti."""
-    # Aspetta che almeno un client sia connesso prima di caricare le notizie all'avvio
-    while not manager.active_connections:
-        await asyncio.sleep(1)
-    
-    # Jitter iniziale per non caricare tutto all'avvio (evita spike CPU/memoria)
-    await asyncio.sleep(random.uniform(3, 8))
-
-    while True:
-        try:
-            # Recupera il news_tool ogni volta dal tool_manager dell'agente globale
-            news_tool = agent.tool_manager.tools.get("news")
-            if news_tool:
-                # Wrap blocking feedparser call in a thread
-                result = await asyncio.to_thread(news_tool.execute, {"limit": 10})
-                if result.get("status") == "ok":
-                    await manager.broadcast(
-                        {"type": "news", "articles": result.get("news", [])}
-                    )
-        except Exception as e:
-            print(f"[BROADCASTER] Errore news: {e}")
-        await asyncio.sleep(600)
-
-
+# ---------------------------------------------------------------------------
+# Lifespan
+# ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -351,7 +76,7 @@ async def lifespan(app: FastAPI):
     ngrok_url = await asyncio.to_thread(start_ngrok, http_port)
     if ngrok_url:
         print(f"\n{'='*50}")
-        print(f"  🌐 MAYA pubblica su: {ngrok_url}")
+        print(f"  \U0001f310 MAYA pubblica su: {ngrok_url}")
         print(f"{'='*50}\n")
     else:
         print("[NGROK] Tunnel non avviato, solo accesso locale.")
@@ -373,17 +98,15 @@ async def lifespan(app: FastAPI):
 
     # display.start()  # Disabilitato: conflitto stdout con console interattiva. Stato inviato via WebSocket
 
-    dashboard_path = os.path.abspath("static/jarvis_dashboard.html")
-
     # Avvia la console e i broadcaster in background
     global _bg_tasks
     _bg_tasks = [
-        asyncio.create_task(interactive_console()),
-        asyncio.create_task(stats_broadcaster()),
-        asyncio.create_task(spotify_broadcaster()),
-        asyncio.create_task(news_broadcaster()),
-        asyncio.create_task(weather_broadcaster()),
-        asyncio.create_task(sensor_broadcaster()),
+        asyncio.create_task(interactive_console(agent, manager)),
+        asyncio.create_task(stats_broadcaster(manager, voice_manager)),
+        asyncio.create_task(spotify_broadcaster(agent, manager)),
+        asyncio.create_task(news_broadcaster(agent, manager)),
+        asyncio.create_task(weather_broadcaster(agent, manager)),
+        asyncio.create_task(sensor_broadcaster(agent, manager)),
     ]
 
     # Apri il browser con un piccolo ritardo (il server deve essere pronto)
@@ -454,392 +177,50 @@ async def lifespan(app: FastAPI):
                     print(f"[SHUTDOWN] Errore in chiusura tool {name}: {e}")
 
 
+# ---------------------------------------------------------------------------
+# Istanze globali
+# ---------------------------------------------------------------------------
 app = FastAPI(lifespan=lifespan)
 agent = AgentCore()
 agent.socket_manager = manager
 display = DisplayTool()
 voice_manager = VoiceManager(agent, manager)
 
-# Applica il filtro dei log della dashboard SUBITO dopo l'inizializzazione FastAPI
-# Questo permette ai log di sistema di passare al terminale durante l'avvio
-_log_filter_applied = False
 
-
+# ---------------------------------------------------------------------------
+# Route HTTP
+# ---------------------------------------------------------------------------
 @app.get("/")
-async def get_dashboard():
-    return FileResponse("static/jarvis_dashboard.html")
+async def _dashboard():
+    return await get_dashboard()
 
 
 @app.get("/sw.js")
-async def get_service_worker():
-    return FileResponse("static/sw.js", media_type="application/javascript")
+async def _sw():
+    return await get_service_worker()
 
 
 @app.get("/manifest.json")
-async def get_manifest():
-    return FileResponse("static/manifest.json", media_type="application/manifest+json")
+async def _manifest():
+    return await get_manifest()
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+async def _health():
+    return await health_check()
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    global _log_filter_applied, client_lat, client_lon
-    try:
-        await manager.connect(websocket)
-
-        # Applica il filtro log al primo collegamento del client (una sola volta)
-        if not _log_filter_applied:
-            setup_dashboard_log_filter(manager)
-            _log_filter_applied = True
-
-        await broadcast_state()
-        try:
-            await websocket.send_json(voice_manager.voice_status_message())
-        except Exception:
-            pass
-        
-        # Invio immediato del meteo corrente (utilizzando le coordinate memorizzate o il fallback)
-        asyncio.create_task(broadcast_weather_update(client_lat, client_lon))
-
-        while True:
-            try:
-                data = await websocket.receive_json()
-                if data.get("type") == "command":
-                    cmd = data.get("text", "")
-                    if cmd:
-                        # Invia la richiesta dell'utente alla dashboard tramite print (che passa dal filtro)
-                        print(f"Richiesta: {cmd}")
-                        asyncio.create_task(execute_and_broadcast(cmd))
-                elif data.get("type") == "geolocation":
-                    if os.environ.get("MAYA_SKIP_BROWSER_OPEN") != "1":
-                        lat = data.get("lat")
-                        lon = data.get("lon")
-                        if lat is not None and lon is not None:
-                            client_lat = lat
-                            client_lon = lon
-                            asyncio.create_task(broadcast_weather_update(lat, lon))
-                elif data.get("type") == "tool":
-                    # Esecuzione diretta tool, bypassa LLM
-                    action = data.get("action", {})
-                    if action:
-                        result = await agent.tool_manager.execute(action)
-                        if action.get("tool") == "calendar" and "events" in result:
-                            await manager.broadcast(
-                                {
-                                    "type": "calendar_data",
-                                    "events": result.get("events", []),
-                                }
-                            )
-                        elif (
-                            action.get("tool") == "trading"
-                            and result.get("status") == "ok"
-                        ):
-                            rdata = result.get("data", {})
-                            if rdata.get("overview"):
-                                # Broadcast ogni item singolarmente (accumulator nel frontend)
-                                for item in rdata.get("items", []):
-                                    await manager.broadcast({"type": "trading", **item})
-                            else:
-                                await manager.broadcast({"type": "trading", **rdata})
-                        elif action.get("tool") == "spotify":
-                            # Dopo next/prev/play_pause, aggiorna widget con brano corrente
-                            import asyncio as _aio
-                            await _aio.sleep(0.5)  # attendi che Spotify aggiorni lo stato
-                            current = await agent.tool_manager.execute({"tool": "spotify", "command": "current"})
-                            await manager.broadcast({
-                                "type": "spotify",
-                                "track": current.get("track", ""),
-                                "artist": current.get("artist", ""),
-                                "album_art": current.get("album_art", ""),
-                                "is_playing": current.get("is_playing", False),
-                            })
-                        else:
-                            await manager.broadcast(
-                                {
-                                    "type": "log",
-                                    "text": result.get("message", ""),
-                                    "level": "ok",
-                                }
-                            )
-                        await broadcast_state()
-            except WebSocketDisconnect:
-                break
-            except RuntimeError as e:
-                err = str(e).lower()
-                if "accept" in err or "not connected" in err or "disconnect" in err:
-                    break
-                raise
-            except Exception as e:
-                print(f"[WebSocket] Errore durante receive: {e}")
-                break
-    except Exception as e:
-        print(f"[WebSocket] Errore connessione: {e}")
-    finally:
-        manager.disconnect(websocket)
+async def _ws(websocket: WebSocket):
+    await websocket_endpoint(websocket, agent, manager, voice_manager, MODELS)
 
 
-async def execute_and_broadcast(cmd: str):
-    """
-    Esegue il comando tramite agent.process() e trasmette la risposta in streaming.
-    """
-
-    # Callback per inviare il filler message al frontend quando elabora
-    async def send_progress(msg: str):
-        await manager.broadcast(
-            {"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"}
-        )
-
-    # Streaming dei token
-    full_reply = ""
-    # Inizia con l'emoji
-    await manager.broadcast(
-        {"type": "stream", "token": "🤖 MAYA: ", "full_text": "🤖 MAYA: "}
-    )
-    full_reply = "🤖 MAYA: "
-
-    layout_data = {"type": "orb", "params": {}}
-    try:
-        async for token in agent.process(cmd, progress_cb=send_progress):
-            full_reply += token
-            await manager.broadcast(
-                {"type": "stream", "token": token, "full_text": full_reply}
-            )
-
-        # Dopo la fine del generatore, recuperiamo i dati finali dall'attributo dell'agente
-        task = asyncio.current_task()
-        if task and task in agent._current_task_final_data:
-            _, layout_data = agent._current_task_final_data.pop(task)
-        elif hasattr(agent, "_last_final_data"):
-            _, layout_data = agent._last_final_data
-
-    except Exception as e:
-        print(f"[PROCESS] Errore: {e}")
-
-    # Invia il layout finale alla dashboard
-    await manager.broadcast(
-        {
-            "type": "layout",
-            "layout": layout_data.get("type", "orb"),
-            "params": layout_data.get("params", {}),
-        }
-    )
-
-    print(f"MAYA > {full_reply}")
-
-    # Aggiorna lo stato del sistema (modelli, stats, ecc)
-    await broadcast_state()
-
-
-async def get_models_status():
-    """
-    Controlla lo stato di tutti i modelli configurati su Ollama.
-    Ritorna un dizionario con il nome del modello e il suo stato (online/offline).
-    """
-    try:
-        # Check if ollama is reachable first to avoid long library timeouts
-        if not await _ollama_api_reachable(timeout=0.5):
-            return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
-
-        client = ollama.AsyncClient()
-        # Timeout di 2 secondi per evitare blocchi infiniti se ollama è appeso
-        local_models = await asyncio.wait_for(client.list(), timeout=2.0)
-        downloaded = [m.get("name", "") for m in local_models.get("models", [])]
-
-        status = {}
-        for key, name in MODELS.items():
-            # Controlla se il modello esatto o una variante è disponibile
-            is_ok = any(name in d or d in name for d in downloaded)
-            status[key] = {"name": name, "online": is_ok, "id": key}
-        return status
-    except (asyncio.TimeoutError, Exception) as e:
-        if not isinstance(e, asyncio.TimeoutError):
-            print(f"[MONITOR] Errore nel controllo modelli: {e}")
-        # Ritorna tutti i modelli come offline se c'è un errore o timeout
-        return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
-
-
-_last_models_check: float = 0.0
-_cached_models_status: dict = {}
-
-async def broadcast_state():
-    """
-    Trasmette lo stato del sistema alla dashboard, includendo:
-    - Stato dei modelli (online/offline)
-    - Stato di Ollama
-    - Informazioni di sistema
-    """
-    global _last_models_check, _cached_models_status
-    arduino_tool = agent.tool_manager.tools.get("arduino")
-    now = time.time()
-    if now - _last_models_check > 30:
-        _cached_models_status = await get_models_status()
-        _last_models_check = now
-    models_status = _cached_models_status
-    ollama_online = any(m.get("online", False) for m in models_status.values())
-
-    _debug_reset_client = os.environ.get(
-        "MAYA_DEBUG_RESET_CLIENT", ""
-    ).strip().lower() in ("1", "true", "yes")
-
-    state_payload = {
-        "type": "state",
-        "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, "memory") else 0,
-        "memTurns": len(agent.memory.turns) if hasattr(agent, "memory") else 0,
-        "ollama": "ONLINE" if ollama_online else "OFFLINE",
-        "models": models_status,
-        "led": (
-            arduino_tool.sim_state.get("light", "OFF")
-            if isinstance(arduino_tool.sim_state.get("light"), str)
-            else ("ON" if arduino_tool.sim_state.get("light") else "OFF")
-        ).lower(),
-        "servo": (
-            arduino_tool.sim_state.get("servo", "CLOSED")
-            if isinstance(arduino_tool.sim_state.get("servo"), str)
-            else str(arduino_tool.sim_state.get("servo"))
-        ).lower(),
-        "servo2": (
-            arduino_tool.sim_state.get("servo2", 0)
-            if isinstance(arduino_tool.sim_state.get("servo2"), int)
-            else 0
-        ),
-        "rgb1":   list(arduino_tool.sim_state.get("rgb1", [0, 0, 0])),
-        "rgb2":   list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])),
-        "rgb3":   list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])),
-        "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)),
-        "system": {
-            "model": MODELS.get("router", "llama3.2").upper(),
-            "name": os.getenv("ASSISTANT_NAME", "MAYA"),
-            "version": "2.0.1-dev",
-            "reset_storage": _debug_reset_client,
-        },
-    }
-    await manager.broadcast(state_payload)
-
-
-async def stats_broadcaster():
-    import psutil
-
-    # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
-    psutil.cpu_percent(interval=None)
-    await asyncio.sleep(2)
-
-    while True:
-        try:
-            cpu_load = psutil.cpu_percent(interval=None)
-            memory = psutil.virtual_memory()
-            stats = {
-                "type": "stats",
-                "neural_load": cpu_load,
-                "memory": memory.percent,
-                "ram_used_gb": round(memory.used / (1024**3), 1),
-                "ram_total_gb": round(memory.total / (1024**3), 1),
-                "uptime": "Online",
-                # Allinea widget voce anche se alcuni broadcast si perdono
-                "voice_status": voice_manager.get_dashboard_voice_status(),
-            }
-            await manager.broadcast(stats)
-        except:
-            pass
-        await asyncio.sleep(2)
-
-
-async def sensor_broadcaster():
-    while True:
-        try:
-            arduino_tool = agent.tool_manager.tools.get("arduino")
-            if arduino_tool:
-                result = await asyncio.to_thread(arduino_tool.get_sensor_data)
-                if result is not None:
-                    await manager.broadcast({
-                        "type": "arduino_event",
-                        "telemetry": result,
-                    })
-        except Exception:
-            pass
-        await asyncio.sleep(30)
-
-
-async def spotify_broadcaster():
-    if not SPOTIFY_ENABLED:
-        return
-    while True:
-        try:
-            spotify_tool = agent.tool_manager.tools.get("spotify")
-            if spotify_tool and spotify_tool.sp:
-                # Wrap blocking spotipy call in a thread
-                result = await asyncio.to_thread(spotify_tool._current_track)
-                if result["status"] == "ok":
-                    await manager.broadcast(
-                        {
-                            "type": "spotify",
-                            "message": result.get("message", ""),
-                            "track": result.get("track", ""),
-                            "artist": result.get("artist", ""),
-                            "is_playing": result.get("is_playing", False),
-                            "album_art": result.get("album_art", ""),
-                        }
-                    )
-        except Exception:
-            pass
-        await asyncio.sleep(3)
-
-
-async def interactive_console():
-    """Legge i comandi dal terminale e li processa."""
-    print("\n[MAYA] Sistema pronto. Digita un comando o 'exit' per uscire.\n")
-    loop = asyncio.get_running_loop()
-    while True:
-        try:
-            sys.stdout.write("MAYA > ")
-            sys.stdout.flush()
-            user_input = await loop.run_in_executor(None, sys.stdin.readline)
-            user_input = user_input.strip()
-            if not user_input:
-                continue
-
-            if user_input.lower() in ["exit", "quit", "esci"]:
-                print("[MAYA] Spegnimento in corso...")
-                os._exit(0)
-
-            # Invia il comando dal terminale come se venisse dalla dashboard
-            print(f"Richiesta: {user_input}")
-            full_reply = ""
-            layout_data = {"type": "orb", "params": {}}
-            try:
-                async for token in agent.process(user_input):
-                    full_reply += token
-
-                task = asyncio.current_task()
-                if task and task in agent._current_task_final_data:
-                    _, layout_data = agent._current_task_final_data.pop(task)
-                elif hasattr(agent, "_last_final_data"):
-                    _, layout_data = agent._last_final_data
-            except Exception as e:
-                print(f"[CONSOLE] Errore: {e}")
-
-            await manager.broadcast(
-                {
-                    "type": "layout",
-                    "layout": layout_data.get("type", "orb"),
-                    "params": layout_data.get("params", {}),
-                }
-            )
-            print(f"MAYA > {full_reply}")
-
-        except EOFError:
-            # Terminale chiuso
-            break
-        except Exception as e:
-            user_log(f"Errore comando: {e}", is_error=True)
-
-
+# ---------------------------------------------------------------------------
+# Entrypoint
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     from core.instance_guard import (
         LOCK_PORT,
@@ -856,7 +237,7 @@ if __name__ == "__main__":
         _instance_guard = InstanceGuard()
         if not _instance_guard.acquire():
             print(
-                "[MAYA] È già attiva un'istanza (lock su 127.0.0.1:"
+                "[MAYA] \u00c8 gi\u00e0 attiva un'istanza (lock su 127.0.0.1:"
                 f"{LOCK_PORT}).\n"
                 "       Per chiuderla:  python main.py kill\n"
                 "       Bypass (solo debug):  MAYA_SKIP_INSTANCE_GUARD=1\n"
@@ -865,7 +246,7 @@ if __name__ == "__main__":
         install_signal_handlers(_instance_guard)
 
     _http_host = "127.0.0.1"
-    _http_port = _pick_http_port(_http_host)
+    _http_port = pick_http_port(_http_host)
     if _http_port != int(os.environ.get("MAYA_PORT", "8000")):
         print(
             f"[MAYA] Porta {os.environ.get('MAYA_PORT', '8000')} occupata: "

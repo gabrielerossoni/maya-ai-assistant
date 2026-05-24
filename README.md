@@ -13,7 +13,7 @@
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** Maggio 2026 — **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
+> **Ultimo aggiornamento:** Maggio 2026 — **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -256,7 +256,7 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 
 ```
 maya/
-├── main.py                    # Entrypoint: FastAPI, lifecycle, WS, broadcaster
+├── main.py                    # Entrypoint: thin wiring, lifespan, avvio uvicorn
 ├── MAYA_DESKTOP.bat           # Launcher rapido Windows (Electron)
 ├── package.json               # Electron / npm
 │
@@ -269,6 +269,11 @@ maya/
 │   ├── memory_manager.py      # Memoria semantica ChromaDB + sliding window
 │   ├── voice_manager.py       # Voice I/O: Whisper STT + Piper TTS + VAD
 │   ├── websocket_manager.py   # Broadcast manager WebSocket
+│   ├── broadcasters.py        # Task asincroni: meteo, news, stats, spotify, sensori
+│   ├── routes.py              # FastAPI routes HTTP + handler WebSocket
+│   ├── ollama_manager.py      # Gestione avvio e connessione Ollama
+│   ├── ngrok_manager.py       # Tunnel ngrok
+│   ├── server_utils.py        # Selezione porta HTTP + banner ASCII
 │   ├── plugin_loader.py       # Caricamento dinamico plugin
 │   ├── proactive_manager.py   # Monitor proattivo CPU/RAM/calendario
 │   ├── instance_guard.py      # Lock single-instance
@@ -831,6 +836,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Dashboard scene chips** — 18 chip scene con feedback visivo live: il chip attivo si evidenzia verde/arancio al completamento via `scene_executed` WebSocket; pill header mostra la scena corrente.
 - [x] **Velocizzazione risposte IA** — TTS streaming frase-per-frase (parla mentre genera), timeout Groq ridotti (15→8s), early exit più permissivo, cache intent pre-popolata, eliminazione sleep tra token yield, max_tokens CHITCHAT ridotto.
 - [x] **Speaker Gikfun 8Ω 2W** — Sostituisce buzzer2 su pin 3 con speaker di qualità superiore. Nuove melodie: `notify`, `error`, `welcome`. Alias `speaker` nel tool Python e nel prompt LLM.
+- [x] **Refactoring `main.py`** — Riduzione da 894 a ~230 righe. Logica estratta in moduli dedicati: `core/ollama_manager.py`, `core/ngrok_manager.py`, `core/server_utils.py`, `core/broadcasters.py`, `core/routes.py`. Zero cambiamenti di comportamento, smoke test aggiunto.
 
 ### 🔲 In corso / Prossimi
 
