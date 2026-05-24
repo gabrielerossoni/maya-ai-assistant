@@ -10,6 +10,8 @@ Sostituisce il dizionario AUTOMATIONS statico con un sistema OO completo:
 - Event bus interno
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -113,7 +115,8 @@ class Condition:
     def evaluate(self) -> bool:
         if not self.requirements:
             return True
-        return context.matches(self.requirements)
+        import core.automation_engine as _self_module
+        return _self_module.context.matches(self.requirements)
 
     def __repr__(self):
         return f"Condition({self.requirements})"

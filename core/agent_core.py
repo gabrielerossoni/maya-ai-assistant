@@ -3,6 +3,8 @@ agent_core.py - Cuore dell'agente Jarvis
 Gestisce: LLM (Ollama), Planner, Executor, Validator
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import os
@@ -418,9 +420,7 @@ class AgentCore:
             return automation  # ritorna l'oggetto Automation, gestito in process()
 
         # 2. Fallback: dizionario statico (retrocompatibilità)
-        import re as _re
-
-        lower = _re.sub(r"\s+", " ", user_input.lower().strip())
+        lower = re.sub(r"\s+", " ", user_input.lower().strip())
         for alias, canonical in AUTOMATION_ALIASES.items():
             if alias in lower:
                 actions = AUTOMATIONS.get(canonical)
@@ -905,14 +905,15 @@ class AgentCore:
         if not spotify_action:
             import re as _re
 
-            m = _re.match(
-                r"(?:metti|riproduci|play|fammi sentire|cerca)\s+([^\n]{1,200})(?:\s+(?:su|on)\s+spotify)?$",
-                _clean,
-            )
+            _pfx = r"(?:metti|riproduci|play|fammi sentire|cerca)\s+"
+            m = _re.match(_pfx + r"(.+?)\s+(?:su|on)\s+spotify$", _clean) \
+                or _re.match(_pfx + r"(.+)$", _clean)
             if m and ("spotify" in _clean or any(w in _clean for w in ["metti", "riproduci", "fammi sentire"])):
                 query = m.group(1).strip()
                 # Rimuovi "di" come separatore artista (es. "ferrari di lilcr")
-                query = re.sub(r"\s+di\s+", " ", query)
+                query = " ".join(
+                    part for part in query.split(" di ") if part
+                ) if " di " in query else query
                 spotify_action = {"tool": "spotify", "command": "search", "query": query}
 
         if spotify_action:

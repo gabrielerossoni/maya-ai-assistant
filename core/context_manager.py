@@ -5,6 +5,8 @@ Tiene traccia di: orario, presenza, meteo, attività, modalità attiva,
 dispositivi online/offline. Thread-safe, persistente su disco.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import time
@@ -38,6 +40,7 @@ class ContextManager:
             cls._instance = super().__new__(cls)
             cls._instance._lock = RLock()
             cls._instance._state: dict = {}
+            cls._instance._time_slot_locked = False
             cls._instance._load()
         return cls._instance
 
@@ -83,7 +86,8 @@ class ContextManager:
     def snapshot(self) -> dict:
         """Ritorna una copia immutabile dello stato corrente."""
         with self._lock:
-            self._state["time_slot"] = self._compute_time_slot()
+            if not self._time_slot_locked:
+                self._state["time_slot"] = self._compute_time_slot()
             return dict(self._state)
 
     # ── Scrittura ─────────────────────────────────────────────────────────────
@@ -91,6 +95,8 @@ class ContextManager:
     def set(self, key: str, value: Any, persist: bool = True):
         with self._lock:
             self._state[key] = value
+            if key == "time_slot":
+                self._time_slot_locked = True
             self._state["last_updated"] = time.time()
             if persist:
                 self._save()

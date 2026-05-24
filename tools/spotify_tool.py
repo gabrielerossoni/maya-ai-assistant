@@ -2,10 +2,12 @@
 spotify_tool.py - Controllo Spotify tramite Web API (spotipy)
 """
 
+from __future__ import annotations
+
 import os
 
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy.oauth2 import CacheFileHandler, SpotifyOAuth
 
 SCOPE = " ".join(
     [
@@ -36,7 +38,7 @@ class SpotifyTool:
                 client_secret=os.getenv("SPOTIFY_CLIENT_SECRET"),
                 redirect_uri=os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback"),
                 scope=SCOPE,
-                cache_path="data/.spotify_token_cache",
+                cache_handler=CacheFileHandler(cache_path="data/.spotify_token_cache"),
                 open_browser=False,
             )
             self.sp = spotipy.Spotify(auth_manager=auth_manager)

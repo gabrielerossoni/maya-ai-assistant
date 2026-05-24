@@ -4,11 +4,14 @@ Intercetta errori ripetuti, genera patch via Groq, le salva in plugins/ per hot-
 La patch NON sovrascrive mai tools/ — usa il PluginLoader come vettore sicuro.
 """
 
+from __future__ import annotations
+
 import ast
 import asyncio
 import inspect
 import os
 import re
+import traceback
 
 import httpx
 
@@ -47,9 +50,10 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
         self._error_counts[tool_name] = count
         if count >= self.ERROR_THRESHOLD and tool_name not in self._patched:
             self._patched.add(tool_name)
-            asyncio.create_task(self._attempt_fix(tool_name, error, source_file))
+            tb_text = traceback.format_exc()
+            asyncio.create_task(self._attempt_fix(tool_name, error, source_file, tb_text))
 
-    async def _attempt_fix(self, tool_name: str, error: Exception, source_file: str):
+    async def _attempt_fix(self, tool_name: str, error: Exception, source_file: str, tb_text: str = ""):
         print(f"[SELF_HEALER] Tentativo fix per '{tool_name}' dopo {self.ERROR_THRESHOLD} errori consecutivi")
 
         if not source_file or not os.path.exists(source_file):
@@ -58,10 +62,6 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
 
         with open(source_file, "r", encoding="utf-8") as f:
             original_code = f.read()
-
-        import traceback as _tb
-
-        tb_text = _tb.format_exc()
 
         user_msg = (
             f"Tool: {tool_name}\n"

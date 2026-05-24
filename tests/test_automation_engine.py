@@ -195,14 +195,17 @@ class TestExecute:
 
 class TestConditions:
     @pytest.mark.asyncio
-    async def test_condition_blocks_execution(self, engine, fresh_context):
+    async def test_condition_blocks_execution(self, engine, fresh_context, monkeypatch):
+        import core.automation_engine as _ae
         fresh_context.set("time_slot", "morning")
+        monkeypatch.setattr(_ae, "context", fresh_context)
         auto = _simple_automation(
             "solo_notte",
             conditions=[Condition({"time_slot": "night"})],
         )
         engine.register(auto)
-        result = await engine.execute(auto)
+        with patch("core.automation_engine.context", fresh_context):
+            result = await engine.execute(auto)
         assert result["status"] == "skipped"
 
     @pytest.mark.asyncio

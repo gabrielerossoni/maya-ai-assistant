@@ -3,6 +3,8 @@ Gestione avvio e connessione Ollama.
 Estratto da main.py per ridurre la complessità del punto di ingresso.
 """
 
+from __future__ import annotations
+
 import asyncio
 import os
 import shutil

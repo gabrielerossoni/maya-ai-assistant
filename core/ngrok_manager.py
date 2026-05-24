@@ -3,6 +3,8 @@ Gestione tunnel ngrok.
 Estratto da main.py per ridurre la complessità del punto di ingresso.
 """
 
+from __future__ import annotations
+
 import subprocess
 import sys
 import time

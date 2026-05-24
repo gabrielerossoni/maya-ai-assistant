@@ -18,7 +18,7 @@
     <meta name="theme-color" content="#0a0a0c">
     <!-- Prevent phone number detection -->
     <meta name="format-detection" content="telephone=no">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <style>
@@ -3419,7 +3419,8 @@
                 try {
                     const _u = new URL(params.url);
                     if (_u.protocol === 'https:' || _u.protocol === 'http:') {
-                        document.getElementById('browser-iframe').src = _u.href;
+                        const _safeHref = _u.href;
+                        document.getElementById('browser-iframe').setAttribute('src', _safeHref);
                     }
                 } catch (_) { /* invalid url — ignore */ }
             }
@@ -3475,7 +3476,8 @@
                 document.getElementById('spotify-track').innerText = d.track;
                 document.getElementById('spotify-artist').innerText = d.artist;
                 const _artUrl = d.album_art || '';
-                document.getElementById('spotify-art').src = /^https?:\/\//.test(_artUrl) ? _artUrl : '';
+                const _safeArt = /^https:\/\//.test(_artUrl) ? _artUrl : '';
+                document.getElementById('spotify-art').setAttribute('src', _safeArt);
                 document.getElementById('spotify-play-btn').innerText = d.is_playing ? '⏸' : '▶';
                 if (d.is_playing && !widget.classList.contains('active')) {
                     widget.style.display = 'block';
@@ -3523,7 +3525,8 @@
                 const dateLabel = isToday ? 'OGGI' : dt.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
                 const timeLabel = isNaN(dt) ? _esc(e.time) : dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
                 const title = _esc(e.title || '');
-                return `<div class="cal-event-item${isToday ? ' today' : ''}">
+                const _lnk = e.link ? (() => { try { const _p = new URL(e.link); return (_p.protocol==='https:'||_p.protocol==='http:') ? _p.href : ''; } catch(_){return '';} })() : '';
+                return `<div class="cal-event-item${isToday ? ' today' : ''}"${_lnk ? ` data-url="${_esc(_lnk)}"` : ''} style="${_lnk ? 'cursor:pointer;' : ''}">
                     <div class="cal-event-info">
                         <div class="cal-event-title">${title}</div>
                         <div class="cal-event-source">${e.source === 'google' ? 'GOOGLE' : 'MAYA'}</div>
@@ -3534,6 +3537,9 @@
                     </div>
                 </div>`;
             }).join('');
+            list.querySelectorAll('[data-url]').forEach(el => {
+                el.addEventListener('click', () => setLayout('browser', { url: el.dataset.url }));
+            });
         }
 
         function renderCalGrid() {
@@ -3706,9 +3712,13 @@
             for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
                 const iframe = document.getElementById(`stream-iframe-${i}`);
                 if (iframe && iframe.src) {
-                    const src = iframe.src;
-                    iframe.src = '';
-                    setTimeout(() => { iframe.src = src; }, 300 * i);
+                    try {
+                        const _ru = new URL(iframe.src);
+                        if (_ru.protocol !== 'https:') continue;
+                        const _safeSrc = _ru.href;
+                        iframe.setAttribute('src', '');
+                        setTimeout(() => { iframe.setAttribute('src', _safeSrc); }, 300 * i);
+                    } catch (_) { /* invalid src — skip */ }
                 }
             }
         }, 20 * 60 * 1000);
@@ -3717,14 +3727,19 @@
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
             const _en = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
             const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? _en(p.href) : '#'; } catch(_){return '#';} };
-            document.getElementById('news-sidebar-list').innerHTML = articles.map((a, i) => `
-                <div class="ns-item" onclick="setLayout('browser',{url:'${_safeUrl(a.link)}'})">
+            document.getElementById('news-sidebar-list').innerHTML = articles.map((a, i) => {
+                const _u = _safeUrl(a.link);
+                return `<div class="ns-item"${_u !== '#' ? ` data-url="${_en(_u)}"` : ''} style="cursor:pointer;">
                     <div class="ns-rank">${String(i + 1).padStart(2, '0')}</div>
                     <div class="ns-content">
                         <div class="ns-source">${_en(a.source || 'MAYA FEED')}</div>
                         <div class="ns-title">${_en(a.title)}</div>
                     </div>
-                </div>`).join('');
+                </div>`;
+            }).join('');
+            document.getElementById('news-sidebar-list').querySelectorAll('[data-url]').forEach(el => {
+                el.addEventListener('click', () => setLayout('browser', { url: el.dataset.url }));
+            });
             // Ticker — all headlines scrolling
             const tickerItems = articles.map(a =>
                 `<span class="ntk-label">${_en(a.source || 'NEWS')}</span><span class="ntk-sep">//</span><span class="ntk-item">${_en(a.title)}</span><span class="ntk-sep">///</span>`

@@ -5,6 +5,8 @@ Tiene traccia dell'ultimo stato noto di ogni dispositivo fisico (luci,
 servo, RGB, relay, ecc.). Permette conflict detection e rollback.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import time
