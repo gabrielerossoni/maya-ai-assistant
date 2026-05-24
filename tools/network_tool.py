@@ -58,7 +58,7 @@ class NetworkTool:
 # ══════════════════════════════════════════════
 
 
-def run_server(host="0.0.0.0", port=9999):
+def run_server(host="127.0.0.1", port=9999):
     """
     Server TCP da avviare sul secondo PC.
     Riceve comandi da Jarvis ed esegue azioni locali.

@@ -18,9 +18,9 @@
     <meta name="theme-color" content="#0a0a0c">
     <!-- Prevent phone number detection -->
     <meta name="format-detection" content="telephone=no">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPgM=" crossorigin=""></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Syncopate:wght@400;700&family=Sora:wght@100;300;400;600&display=swap');
 
@@ -3415,7 +3415,14 @@
             const target = document.getElementById(`panel-${layout}`);
             if (target) target.classList.add('active');
             if (layout === 'map' && params.location) updateMap(params.location);
-            if (layout === 'browser' && params.url) document.getElementById('browser-iframe').src = params.url;
+            if (layout === 'browser' && params.url) {
+                try {
+                    const _u = new URL(params.url);
+                    if (_u.protocol === 'https:' || _u.protocol === 'http:') {
+                        document.getElementById('browser-iframe').src = _u.href;
+                    }
+                } catch (_) { /* invalid url — ignore */ }
+            }
             if (layout === 'news') {
                 if (newsStreamsInitialized && Date.now() - newsStreamsInitTime > 20 * 60 * 1000)
                     newsStreamsInitialized = false;
@@ -3467,7 +3474,8 @@
             if (d.track) {
                 document.getElementById('spotify-track').innerText = d.track;
                 document.getElementById('spotify-artist').innerText = d.artist;
-                document.getElementById('spotify-art').src = d.album_art || '';
+                const _artUrl = d.album_art || '';
+                document.getElementById('spotify-art').src = /^https?:\/\//.test(_artUrl) ? _artUrl : '';
                 document.getElementById('spotify-play-btn').innerText = d.is_playing ? '⏸' : '▶';
                 if (d.is_playing && !widget.classList.contains('active')) {
                     widget.style.display = 'block';
@@ -3508,12 +3516,13 @@
                 list.innerHTML = '<div class="cal-empty">NESSUN EVENTO</div>';
                 return;
             }
+            const _esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             list.innerHTML = future.map(e => {
                 const dt = new Date(e.time.replace(' ', 'T'));
                 const isToday = dt.toDateString() === now.toDateString();
                 const dateLabel = isToday ? 'OGGI' : dt.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
-                const timeLabel = isNaN(dt) ? e.time : dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                const title = e.title || '';
+                const timeLabel = isNaN(dt) ? _esc(e.time) : dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                const title = _esc(e.title || '');
                 return `<div class="cal-event-item${isToday ? ' today' : ''}">
                     <div class="cal-event-info">
                         <div class="cal-event-title">${title}</div>
@@ -3620,9 +3629,10 @@
             }
             const fc = document.getElementById('weather-forecast-col');
             if (fc && data.daily) {
+                const _e = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
                 fc.innerHTML = data.daily.slice(0, 5).map(day => {
                     const d = new Date(day.date).toLocaleDateString('it-IT', { weekday: 'short' }).toUpperCase();
-                    const desc = (day.condition || day.description || '').toLowerCase();
+                    const desc = _e((day.condition || day.description || '').toLowerCase());
                     return `<div class="wx-fc-row">
                         <span class="wx-fc-day">${d}</span>
                         <span class="wx-fc-desc">${desc}</span>
@@ -3705,17 +3715,19 @@
         function updateNews(articles) {
             if (!articles || articles.length === 0) return;
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
+            const _en = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+            const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? _en(p.href) : '#'; } catch(_){return '#';} };
             document.getElementById('news-sidebar-list').innerHTML = articles.map((a, i) => `
-                <div class="ns-item" onclick="setLayout('browser',{url:'${a.link}'})">
+                <div class="ns-item" onclick="setLayout('browser',{url:'${_safeUrl(a.link)}'})">
                     <div class="ns-rank">${String(i + 1).padStart(2, '0')}</div>
                     <div class="ns-content">
-                        <div class="ns-source">${a.source || 'MAYA FEED'}</div>
-                        <div class="ns-title">${a.title}</div>
+                        <div class="ns-source">${_en(a.source || 'MAYA FEED')}</div>
+                        <div class="ns-title">${_en(a.title)}</div>
                     </div>
                 </div>`).join('');
             // Ticker — all headlines scrolling
             const tickerItems = articles.map(a =>
-                `<span class="ntk-label">${a.source || 'NEWS'}</span><span class="ntk-sep">//</span><span class="ntk-item">${a.title}</span><span class="ntk-sep">///</span>`
+                `<span class="ntk-label">${_en(a.source || 'NEWS')}</span><span class="ntk-sep">//</span><span class="ntk-item">${_en(a.title)}</span><span class="ntk-sep">///</span>`
             ).join('');
             const track = document.getElementById('news-ticker-track');
             track.innerHTML = tickerItems + tickerItems;

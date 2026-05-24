@@ -906,7 +906,7 @@ class AgentCore:
             import re as _re
 
             m = _re.match(
-                r"(?:metti|riproduci|play|fammi sentire|cerca)\s+(.+?)(?:\s+(?:su|on)\s+spotify)?$",
+                r"(?:metti|riproduci|play|fammi sentire|cerca)\s+([^\n]{1,200})(?:\s+(?:su|on)\s+spotify)?$",
                 _clean,
             )
             if m and ("spotify" in _clean or any(w in _clean for w in ["metti", "riproduci", "fammi sentire"])):
@@ -1065,13 +1065,13 @@ class AgentCore:
                     if reply:
                         final_reply = reply
                         # Stream the final reply token by token
-                        for token in re.findall(r".*?\s|.*$", final_reply):
+                        for token in (w + " " for w in final_reply.split()):
                             yield token
                     else:
                         print("[ReAct] Reply vuota — richiamo pipeline specialistica.")
                         fallback = await self._call_llm(user_input, progress_cb)
                         final_reply = fallback.get("reply") or "Come posso aiutarti?"
-                        for token in re.findall(r".*?\s|.*$", final_reply):
+                        for token in (w + " " for w in final_reply.split()):
                             yield token
                     break
 
