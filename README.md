@@ -13,7 +13,7 @@
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** Maggio 2026 — Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop con icona MAYA, bug fixes pre-demo.
+> **Ultimo aggiornamento:** Maggio 2026 — **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -30,7 +30,7 @@ La differenza rispetto ai sistemi già esistenti:
 - **Gestione multi-scenario** — non un singolo dispositivo acceso/spento, ma un ambiente coordinato
 - **Dashboard HUD dinamica** — pannello "STATO CASA // LIVE" con stato real-time di ogni dispositivo
 - **Linguaggio naturale in italiano** — comandi normali, senza formule rigide
-- **18 scene configurate** — modalità studio, notte, film, relax, uscita, ospite, allarme + scene giornaliere (buongiorno, cena, sveglia, piove, pausa caffè e altre)
+- **21+ scene OO** — modalità studio, notte, film, relax, gaming, lavoro, uscita, ospite, allarme + scene giornaliere (buongiorno, sveglia, cena, piove, weekend, pausa caffè e altre) con priorità, cooldown e trigger automatici
 
 ---
 
@@ -46,7 +46,10 @@ flowchart LR
 
     subgraph CORE["AgentCore (PC)"]
         R["Router Intent"] --> P["Planner (ReAct)"]
+        P --> AE["AutomationEngine"]
         P --> E["Executor"] --> V["Validator"]
+        AE --> CM["ContextManager"]
+        AE --> DR["DeviceRegistry"]
     end
 
     subgraph TOOLS["ToolManager"]
@@ -59,6 +62,7 @@ flowchart LR
         SERVO["🚪 Servo  pin 9"]
         RGB["🌈 RGB  pin 3/5/6"]
         BUZZ["🔔 Buzzer  pin 8"]
+        SPK["🔊 Speaker 8Ω  pin 3"]
         DHT["🌡️ DHT11  pin 4"]
     end
 
@@ -95,7 +99,7 @@ Arduino Uno / Nano
 ├── Pin  9  →  Servo SG90      (porta / accesso — PWM)
 ├── Pin  5  →  RGB canale R    (PWM analogWrite)
 ├── Pin  6  →  RGB canale G    (PWM analogWrite)
-├── Pin  3  →  RGB canale B    (PWM analogWrite)
+├── Pin  3  →  Speaker 8Ω 2W  (Gikfun — melodie via tone(), ex buzzer2)
 ├── Pin  8  →  Buzzer          (allarme — digitale, auto-off 200 ms)
 ├── Pin  4  →  DHT11           (temperatura e umidità — OneWire)
 └── USB     →  Seriale PC      (115200 baud)
@@ -110,7 +114,7 @@ Arduino Uno / Nano
 | Servo SG90 (porta) | 9 | PWM / Servo | 0° = chiusa, 90° = aperta |
 | RGB — canale R | 5 | PWM (analogWrite) | 0–255 |
 | RGB — canale G | 6 | PWM (analogWrite) | 0–255 |
-| RGB — canale B | 3 | PWM (analogWrite) | 0–255 |
+| Speaker 8Ω 2W (Gikfun) | 3 | PWM (tone) | Melodie: beep, alarm, startup, ok, notify, error, welcome |
 | Buzzer | 8 | Digitale OUT | Cicalino, auto-off dopo 200 ms |
 | DHT11 | 4 | OneWire | Temp. + umidità; telemetria ogni 5 s |
 
@@ -137,7 +141,7 @@ Comunicazione seriale **115200 baud**, una riga JSON per messaggio, terminata co
 | Campo | Valori |
 |---|---|
 | `cmd` | `"SET"` oppure `"GET"` |
-| `target` | `"light"` · `"relay"` · `"servo"` · `"rgb"` · `"buzzer"` · `"sensor_read"` |
+| `target` | `"light"` · `"relay"` · `"servo"` · `"rgb"` · `"buzzer"` · `"buzzer2"`/`"speaker"` · `"sensor_read"` |
 | `value` | `0`/`1` per digitali · `0–180` per servo · intero `0xRRGGBB` o oggetto `{"r":R,"g":G,"b":B}` per RGB |
 
 ### Risposta (Arduino → PC)
@@ -209,12 +213,15 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 ## Caratteristiche
 
 - **Agentic ReAct Loop** — ciclo asincrono Ragiona → Agisci → Osserva con routing ibrido dell'intent
-- **Voice I/O Integrato** — STT via `faster-whisper` (tiny) e TTS via `Piper` (voce Paola) con VAD adattivo
+- **Automation Engine OO** — 21+ scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno, scheduler asincrono
+- **Context Manager** — stato globale casa thread-safe e persistente: time slot, presenza, meteo, attività, scena attiva, flag custom
+- **Device Registry** — memoria persistente dei dispositivi con tracciamento `last_set_by` e conflict detection tra scene
+- **Voice I/O Integrato** — STT via `faster-whisper` (small) e TTS via `Piper` (voce Paola) con VAD adattivo
 - **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window
-- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; pannelli live per Meteo, Notizie, Trading, Stato Casa, Calendario (griglia mensile + prossimi eventi), Spotify
+- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 18 chip scene con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify
 - **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`
 - **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout
-- **Stato Casa Live** — pannello "STATO CASA // LIVE" aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
+- **Stato Casa Live** — pannello aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
 - **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` pubblica ai client ogni 30 s
 - **Graceful Degradation** — senza Arduino → simulazione automatica; `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline
 - **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente i card della dashboard via WebSocket
@@ -254,7 +261,10 @@ maya/
 ├── package.json               # Electron / npm
 │
 ├── core/
-│   ├── agent_core.py          # Planner/Executor/Validator, routing, AUTOMATIONS
+│   ├── agent_core.py          # Planner/Executor/Validator, routing, integrazione engine
+│   ├── automation_engine.py   # AutomationEngine OO: scene, trigger, priorità, event bus
+│   ├── context_manager.py     # ContextManager: stato globale casa (presenza, meteo, orario)
+│   ├── device_registry.py     # DeviceRegistry: memoria persistente stato dispositivi
 │   ├── tool_manager.py        # Registry e dispatcher di tutti i tool
 │   ├── memory_manager.py      # Memoria semantica ChromaDB + sliding window
 │   ├── voice_manager.py       # Voice I/O: Whisper STT + Piper TTS + VAD
@@ -304,7 +314,9 @@ maya/
 │   ├── token.json             # Google token (gitignored)
 │   ├── memory_metadata.json
 │   ├── calendar.json
-│   └── notes.json
+│   ├── notes.json
+│   ├── context_state.json     # Stato persistente ContextManager (gitignored)
+│   └── device_registry.json   # Stato persistente DeviceRegistry (gitignored)
 │
 ├── electron/
 │   ├── main.js                # Electron main process
@@ -434,6 +446,7 @@ Il frontend si connette a `ws://127.0.0.1:8000/ws`.
 { "type": "state",         "led": "on", "relay": "off", "servo": "0",
                             "rgb": [255, 238, 153], "buzzer": false }
 { "type": "arduino_event", "telemetry": { "temp": 22.4, "humidity": 58.1, "uptime_ms": 12000 } }
+{ "type": "scene_executed", "scene": "buongiorno", "status": "ok|partial", "elapsed": 1.23 }
 { "type": "weather",       "data": { ... } }
 { "type": "trading",       "symbol": "BTC", "price": 68000, "change_pct": 2.4 }
 { "type": "news",          "articles": [ ... ] }
@@ -758,7 +771,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 | Data | Verifica | Obiettivo | Stato |
 |---|---|---|---|
 | 16/05/2026 | Verifica 1 | Schema scelto, hardware collegato, dashboard aperta, ≥ 1 dispositivo risponde | ✅ |
-| 23/05/2026 | Verifica 2 | Flusso completo: comando → LLM → Arduino → feedback real-time sulla dashboard | 🔲 |
+| 23/05/2026 | Verifica 2 | Flusso completo: comando → LLM → Arduino → feedback real-time sulla dashboard | ✅ |
 | 30/05/2026 | Verifica 3 | Demo stabile, correzione bug, prova con pubblico interno, video di backup pronto | 🔲 |
 | 04/06/2026 | Arduino Day | Solo rifinitura e presentazione. **Niente nuove funzioni** | 🔲 |
 
@@ -779,7 +792,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Firmware Arduino JSON 115200 baud** — controllo completo di LED, relay, servo, RGB, buzzer, DHT11.
 - [x] **Protocollo telemetria automatica da DHT11** — invio automatico dei dati sensore ogni 5 s.
 - [x] **Pannello "STATO CASA // LIVE"** — visualizzazione istantanea del funzionamento di ogni dispositivo.
-- [x] **18 scene configurate con controllo RGB e buzzer** — scenari domotici pronti all'uso per ogni momento della giornata.
+- [x] **21+ scene OO configurate** — scenari domotici pronti all'uso con priorità, cooldown, condizioni contestuali e trigger automatici.
 - [x] **`sensor_broadcaster`** — aggiornamento automatico temperatura/umidità ogni 30 s.
 - [x] **`SPOTIFY_ENABLED` flag** — abilitazione e disattivazione dinamica del controllo Spotify.
 - [x] **`OLLAMA_ENABLED` flag** — fallback sicuro su Groq o Keyword parser se Ollama locale è offline.
@@ -810,11 +823,22 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Apprendimento statistico delle preferenze utente (`preference_learner.py`)** — monitoraggio delle abitudini (frequenza scene, orari di maggiore attività, tool usati) con persistenza in `data/user_preferences.json` e iniezione automatica delle preferenze del profilo utente nel prompt di sistema di MAYA.
 - [x] **Risoluzione blocco asincrono Voice Manager (`voice_manager.py`)** — conversione della lettura vocale delle notizie da `time.sleep` sincrono e bloccante ad `await asyncio.sleep` asincrono non-bloccante, garantendo la fluidità della dashboard HUD.
 
+### ✅ Recenti
+
+- [x] **Automation Engine OO** — refactoring completo del sistema automazioni: classi `Action`, `Condition`, `Trigger`, `Scene`, `Automation`, `AutomationEngine`, `EventBus`. Supporto priorità, cooldown, conflict detection, retry, timeout, scheduler asincrono, event log strutturato, automazioni temporanee con scadenza.
+- [x] **ContextManager** — singleton thread-safe con persistenza JSON: traccia time slot, presenza, meteo, attività, scena attiva, flag. Metodo `matches()` per condizioni complesse (valore singolo, lista OR, negazione).
+- [x] **DeviceRegistry** — singleton con persistenza JSON: ogni dispositivo ha stato, `last_set_by` e timestamp. Conflict detection tra scene, sync automatico dallo stato Arduino.
+- [x] **Dashboard scene chips** — 18 chip scene con feedback visivo live: il chip attivo si evidenzia verde/arancio al completamento via `scene_executed` WebSocket; pill header mostra la scena corrente.
+- [x] **Velocizzazione risposte IA** — TTS streaming frase-per-frase (parla mentre genera), timeout Groq ridotti (15→8s), early exit più permissivo, cache intent pre-popolata, eliminazione sleep tra token yield, max_tokens CHITCHAT ridotto.
+- [x] **Speaker Gikfun 8Ω 2W** — Sostituisce buzzer2 su pin 3 con speaker di qualità superiore. Nuove melodie: `notify`, `error`, `welcome`. Alias `speaker` nel tool Python e nel prompt LLM.
+
 ### 🔲 In corso / Prossimi
 
+- [ ] **Trigger da processi OS** — `app_opened:vscode` / `app_opened:spotify` rilevati via `psutil` nel `ProactiveManager` → pubblica su `EventBus` per attivare automazioni contestuali.
+- [ ] **Trigger Wi-Fi telefono** — monitor DHCP lease → `bus.publish("phone_joined_wifi" | "phone_left_wifi")` per automazioni presenze.
+- [ ] **Rimozione dizionario statico** — una volta stabilizzato il nuovo engine, eliminare `AUTOMATIONS` e `AUTOMATION_ALIASES` legacy da `agent_core.py`.
 - [ ] **Multi-room multi-board MQTT** — Espansione del protocollo MQTT per gestire schede Arduino R4 WiFi multiple allocate in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
-- [ ] **Streaming token-by-token nativo** — Ottimizzazione della latenza dell'orb con il passaggio a streaming progressivo dei token dell'LLM tramite WebSocket direttamente sulla dashboard durante la generazione della risposta.
-- [ ] **Suite di test asincroni end-to-end** — Consolidamento e riscrittura dei test di integrazione per validare il comportamento dei moduli asincroni (`proactive_manager`, `self_healer`, `websocket_manager`) simulando risposte hardware e interruzioni di rete.
+- [ ] **Suite di test asincroni end-to-end** — Consolidamento e riscrittura dei test di integrazione per validare il comportamento dei moduli asincroni (`proactive_manager`, `self_healer`, `automation_engine`) simulando risposte hardware e interruzioni di rete.
 
 ### 🔮 Futuro
 
@@ -974,6 +998,7 @@ Progetto sviluppato da studenti dell'**ITIS di Crema** per l'**Arduino Day 2026*
 | **Marcello Patrini** — *Co-Developer* | Contributi allo sviluppo e testing. |
 
 [![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-gabrielerossoni-181717?style=flat-square&logo=github)](https://github.com/gabrielerossoni)
+[![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-Marcello1408-181717?style=flat-square&logo=github)](https://github.com/Marcello1408)
 
 ---
 

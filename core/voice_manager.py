@@ -401,49 +401,92 @@ class VoiceManager:
         if loop:
             asyncio.run_coroutine_threadsafe(self._process_voice_text(cmd_text.strip()), loop)
 
+    def _split_sentences(self, text: str) -> list[str]:
+        """Divide il testo in frasi complete (separatori: . ! ? e a-capo con elenco)."""
+        parts = re.split(r'(?<=[.!?])\s+|\n[-*]\s*|\n{2,}', text)
+        return [p.strip().lstrip('-').lstrip('*').strip() for p in parts if p.strip()]
+
     async def _process_voice_text(self, text: str):
         self._broadcast("PROCESSING")
+        # Mostra il testo trascritto sulla dashboard
+        if self.socket_manager:
+            await self.socket_manager.broadcast({
+                "type": "stream", "token": f"🎤 {text}\n", "full_text": f"🎤 {text}"
+            })
+        print(f"Richiesta (voce): {text}")
         try:
-            # Per le notizie, vogliamo che l'agente legga i titoli con pause
             is_news_request = any(word in text.lower() for word in ["notizie", "news", "notiziario", "aggiornamenti"])
-            
+
+            # ── Streaming TTS: parla frase per frase mentre l'agente genera ──
+            sentence_buf = ""
             full_reply = ""
-            async def _collect():
-                result = ""
-                async for token in self.agent.process(text):
-                    result += token
-                return result
+            spoke_something = False
+
+            # Coda per frasi pronte → thread TTS le riproduce in pipeline
+            tts_queue: queue.Queue = queue.Queue()
+            tts_done = threading.Event()
+
+            def _tts_worker():
+                """Thread dedicato: riproduce frasi dalla coda appena disponibili."""
+                first = True
+                while True:
+                    sentence = tts_queue.get()
+                    if sentence is None:          # sentinella di fine
+                        break
+                    if first:
+                        self.is_speaking = True
+                        self._broadcast("SPEAKING")
+                        first = False
+                    self._speak_raw(sentence)
+                    if is_news_request:
+                        time.sleep(0.8)
+                tts_done.set()
+
+            tts_thread = threading.Thread(target=_tts_worker, daemon=True)
+            tts_thread.start()
 
             try:
-                full_reply = await asyncio.wait_for(_collect(), timeout=15.0)
+                async for token in self.agent.process(text):
+                    full_reply += token
+                    sentence_buf += token
+
+                    # Controlla se abbiamo una frase completa nel buffer
+                    sentences = self._split_sentences(sentence_buf)
+                    if len(sentences) > 1:
+                        # Tutte tranne l'ultima (potrebbe essere incompleta)
+                        for s in sentences[:-1]:
+                            if s:
+                                tts_queue.put(s)
+                                spoke_something = True
+                        sentence_buf = sentences[-1]
             except asyncio.TimeoutError:
-                print("[VOICE] Timeout agente (15s): risposta ignorata.")
-                return
-            
+                print("[VOICE] Timeout agente: risposta parziale.")
+            except Exception as e:
+                print(f"[VOICE] Errore stream agente: {e}")
+
+            # Frase residua nel buffer
+            remainder = sentence_buf.strip()
+            if remainder:
+                tts_queue.put(remainder)
+                spoke_something = True
+
+            # Segnala fine coda
+            tts_queue.put(None)
+            tts_done.wait(timeout=30)
+
             # Recupera dati finali (layout) salvati dall'agente
             layout_data = {"type": "orb", "params": {}}
             if hasattr(self.agent, '_last_final_data'):
                 _, layout_data = self.agent._last_final_data
-            
-            if full_reply.strip():
-                if self.socket_manager:
-                    await self.socket_manager.broadcast({
-                        "type": "layout",
-                        "layout": layout_data.get("type", "orb"),
-                        "params": layout_data.get("params", {})
-                    })
-                
-                if is_news_request:
-                    # Se è una richiesta di notizie, dividiamo per punti elenco o articoli
-                    articles = re.split(r'\n-|\n\*', full_reply)
-                    for article in articles:
-                        if article.strip():
-                            clean_text = article.strip().lstrip('-').lstrip('*').strip()
-                            self.speak(clean_text)
-                            await asyncio.sleep(1.5)
-                else:
-                    self.speak(full_reply)
-            else:
+
+            if full_reply.strip() and self.socket_manager:
+                await self.socket_manager.broadcast({
+                    "type": "layout",
+                    "layout": layout_data.get("type", "orb"),
+                    "params": layout_data.get("params", {})
+                })
+
+            if not spoke_something:
                 print("[VOICE] Risposta agente vuota, niente TTS.")
 
         except Exception as e:
@@ -451,7 +494,30 @@ class VoiceManager:
             import traceback
             traceback.print_exc()
         finally:
+            self.is_speaking = False
             self._broadcast("IDLE")
+
+    def _speak_raw(self, text: str):
+        """Sintetizza e riproduce una singola frase (usato dal TTS pipeline worker)."""
+        if not os.path.exists(self.piper_exe):
+            return
+        try:
+            output_wav = "voice/response.wav"
+            command = [
+                self.piper_exe,
+                "--model", self.piper_model,
+                "--output_file", output_wav
+            ]
+            subprocess.run(
+                command,
+                input=text.encode('utf-8'),
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            self._play_wav(output_wav)
+        except Exception as e:
+            print(f"[VOICE] Errore TTS raw: {e}")
 
     def speak(self, text):
         if not os.path.exists(self.piper_exe):

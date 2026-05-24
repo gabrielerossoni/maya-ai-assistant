@@ -2608,9 +2608,9 @@
             </div>
         </div>
         <div class="spotify-mini-controls">
-            <button class="btn-mini-ctrl" onclick="sendCmdToWS('spotify previous')">⏮</button>
-            <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="sendCmdToWS('spotify play_pause')">▶</button>
-            <button class="btn-mini-ctrl" onclick="sendCmdToWS('spotify next')">⏭</button>
+            <button class="btn-mini-ctrl" onclick="spotifyCmd('prev')">⏮</button>
+            <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="spotifyCmd('play_pause')">▶</button>
+            <button class="btn-mini-ctrl" onclick="spotifyCmd('next')">⏭</button>
         </div>
     </div>
     <div id="cmd-container">
@@ -2703,6 +2703,9 @@
                             <div class="dom-header-title">Casa M.A.Y.A.</div>
                         </div>
                         <div class="dom-header-right">
+                            <span class="dom-status-pill" id="dom-scene-pill" style="display:none">
+                                <span class="dot" style="background:rgba(255,30,30,0.7);box-shadow:0 0 6px rgba(255,30,30,0.5)"></span><span id="dom-scene-pill-text">—</span>
+                            </span>
                             <span class="dom-status-pill" id="dom-arduino-pill">
                                 <span class="dot"></span>ARDUINO
                             </span>
@@ -2714,26 +2717,24 @@
                     <!-- Scene chips -->
                     <div class="dom-scene-strip">
                         <span class="dom-scene-strip-label">SCENE</span>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('buongiorno')"><span
-                                class="dom-chip-icon">☀️</span>Buongiorno</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità notte')"><span
-                                class="dom-chip-icon">🌙</span>Notte</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità studio')"><span
-                                class="dom-chip-icon">📚</span>Studio</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità film')"><span
-                                class="dom-chip-icon">🎬</span>Film</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità relax')"><span
-                                class="dom-chip-icon">🛋️</span>Relax</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('cena')"><span
-                                class="dom-chip-icon">🍽️</span>Cena</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('pausa caffè')"><span
-                                class="dom-chip-icon">☕</span>Caffè</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità ospite')"><span
-                                class="dom-chip-icon">👥</span>Ospiti</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('modalità uscita')"><span
-                                class="dom-chip-icon">🚶</span>Uscita</div>
-                        <div class="dom-scene-chip" onclick="sendCmdToWS('allarme')"><span
-                                class="dom-chip-icon">🚨</span>Allarme</div>
+                        <div class="dom-scene-chip" id="chip-buongiorno" onclick="sendCmdToWS('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
+                        <div class="dom-scene-chip" id="chip-sveglia" onclick="sendCmdToWS('sveglia')"><span class="dom-chip-icon">⏰</span>Sveglia</div>
+                        <div class="dom-scene-chip" id="chip-studio" onclick="sendCmdToWS('modalità studio')"><span class="dom-chip-icon">📚</span>Studio</div>
+                        <div class="dom-scene-chip" id="chip-lavoro" onclick="sendCmdToWS('modalità lavoro')"><span class="dom-chip-icon">💼</span>Lavoro</div>
+                        <div class="dom-scene-chip" id="chip-film" onclick="sendCmdToWS('modalità film')"><span class="dom-chip-icon">🎬</span>Film</div>
+                        <div class="dom-scene-chip" id="chip-gaming" onclick="sendCmdToWS('modalità gaming')"><span class="dom-chip-icon">🎮</span>Gaming</div>
+                        <div class="dom-scene-chip" id="chip-relax" onclick="sendCmdToWS('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
+                        <div class="dom-scene-chip" id="chip-notte" onclick="sendCmdToWS('modalità notte')"><span class="dom-chip-icon">🌙</span>Notte</div>
+                        <div class="dom-scene-chip" id="chip-dormire" onclick="sendCmdToWS('ora di dormire')"><span class="dom-chip-icon">😴</span>Dormi</div>
+                        <div class="dom-scene-chip" id="chip-cena" onclick="sendCmdToWS('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
+                        <div class="dom-scene-chip" id="chip-caffe" onclick="sendCmdToWS('pausa caffè')"><span class="dom-chip-icon">☕</span>Caffè</div>
+                        <div class="dom-scene-chip" id="chip-weekend" onclick="sendCmdToWS('weekend mattina')"><span class="dom-chip-icon">🌅</span>Weekend</div>
+                        <div class="dom-scene-chip" id="chip-ospite" onclick="sendCmdToWS('modalità ospite')"><span class="dom-chip-icon">👥</span>Ospiti</div>
+                        <div class="dom-scene-chip" id="chip-rientro" onclick="sendCmdToWS('sono rientrato')"><span class="dom-chip-icon">🏠</span>Rientro</div>
+                        <div class="dom-scene-chip" id="chip-uscita" onclick="sendCmdToWS('modalità uscita')"><span class="dom-chip-icon">🚶</span>Uscita</div>
+                        <div class="dom-scene-chip" id="chip-piove" onclick="sendCmdToWS('piove')"><span class="dom-chip-icon">🌧️</span>Piove</div>
+                        <div class="dom-scene-chip" id="chip-bambini" onclick="sendCmdToWS('bambini dormono')"><span class="dom-chip-icon">🤫</span>Silenzio</div>
+                        <div class="dom-scene-chip" id="chip-allarme" onclick="sendCmdToWS('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
                     </div>
                     <!-- Main content -->
                     <div class="dom-content">
@@ -3357,6 +3358,7 @@
                 }
                 if (d.type === 'spotify') updateSpotify(d);
                 if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
+                if (d.type === 'scene_executed') updateScenePill(d.scene, d.status);
             };
             ws.onopen = () => {
                 document.getElementById('log-strip').innerText = "MAYA Neural Link Established.";
@@ -3443,6 +3445,13 @@
             if (!input.value.trim()) return;
             ws.send(JSON.stringify({ type: 'command', text: input.value }));
             input.value = '';
+        }
+        function spotifyCmd(command, extra) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const action = { tool: 'spotify', command };
+                if (extra) Object.assign(action, extra);
+                ws.send(JSON.stringify({ type: 'tool', action }));
+            }
         }
         function sendCmdToWS(text) {
             if (ws && ws.readyState === WebSocket.OPEN) {
@@ -3710,6 +3719,65 @@
             ).join('');
             const track = document.getElementById('news-ticker-track');
             track.innerHTML = tickerItems + tickerItems;
+        }
+        // =============================================
+        // SCENE PILL — feedback scena attiva
+        // =============================================
+        const SCENE_CHIP_MAP = {
+            'buongiorno':      'chip-buongiorno',
+            'sveglia':         'chip-sveglia',
+            'modalità studio': 'chip-studio',
+            'modalità lavoro': 'chip-lavoro',
+            'modalità film':   'chip-film',
+            'modalità gaming': 'chip-gaming',
+            'modalità relax':  'chip-relax',
+            'modalità notte':  'chip-notte',
+            'ora di dormire':  'chip-dormire',
+            'cena':            'chip-cena',
+            'pausa caffè':     'chip-caffe',
+            'weekend mattina': 'chip-weekend',
+            'modalità ospite': 'chip-ospite',
+            'sono rientrato':  'chip-rientro',
+            'modalità uscita': 'chip-uscita',
+            'piove':           'chip-piove',
+            'bambini dormono': 'chip-bambini',
+            'allarme':         'chip-allarme',
+        };
+        let _activeChip = null;
+        let _scenePillTimer = null;
+        function updateScenePill(sceneName, status) {
+            // Evidenzia chip corrispondente
+            if (_activeChip) {
+                const prev = document.getElementById(_activeChip);
+                if (prev) prev.style.borderColor = '';
+            }
+            const chipId = SCENE_CHIP_MAP[sceneName];
+            if (chipId) {
+                const chip = document.getElementById(chipId);
+                if (chip) {
+                    chip.style.borderColor = status === 'ok' ? 'rgba(76,175,80,0.7)' : 'rgba(255,180,0,0.7)';
+                    _activeChip = chipId;
+                    chip.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+                }
+            }
+            // Aggiorna pill header
+            const pill = document.getElementById('dom-scene-pill');
+            const pillText = document.getElementById('dom-scene-pill-text');
+            if (pill && pillText) {
+                pillText.textContent = sceneName.toUpperCase();
+                pill.style.display = 'flex';
+                pill.style.borderColor = status === 'ok' ? 'rgba(76,175,80,0.4)' : 'rgba(255,180,0,0.4)';
+                pill.style.color = status === 'ok' ? '#4CAF50' : '#ffb300';
+                if (_scenePillTimer) clearTimeout(_scenePillTimer);
+                _scenePillTimer = setTimeout(() => {
+                    pill.style.opacity = '0.35';
+                    pill.style.color = '';
+                    pill.style.borderColor = '';
+                }, 8000);
+                pill.style.opacity = '1';
+            }
+            // Log strip
+            document.getElementById('log-strip').innerText = `[SCENA] ${sceneName} — ${status.toUpperCase()}`;
         }
         // Stato locale dispositivi per la mappa casa
         const domState = {

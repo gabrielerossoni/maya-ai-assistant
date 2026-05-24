@@ -20,7 +20,7 @@ SERIAL_PORT = os.getenv("ARDUINO_PORT", "AUTO")
 VALID_TARGETS = {
     "light", "servo", "servo2",
     "rgb", "rgb1", "rgb2", "rgb3", "neopixel",
-    "buzzer", "buzzer2",
+    "buzzer", "buzzer2", "speaker",
     "sensor_read", "status"
 }
 
@@ -161,6 +161,10 @@ class ArduinoTool:
         value  = action.get("value", None)
         op     = action.get("op", "SET")
 
+        # Alias: speaker → buzzer2 (stesso pin, protocollo invariato)
+        if target == "speaker":
+            target = "buzzer2"
+
         legacy_map = {
             "LIGHT_ON":    ("SET", "light",  1),
             "LIGHT_OFF":   ("SET", "light",  0),
@@ -250,7 +254,7 @@ class ArduinoTool:
                 self.sim_state["rgb3"] = list(c)
             elif target == "buzzer":
                 self.sim_state["buzzer"] = bool(value)
-            elif target == "buzzer2":
+            elif target in ("buzzer2", "speaker"):
                 self.sim_state["buzz2_playing"] = True
 
         if target == "sensor_read":
