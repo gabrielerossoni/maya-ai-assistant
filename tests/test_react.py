@@ -23,9 +23,10 @@ async def test_react_loop_logic(agent):
          patch.object(agent, "_route_intent", return_value="domotic"), \
          patch.object(agent.tool_manager, "execute", new_callable=AsyncMock) as mock_execute:
         
-        # Step 1: LLM decide di usare un tool
+        # Il tool "weather" è nella lista needs_rephrase, quindi il ReAct loop
+        # fa 2 step: primo chiama il tool, secondo riformula i dati in linguaggio naturale.
         mock_chat.side_effect = [
-            # Primo step: chiama tool
+            # Primo step: chiama tool weather
             {
                 "message": {
                     "content": json.dumps({
@@ -35,13 +36,13 @@ async def test_react_loop_logic(agent):
                     })
                 }
             },
-            # Secondo step: fornisce risposta finale
+            # Secondo step: riformula i dati del tool in risposta naturale
             {
                 "message": {
                     "content": json.dumps({
                         "thought": "Ho i dati, ora rispondo.",
                         "actions": [],
-                        "reply": "A Milano c'è il sole."
+                        "reply": "A Milano c'è il sole, 20 gradi."
                     })
                 }
             }
@@ -54,6 +55,10 @@ async def test_react_loop_logic(agent):
             response_tokens.append(token)
         response = "".join(response_tokens)
         
+        # La frase pre ("Controllo il meteo...") è streamata come primo token,
+        # poi il secondo step riformula i dati meteo in linguaggio naturale
+        assert "Controllo il meteo..." in response
         assert "A Milano c'è il sole" in response
         assert mock_execute.call_count == 1
+        # 2 chiamate LLM: prima per decidere il tool, seconda per riformulare
         assert mock_chat.call_count == 2

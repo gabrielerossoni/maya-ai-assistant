@@ -1,0 +1,21 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "asyncio: mark test as async",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",   # line too long (gestito caso per caso)
+    "F401",   # unused import (alcuni import sono necessari per side effect)
+    "E402",   # module level import not at top (sys.path manipulation nei test)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
