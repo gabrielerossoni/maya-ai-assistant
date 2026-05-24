@@ -38,45 +38,92 @@ La differenza rispetto ai sistemi già esistenti:
 ## Architettura
 
 ```mermaid
-flowchart LR
-    subgraph IN["Input"]
-        WS["WS /ws"]
-        CLI["CLI"]
-        MIC["🎤 Voce"]
+flowchart TD
+    %% ── INPUT ──────────────────────────────────────────────────────────────
+    subgraph IN["🎯 Input Layer"]
+        direction LR
+        MIC["🎤 Microfono\nWakeWord hey_maya\n+ Whisper STT"]
+        WEB["🌐 Dashboard HUD\nWebSocket /ws"]
+        REST["🔌 REST API\nFastAPI /chat /scene /status"]
     end
 
-    subgraph CORE["AgentCore (PC)"]
-        R["Router Intent"] --> P["Planner (ReAct)"]
-        P --> AE["AutomationEngine"]
-        P --> E["Executor"] --> V["Validator"]
-        AE --> CM["ContextManager"]
-        AE --> DR["DeviceRegistry"]
+    %% ── AGENT CORE ─────────────────────────────────────────────────────────
+    subgraph CORE["🧠 AgentCore — Cervello del sistema"]
+        direction TB
+        ROUTER["🔀 Intent Router\nkeyword · LLM · scene · chitchat"]
+        PLANNER["📋 Planner ReAct\nGroq llama-3.3-70b / Ollama\n(chain-of-thought)"]
+        EXEC["⚙️ Executor\nesegue il piano step-by-step"]
+        VALID["✅ Validator\nverifica risultato atteso"]
+        ROUTER --> PLANNER --> EXEC --> VALID
     end
 
-    subgraph TOOLS["ToolManager"]
-        T["arduino · calendar · weather · news\ntrading · search · spotify · timer · ..."]
+    %% ── AUTOMATION ENGINE ───────────────────────────────────────────────────
+    subgraph AUT["🤖 AutomationEngine OO"]
+        direction TB
+        AE["Scene + Trigger + Condition\n21 scene predefinite\npriorità · cooldown · retry · timeout"]
+        BUS["📡 EventBus\npresence_changed · phone_joined_wifi\napp_opened · ..."]
+        CTX["🗺️ ContextManager\ntime_slot · presence · weather\nactivity · active_scene · flags"]
+        REG["📦 DeviceRegistry\nstato per-device · last_set_by\nconflict detection"]
+        AE --> BUS
+        AE --> CTX
+        AE --> REG
     end
 
-    subgraph HW["Arduino Uno"]
-        LED["💡 LED  pin 13"]
-        RELAY["⚡ Relè  pin 7"]
-        SERVO["🚪 Servo  pin 9"]
-        RGB["🌈 RGB  pin 3/5/6"]
-        BUZZ["🔔 Buzzer  pin 8"]
-        SPK["🔊 Speaker 8Ω  pin 3"]
-        DHT["🌡️ DHT11  pin 4"]
+    %% ── TOOL MANAGER ────────────────────────────────────────────────────────
+    subgraph TM["🛠️ ToolManager — 18 tool"]
+        direction LR
+        HW_T["🔌 Hardware\narduino · mqtt · display"]
+        INFO["📡 Info\nweather · news · wikipedia\nsearch · trading"]
+        UTIL["🧰 Utility\ncalendar · notes · timer\ntranslate · code_gen · system"]
+        ENT["🎵 Entertainment\nspotify · sys_monitor · network"]
     end
 
-    subgraph SUP["Supporto"]
-        M["Memoria (ChromaDB)"]
-        W["WebSocketManager"]
-        VM["VoiceManager"]
+    %% ── ARDUINO ─────────────────────────────────────────────────────────────
+    subgraph ARD["⚡ Arduino R4 WiFi — Unità Fisica"]
+        direction LR
+        subgraph ATTUATORI["Attuatori"]
+            LED["💡 LED\npin 13"]
+            RELAY["⚡ Relè\npin 7"]
+            SERVO["🚪 Servo SG90\npin 9"]
+            RGB["🌈 RGB\npin 5·6 (R·G)"]
+            SPK["🔊 Speaker 8Ω\npin 3"]
+            BUZZ["🔔 Buzzer\npin 8"]
+        end
+        subgraph SENSORI["Sensori"]
+            DHT["🌡️ DHT11\npin 4\ntemp + umidità"]
+        end
     end
 
-    IN --> CORE
-    E --> TOOLS
-    TOOLS --> HW
-    CORE --> SUP
+    %% ── SUPPORTO ────────────────────────────────────────────────────────────
+    subgraph SUP["🔧 Servizi di Supporto"]
+        direction LR
+        VM["🗣️ VoiceManager\nWakeWord ONNX\nWhisper STT\nPiper TTS"]
+        MEM["🧩 MemoryManager\nChromaDB + Ollama embed\nmemoria semantica conversazioni"]
+        WSM["📺 WebSocketManager\nbroadcast real-time\nstats · sensori · scene"]
+        PROA["🔍 ProactiveManager\nGroq llama-3.1-8b\nanomalie · promemoria · orario"]
+        HEAL["🩹 SelfHealer\nGroq llama-3.3-70b\nauto-patch tool in plugins/"]
+        PREF["📊 PreferenceLearner\nuso scene · orari · tool\ndata/user_preferences.json"]
+    end
+
+    %% ── FLUSSO PRINCIPALE ───────────────────────────────────────────────────
+    MIC -->|"testo trascritto"| CORE
+    WEB -->|"JSON messaggio"| CORE
+    REST -->|"HTTP POST"| CORE
+
+    ROUTER -->|"scene keyword"| AUT
+    VALID -->|"tool action"| TM
+
+    TM -->|"JSON 115200 baud seriale/MQTT"| ARD
+    ARD -->|"telemetria DHT11 ogni 5s"| WSM
+
+    CORE <-->|"snapshot contesto"| CTX
+    CORE <-->|"memoria conversazioni"| MEM
+    CORE <-->|"risposta TTS"| VM
+
+    WSM -->|"broadcast WS"| WEB
+    PROA -->|"suggerimenti autonomi"| CORE
+    HEAL -->|"hot-reload plugin"| TM
+    PREF -->|"preferenze utente nel prompt"| CORE
 ```
 
 **Divisione dei ruoli:**
