@@ -15,9 +15,7 @@ import tempfile
 
 def pid_file_path() -> str:
     """Percorso cross-platform fuori dai binari del progetto."""
-    root = (
-        os.environ.get("MAYA_RUNTIME_DIR") or tempfile.gettempdir()
-    ).rstrip(os.sep)
+    root = (os.environ.get("MAYA_RUNTIME_DIR") or tempfile.gettempdir()).rstrip(os.sep)
     return os.path.join(root, "maya.pid")
 
 
@@ -98,10 +96,7 @@ def kill_existing() -> bool:
             raise ValueError("PID non positivo")
     except ValueError as e:
         preview = raw if raw else "(vuoto)"
-        print(
-            f"[KILL] PID file non valido ({PID_FILE}): contenuto malformato ({preview!r}) "
-            f"— {e}. Rimuovo il file."
-        )
+        print(f"[KILL] PID file non valido ({PID_FILE}): contenuto malformato ({preview!r}) — {e}. Rimuovo il file.")
         try:
             os.remove(PID_FILE)
         except OSError:

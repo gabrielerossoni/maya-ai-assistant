@@ -26,9 +26,11 @@ load_dotenv()
 # Forza l'utilizzo di IPv4 per evitare problemi con localhost su Windows
 os.environ["OLLAMA_HOST"] = os.getenv("OLLAMA_HOST", "127.0.0.1")
 
+
 def is_ollama_enabled() -> bool:
     """Controlla se Ollama è abilitato tramite variabile d'ambiente."""
     return os.getenv("OLLAMA_ENABLED", "true").strip().lower() in ("1", "true", "yes")
+
 
 # ──────────────────────────────────────────────
 # CONFIGURAZIONE
@@ -120,8 +122,7 @@ Esempi:
 Rispondi SOLO con la categoria: DOMOTIC, REASONING o CHITCHAT."""
 
 SPECIALIST_PROMPTS = {
-    "DOMOTIC": DEFAULT_PROMPT
-    + "\nFOCUS: Sii estremamente concisa e usa i tool appropriati. Rispondi SEMPRE in JSON.",
+    "DOMOTIC": DEFAULT_PROMPT + "\nFOCUS: Sii estremamente concisa e usa i tool appropriati. Rispondi SEMPRE in JSON.",
     "REASONING": DEFAULT_PROMPT
     + "\nFOCUS: Fornisci risposte approfondite e strutturate. Se l'utente chiede CODICE, scrivi codice pulito e commentato.",
     "CHITCHAT": DEFAULT_PROMPT
@@ -151,46 +152,46 @@ FILLER_MESSAGES = [
 # ──────────────────────────────────────────────
 
 AUTOMATION_ALIASES: dict[str, str] = {
-    "buona notte":       "buonanotte",
-    "bonne nuit":        "buonanotte",
-    "notte":             "buonanotte",
-    "vado a dormire":    "buonanotte",
-    "va a dormire":      "buonanotte",
-    "buon giorno":       "buongiorno",
-    "morning":           "buongiorno",
-    "svegliami":         "sveglia",
-    "dammi la sveglia":  "sveglia",
-    "esco":              "vado fuori",
-    "me ne vado":        "vado fuori",
-    "vado via":          "vado fuori",
-    "sono tornato":      "sono rientrato",
-    "rientro":           "sono rientrato",
-    "torno":             "sono rientrato",
-    "dormo":             "ora di dormire",
-    "vado a letto":      "ora di dormire",
-    "a letto":           "ora di dormire",
-    "caffe":             "pausa caffè",
-    "caffè":             "pausa caffè",
-    "faccio un caffè":   "pausa caffè",
-    "sta piovendo":      "piove",
-    "pioggia":           "piove",
-    "lavoro":            "modalità lavoro",
-    "work mode":         "modalità lavoro",
-    "studio":            "modalità studio",
-    "relax":             "modalità relax",
-    "film":              "modalità film",
-    "cinema":            "modalità film",
-    "guardo un film":    "modalità film",
-    "gaming":            "modalità gaming",
-    "gioco":             "modalità gaming",
-    "uscita":            "modalità uscita",
-    "ospite":            "modalità ospite",
-    "arrivano ospiti":   "ospiti in arrivo",
-    "stanno arrivando":  "ospiti in arrivo",
-    "bambini a letto":   "bambini dormono",
-    "weekend":           "weekend mattina",
-    "sabato mattina":    "weekend mattina",
-    "domenica mattina":  "weekend mattina",
+    "buona notte": "buonanotte",
+    "bonne nuit": "buonanotte",
+    "notte": "buonanotte",
+    "vado a dormire": "buonanotte",
+    "va a dormire": "buonanotte",
+    "buon giorno": "buongiorno",
+    "morning": "buongiorno",
+    "svegliami": "sveglia",
+    "dammi la sveglia": "sveglia",
+    "esco": "vado fuori",
+    "me ne vado": "vado fuori",
+    "vado via": "vado fuori",
+    "sono tornato": "sono rientrato",
+    "rientro": "sono rientrato",
+    "torno": "sono rientrato",
+    "dormo": "ora di dormire",
+    "vado a letto": "ora di dormire",
+    "a letto": "ora di dormire",
+    "caffe": "pausa caffè",
+    "caffè": "pausa caffè",
+    "faccio un caffè": "pausa caffè",
+    "sta piovendo": "piove",
+    "pioggia": "piove",
+    "lavoro": "modalità lavoro",
+    "work mode": "modalità lavoro",
+    "studio": "modalità studio",
+    "relax": "modalità relax",
+    "film": "modalità film",
+    "cinema": "modalità film",
+    "guardo un film": "modalità film",
+    "gaming": "modalità gaming",
+    "gioco": "modalità gaming",
+    "uscita": "modalità uscita",
+    "ospite": "modalità ospite",
+    "arrivano ospiti": "ospiti in arrivo",
+    "stanno arrivando": "ospiti in arrivo",
+    "bambini a letto": "bambini dormono",
+    "weekend": "weekend mattina",
+    "sabato mattina": "weekend mattina",
+    "domenica mattina": "weekend mattina",
 }
 
 AUTOMATIONS = {
@@ -232,12 +233,12 @@ AUTOMATIONS = {
         {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x440055},
     ],
     "modalità uscita": [
-        {"tool": "arduino", "op": "SET", "target": "light",  "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay",  "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "neopixel","value": 0},
-        {"tool": "arduino", "op": "SET", "target": "servo",  "value": 0},   # porta
-        {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0},   # cancello
-        {"tool": "arduino", "op": "SET", "target": "buzzer2","melody": "ok"},
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "neopixel", "value": 0},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # porta
+        {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0},  # cancello
+        {"tool": "arduino", "op": "SET", "target": "buzzer2", "melody": "ok"},
     ],
     "modalità ospite": [
         {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
@@ -252,15 +253,15 @@ AUTOMATIONS = {
         # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FF0044"},  # rosso gaming
     ],
     "allarme": [
-        {"tool": "arduino", "op": "SET", "target": "buzzer",  "value": 1},
+        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
         {"tool": "arduino", "op": "SET", "target": "buzzer2", "melody": "alarm"},
-        {"tool": "arduino", "op": "SET", "target": "neopixel","value": 0xFF0000, "effect": 3},
+        {"tool": "arduino", "op": "SET", "target": "neopixel", "value": 0xFF0000, "effect": 3},
     ],
     "buongiorno": [
         {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
         {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFD580},
         {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},        # porta chiusa
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # porta chiusa
         {"tool": "spotify", "command": "search", "query": "buongiorno playlist mattina"},
         {"tool": "weather", "location": None},
         {"tool": "news", "limit": 5},
@@ -275,23 +276,23 @@ AUTOMATIONS = {
     ],
     "cena": [
         {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF4400},   # arancio caldo candela
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF4400},  # arancio caldo candela
         {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
         {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
         {"tool": "spotify", "command": "search", "query": "cena romantica musica italiana"},
     ],
     "ospiti in arrivo": [
         {"tool": "arduino", "op": "SET", "target": "servo2", "value": 90},  # apri cancello
-        {"tool": "arduino", "op": "SET", "target": "servo",  "value": 90},  # apri porta
-        {"tool": "arduino", "op": "SET", "target": "neopixel","value": 0xFFEECC, "effect": 1},
-        {"tool": "arduino", "op": "SET", "target": "buzzer2","melody": "startup"},
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},  # apri porta
+        {"tool": "arduino", "op": "SET", "target": "neopixel", "value": 0xFFEECC, "effect": 1},
+        {"tool": "arduino", "op": "SET", "target": "buzzer2", "melody": "startup"},
     ],
     "vado fuori": [
         {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
         {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
         {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},        # porta chiusa
-        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},       # bip conferma
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # porta chiusa
+        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},  # bip conferma
         {"tool": "spotify", "command": "pause"},
         {"tool": "weather", "location": None},
     ],
@@ -309,20 +310,20 @@ AUTOMATIONS = {
         {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
         {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
         {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000008},   # blu notte minimo
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000008},  # blu notte minimo
         {"tool": "calendar", "action": "list"},
     ],
     "piove": [
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},        # chiudi porta/tapparella
+        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # chiudi porta/tapparella
         {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x4488FF},   # blu pioggia
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x4488FF},  # blu pioggia
         {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
         {"tool": "spotify", "command": "search", "query": "rain lofi study"},
         {"tool": "weather", "location": None},
     ],
     "pausa caffè": [
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},        # accende macchinetta via relay
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x8B4513},   # marrone caffè
+        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},  # accende macchinetta via relay
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x8B4513},  # marrone caffè
         {"tool": "spotify", "command": "search", "query": "espresso morning jazz"},
         {"tool": "news", "limit": 3},
         {"tool": "timer", "minutes": 3, "message": "Caffè pronto!"},
@@ -335,8 +336,8 @@ AUTOMATIONS = {
         {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
     ],
     "weekend mattina": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},        # no luce piena
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFCC88},   # ambra soffusa
+        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},  # no luce piena
+        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFCC88},  # ambra soffusa
         {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
         {"tool": "spotify", "command": "search", "query": "lazy sunday morning playlist"},
         {"tool": "weather", "location": None},
@@ -372,17 +373,28 @@ class AgentCore:
 
         # Pre-popola la cache intent con pattern comuni (zero latenza routing)
         _warm = {
-            "accendi la luce": "DOMOTIC", "spegni la luce": "DOMOTIC",
-            "apri la porta": "DOMOTIC", "chiudi la porta": "DOMOTIC",
-            "che tempo fa": "DOMOTIC", "meteo": "DOMOTIC",
-            "ultime notizie": "DOMOTIC", "notizie": "DOMOTIC",
-            "quanto vale bitcoin": "DOMOTIC", "prezzo btc": "DOMOTIC",
-            "spotify next": "DOMOTIC", "spotify prev": "DOMOTIC",
-            "spotify play": "DOMOTIC", "spotify pause": "DOMOTIC",
-            "spotify current": "DOMOTIC", "spotify volume": "DOMOTIC",
-            "ciao": "CHITCHAT", "ciao maya": "CHITCHAT",
-            "come stai": "CHITCHAT", "hey": "CHITCHAT",
-            "buongiorno": "CHITCHAT", "grazie": "CHITCHAT",
+            "accendi la luce": "DOMOTIC",
+            "spegni la luce": "DOMOTIC",
+            "apri la porta": "DOMOTIC",
+            "chiudi la porta": "DOMOTIC",
+            "che tempo fa": "DOMOTIC",
+            "meteo": "DOMOTIC",
+            "ultime notizie": "DOMOTIC",
+            "notizie": "DOMOTIC",
+            "quanto vale bitcoin": "DOMOTIC",
+            "prezzo btc": "DOMOTIC",
+            "spotify next": "DOMOTIC",
+            "spotify prev": "DOMOTIC",
+            "spotify play": "DOMOTIC",
+            "spotify pause": "DOMOTIC",
+            "spotify current": "DOMOTIC",
+            "spotify volume": "DOMOTIC",
+            "ciao": "CHITCHAT",
+            "ciao maya": "CHITCHAT",
+            "come stai": "CHITCHAT",
+            "hey": "CHITCHAT",
+            "buongiorno": "CHITCHAT",
+            "grazie": "CHITCHAT",
         }
         for k, v in _warm.items():
             self._intent_cache[k] = v
@@ -407,6 +419,7 @@ class AgentCore:
 
         # 2. Fallback: dizionario statico (retrocompatibilità)
         import re as _re
+
         lower = _re.sub(r"\s+", " ", user_input.lower().strip())
         for alias, canonical in AUTOMATION_ALIASES.items():
             if alias in lower:
@@ -450,21 +463,14 @@ class AgentCore:
             "come mai",
             "cosa significa",
         ]
-        if (
-            any(x in lower for x in never_hard_route)
-            or '"' in user_input
-            or "'" in user_input
-            or word_count > 12
-        ):
+        if any(x in lower for x in never_hard_route) or '"' in user_input or "'" in user_input or word_count > 12:
             return await self._llm_routing(user_input)
 
         # --- 1. HARD ROUTING: DOMOTIC ---
         # Azione hardware esplicita: VERBO + OGGETTO
         domotic_verbs = ["accendi", "spegni", "apri", "chiudi"]
         domotic_objects = ["luce", "led", "relè", "servo", "tapparella"]
-        if any(v in lower for v in domotic_verbs) and any(
-            o in lower for o in domotic_objects
-        ):
+        if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
             return "DOMOTIC"
 
         # Finanza: PREZZO/QUANTO VALE + ASSET
@@ -479,25 +485,29 @@ class AgentCore:
             "sp500",
             "nasdaq",
         ]
-        if any(v in lower for v in crypto_verbs) and any(
-            a in lower for a in crypto_assets
-        ):
+        if any(v in lower for v in crypto_verbs) and any(a in lower for a in crypto_assets):
             return "DOMOTIC"
 
         # Meteo e News (già filtrati per lunghezza > 12 sopra)
         if any(x in lower for x in ["meteo", "che tempo fa", "temperatura"]):
             return "DOMOTIC"
 
-        if any(
-            x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]
-        ):
+        if any(x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]):
             return "DOMOTIC"
 
         # Spotify: comandi diretti (es. "spotify next", "spotify play")
         spotify_direct = [
-            "spotify next", "spotify prev", "spotify play", "spotify pause",
-            "spotify stop", "spotify volume", "spotify current", "spotify devices",
-            "spotify set_device", "spotify set_device_pc", "spotify search",
+            "spotify next",
+            "spotify prev",
+            "spotify play",
+            "spotify pause",
+            "spotify stop",
+            "spotify volume",
+            "spotify current",
+            "spotify devices",
+            "spotify set_device",
+            "spotify set_device_pc",
+            "spotify search",
         ]
         if any(lower.startswith(cmd) for cmd in spotify_direct):
             return "DOMOTIC"
@@ -512,9 +522,7 @@ class AgentCore:
             "volume",
         ]
         spotify_objects = ["musica", "spotify", "canzone", "brano"]
-        if any(v in lower for v in spotify_verbs) and any(
-            o in lower for o in spotify_objects
-        ):
+        if any(v in lower for v in spotify_verbs) and any(o in lower for o in spotify_objects):
             return "DOMOTIC"
 
         # --- 2. HARD ROUTING: CHITCHAT ---
@@ -621,9 +629,7 @@ class AgentCore:
         # Scegli il modello in base al contenuto dei messaggi (se router o meno)
         # Se json_mode è False, probabilmente siamo nel routing
         model_env = "GROQ_ROUTER_MODEL" if not json_mode else "GROQ_MODEL"
-        default_model = (
-            "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
-        )
+        default_model = "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
         model = os.getenv(model_env, default_model)
 
         payload = {
@@ -636,7 +642,7 @@ class AgentCore:
 
         # Fix 3: Groq token limit stretto per DOMOTIC
         if not json_mode:
-            payload["max_tokens"] = 8   # router
+            payload["max_tokens"] = 8  # router
         elif len(messages) > 0 and "DOMOTIC" in str(messages[0]["content"])[:50]:
             payload["max_tokens"] = 300  # domotic: risposta corta basta
         elif len(messages) > 0 and "CHITCHAT" in str(messages[0].get("content", ""))[:60]:
@@ -690,9 +696,7 @@ class AgentCore:
         """Pipeline specialistica ottimizzata: Router e Retrieval in parallelo."""
         # 1. Avvia Routing e Retrieval semantico in parallelo per risparmiare tempo
         routing_task = asyncio.create_task(self._route_intent(user_input))
-        context_task = asyncio.create_task(
-            self.memory.get_context(query=user_input, top_k=5)
-        )
+        context_task = asyncio.create_task(self.memory.get_context(query=user_input, top_k=5))
 
         # Aspetta il risultato del router
         intent = await routing_task
@@ -842,14 +846,16 @@ class AgentCore:
                 if tool_name == "arduino" and result.get("status") == "ok":
                     st = result.get("state", {})
                     if st:
-                        await self.socket_manager.broadcast({
-                            "type": "state",
-                            "led":    "on" if st.get("light") else "off",
-                            "relay":  "on" if st.get("relay") else "off",
-                            "servo":  "open" if (st.get("servo") or 0) > 0 else "0",
-                            "rgb":    st.get("rgb", [0, 0, 0]),
-                            "buzzer": st.get("buzzer", False),
-                        })
+                        await self.socket_manager.broadcast(
+                            {
+                                "type": "state",
+                                "led": "on" if st.get("light") else "off",
+                                "relay": "on" if st.get("relay") else "off",
+                                "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                                "rgb": st.get("rgb", [0, 0, 0]),
+                                "buzzer": st.get("buzzer", False),
+                            }
+                        )
 
         return results
 
@@ -898,6 +904,7 @@ class AgentCore:
         # 0b. Linguaggio naturale: "metti X su spotify", "riproduci X", "play X"
         if not spotify_action:
             import re as _re
+
             m = _re.match(
                 r"(?:metti|riproduci|play|fammi sentire|cerca)\s+(.+?)(?:\s+(?:su|on)\s+spotify)?$",
                 _clean,
@@ -922,15 +929,22 @@ class AgentCore:
         auto_result = self._check_automation(user_input)
         if auto_result is not None:
             from .automation_engine import Automation as _Automation
+
             if isinstance(auto_result, _Automation):
                 # Nuovo engine OO
                 exec_result = await self.automation_engine.execute(auto_result, source="voice")
                 scene_name = auto_result.name
                 status = exec_result.get("status", "ok")
-                reply = f"Scena '{scene_name}' eseguita." if status == "ok" else f"Scena '{scene_name}' completata con avvisi."
+                reply = (
+                    f"Scena '{scene_name}' eseguita."
+                    if status == "ok"
+                    else f"Scena '{scene_name}' completata con avvisi."
+                )
                 # Broadcast WebSocket se disponibile
                 if self.socket_manager:
-                    await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
+                    await self.socket_manager.broadcast(
+                        {"type": "scene_executed", "scene": scene_name, "status": status}
+                    )
             else:
                 # Fallback lista azioni statiche
                 await self._execute_actions(auto_result)
@@ -1082,28 +1096,26 @@ class AgentCore:
                         msg = data.get("message", "")
                         observation += f"Risultato tool '{tool}' ({status}): {msg}\n"
 
-
                     # --- EARLY EXIT CHECK ---
                     # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
                     # consistente, usciamo senza fare lo Step 2 (riformulazione).
-                    is_error = any(
-                        res.get("result", {}).get("status") == "error"
-                        for res in results
-                    )
+                    is_error = any(res.get("result", {}).get("status") == "error" for res in results)
 
                     # Tool che richiedono riformulazione: i dati grezzi vanno
                     # rielaborati dall'LLM in una risposta naturale (secondo step).
-                    needs_rephrase = ["none", "code_generator", "weather", "news",
-                                      "trading", "search", "wikipedia", "calendar"]
-                    has_rephrase_tool = any(
-                        res["tool"] in needs_rephrase for res in results
-                    )
+                    needs_rephrase = [
+                        "none",
+                        "code_generator",
+                        "weather",
+                        "news",
+                        "trading",
+                        "search",
+                        "wikipedia",
+                        "calendar",
+                    ]
+                    has_rephrase_tool = any(res["tool"] in needs_rephrase for res in results)
 
-                    if (
-                        not is_error
-                        and not has_rephrase_tool
-                        and len(reply) > 15
-                    ):
+                    if not is_error and not has_rephrase_tool and len(reply) > 15:
                         final_reply = reply
                         for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token

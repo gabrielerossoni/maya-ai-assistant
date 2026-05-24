@@ -17,5 +17,6 @@ def test():
     res2 = tool.execute({"operation": "price", "symbol": "spy", "asset_type": "stock"})
     print(f"Test SPY (stock): {res2}")
 
+
 if __name__ == "__main__":
     test()

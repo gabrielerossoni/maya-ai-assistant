@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 # Aggiungi la directory radice al path per importare agent_core
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
 def test_env_loading():
     load_dotenv()
     print("--- Verifica caricamento .env ---")
@@ -15,7 +16,7 @@ def test_env_loading():
         "ARDUINO_PORT",
         "REMOTE_HOST",
         "DEFAULT_WEATHER_LOCATION",
-        "NEWS_FEED_URL"
+        "NEWS_FEED_URL",
     ]
 
     for var in vars_to_check:
@@ -28,6 +29,7 @@ def test_env_loading():
     print("\n--- Verifica AgentCore (import) ---")
     try:
         from core.agent_core import MODELS, SYSTEM_PROMPT
+
         print(f"MODELS: {MODELS}")
         # print(f"SYSTEM_PROMPT: {SYSTEM_PROMPT[:50]}...")
         print("AgentCore caricato correttamente.")
@@ -36,6 +38,7 @@ def test_env_loading():
         return False
 
     return True
+
 
 if __name__ == "__main__":
     if test_env_loading():

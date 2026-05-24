@@ -18,6 +18,7 @@ class BaseChecker:
         """Ritorna una stringa di avviso se il trigger è attivo, altrimenti None."""
         raise NotImplementedError
 
+
 class SysMonitorChecker(BaseChecker):
     def __init__(self, cpu_threshold=80, ram_threshold=85):
         super().__init__("System Monitor")
@@ -32,6 +33,7 @@ class SysMonitorChecker(BaseChecker):
         if ram > self.ram_threshold:
             return f"⚠️ Allerta Sistema: Utilizzo RAM al {ram}%!"
         return None
+
 
 class CalendarChecker(BaseChecker):
     def __init__(self, calendar_tool):
@@ -54,6 +56,7 @@ class CalendarChecker(BaseChecker):
                     return f"📅 Promemoria: L'evento '{event['title']}' inizia tra poco ({event['time']})."
         return None
 
+
 class CalendarSyncChecker(BaseChecker):
     def __init__(self, calendar_tool):
         super().__init__("Calendar Sync")
@@ -66,6 +69,7 @@ class CalendarSyncChecker(BaseChecker):
             return f"Sincronizzati {synced} eventi locali su Google Calendar."
         return None
 
+
 class ContextualSensorChecker(BaseChecker):
     """
     Livello 1: soglie hard (veloce, no LLM).
@@ -74,8 +78,8 @@ class ContextualSensorChecker(BaseChecker):
     """
 
     HARD_THRESHOLDS = {
-        "temp_high":     lambda s: s.get("temp", 0) > 28,
-        "temp_low":      lambda s: s.get("temp", 99) < 14,
+        "temp_high": lambda s: s.get("temp", 0) > 28,
+        "temp_low": lambda s: s.get("temp", 99) < 14,
         "humidity_high": lambda s: s.get("humidity", 0) > 75,
     }
 
@@ -116,16 +120,15 @@ Rispondi SOLO con JSON:
         # Livello 1: soglie hard
         now = time.time()
         triggered = [
-            k for k, fn in self.HARD_THRESHOLDS.items()
+            k
+            for k, fn in self.HARD_THRESHOLDS.items()
             if fn(hw_state) and now - self._last_notified.get(k, 0) > self.COOLDOWN
         ]
         if not triggered:
             return None
 
         # Livello 2: chiedi all'LLM
-        recent_context = await self.memory_manager.get_context(
-            query="temperatura umidità comfort casa", top_k=3
-        )
+        recent_context = await self.memory_manager.get_context(query="temperatura umidità comfort casa", top_k=3)
         user_msg = (
             f"Stato sensori: temp={hw_state.get('temp')}°C, "
             f"umidità={hw_state.get('humidity')}%, "
@@ -218,9 +221,7 @@ class ContextPrefetchChecker(BaseChecker):
                     else:
                         titles = result.get("message", "")
                     if titles:
-                        await self.memory_manager.add_turn(
-                            "system", f"[PREFETCH] Ultime notizie: {titles}"
-                        )
+                        await self.memory_manager.add_turn("system", f"[PREFETCH] Ultime notizie: {titles}")
             except Exception as e:
                 print(f"[PREFETCH] Errore news: {e}")
 
@@ -260,17 +261,21 @@ class ProactiveManager:
                         print(f"[PROACTIVE] Trigger attivato ({checker.name}): {alert}")
                         if self.websocket_manager:
                             if isinstance(checker, ContextualSensorChecker):
-                                await self.websocket_manager.broadcast({
-                                    "type": "proactive_suggestion",
-                                    "text": alert,
-                                    "level": "suggestion",
-                                })
+                                await self.websocket_manager.broadcast(
+                                    {
+                                        "type": "proactive_suggestion",
+                                        "text": alert,
+                                        "level": "suggestion",
+                                    }
+                                )
                             else:
-                                await self.websocket_manager.broadcast({
-                                    "type": "log",
-                                    "text": f"🔔 {alert}",
-                                    "level": "warning",
-                                })
+                                await self.websocket_manager.broadcast(
+                                    {
+                                        "type": "log",
+                                        "text": f"🔔 {alert}",
+                                        "level": "warning",
+                                    }
+                                )
                 await asyncio.sleep(self.interval)
             except Exception as e:
                 print(f"[PROACTIVE] Errore nel loop: {e}")

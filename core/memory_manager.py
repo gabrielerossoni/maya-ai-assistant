@@ -49,8 +49,7 @@ class MemoryManager:
 
             # Crea o recupera collection
             self.collection = self.chroma_client.get_or_create_collection(
-                name="jarvis_memory",
-                metadata={"hnsw:space": "cosine"}
+                name="jarvis_memory", metadata={"hnsw:space": "cosine"}
             )
         except Exception as e:
             print(f"[MEMORY] Errore inizializzazione ChromaDB: {e}")
@@ -73,7 +72,6 @@ class MemoryManager:
         else:
             self.turns = []
 
-
     async def save(self):
         """Salva metadata su JSON."""
         async with self.save_lock:
@@ -92,11 +90,9 @@ class MemoryManager:
 
         try:
             import ollama
+
             client = ollama.AsyncClient()
-            response = await client.embed(
-                model=EMBEDDING_MODEL,
-                input=text
-            )
+            response = await client.embed(model=EMBEDDING_MODEL, input=text)
             embeddings = response.get("embeddings", [])
             if embeddings:
                 return embeddings[0]
@@ -117,7 +113,7 @@ class MemoryManager:
         async with self.turn_lock:
             self.turns.append(turn)
 
-            if len(self.turns) > 200:   # ← era 1000, troppo per sessioni lunghe
+            if len(self.turns) > 200:  # ← era 1000, troppo per sessioni lunghe
                 self.turns = self.turns[-200:]
 
             # Trigger summary periodico (ogni 50 turni, non-blocking)
@@ -127,6 +123,7 @@ class MemoryManager:
             # Calcola embedding e aggiungilo a ChromaDB
             if self.collection:
                 import random
+
                 ts_ms = int(datetime.now().timestamp() * 1000)
                 rnd = random.randint(100, 999)
                 turn_id = f"{role}_{ts_ms}_{rnd}"
@@ -137,14 +134,12 @@ class MemoryManager:
                             ids=[turn_id],
                             documents=[text],
                             metadatas=[{"role": role, "time": timestamp}],
-                            embeddings=[embedding]
+                            embeddings=[embedding],
                         )
                     else:
                         # Ollama non disponibile: ChromaDB usa all-MiniLM-L6-v2 integrato
                         self.collection.add(
-                            ids=[turn_id],
-                            documents=[text],
-                            metadatas=[{"role": role, "time": timestamp}]
+                            ids=[turn_id], documents=[text], metadatas=[{"role": role, "time": timestamp}]
                         )
                 except Exception as e:
                     print(f"[MEMORY] Errore aggiunta a ChromaDB: {e}")
@@ -171,7 +166,10 @@ class MemoryManager:
             f"riguardo '{topic}', basandoti su questi messaggi:\n{text}"
         )
         messages = [
-            {"role": "system", "content": "Sei un assistente che sintetizza abitudini utente. Rispondi in italiano, massimo 3 frasi."},
+            {
+                "role": "system",
+                "content": "Sei un assistente che sintetizza abitudini utente. Rispondi in italiano, massimo 3 frasi.",
+            },
             {"role": "user", "content": prompt},
         ]
         try:
@@ -255,16 +253,10 @@ class MemoryManager:
         try:
             embedding = await self._get_embedding(query)
             if embedding:
-                results = self.collection.query(
-                    query_embeddings=[embedding],
-                    n_results=top_k
-                )
+                results = self.collection.query(query_embeddings=[embedding], n_results=top_k)
             else:
                 # Fallback: ChromaDB usa il proprio embedding integrato
-                results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k
-                )
+                results = self.collection.query(query_texts=[query], n_results=top_k)
 
             semantic_context = ""
             if results and results.get("documents") and results["documents"][0]:
@@ -295,9 +287,9 @@ class MemoryManager:
             text = turn.get("text", "").strip()
             if not text:
                 continue
-            role      = turn.get("role", "unknown")
+            role = turn.get("role", "unknown")
             timestamp = turn.get("time", "")
-            turn_id   = f"migrate_{role}_{i}"
+            turn_id = f"migrate_{role}_{i}"
             try:
                 embedding = await self._get_embedding(text)
                 if embedding:
@@ -305,14 +297,10 @@ class MemoryManager:
                         ids=[turn_id],
                         documents=[text],
                         metadatas=[{"role": role, "time": timestamp}],
-                        embeddings=[embedding]
+                        embeddings=[embedding],
                     )
                 else:
-                    self.collection.add(
-                        ids=[turn_id],
-                        documents=[text],
-                        metadatas=[{"role": role, "time": timestamp}]
-                    )
+                    self.collection.add(ids=[turn_id], documents=[text], metadatas=[{"role": role, "time": timestamp}])
                 imported += 1
             except Exception:
                 errors += 1
@@ -334,15 +322,9 @@ class MemoryManager:
         try:
             embedding = await self._get_embedding(query)
             if embedding:
-                results = self.collection.query(
-                    query_embeddings=[embedding],
-                    n_results=top_k
-                )
+                results = self.collection.query(query_embeddings=[embedding], n_results=top_k)
             else:
-                results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k
-                )
+                results = self.collection.query(query_texts=[query], n_results=top_k)
 
             if results and results.get("documents"):
                 return results["documents"][0]

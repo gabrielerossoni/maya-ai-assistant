@@ -9,41 +9,56 @@ from typing import Callable, Optional
 try:
     import serial
     import serial.tools.list_ports
+
     SERIAL_AVAILABLE = True
 except ImportError:
     SERIAL_AVAILABLE = False
 
-BAUD_RATE   = 115200
+BAUD_RATE = 115200
 TIMEOUT_SEC = 3
 SERIAL_PORT = os.getenv("ARDUINO_PORT", "AUTO")
 
 VALID_TARGETS = {
-    "light", "servo", "servo2",
-    "rgb", "rgb1", "rgb2", "rgb3", "neopixel",
-    "buzzer", "buzzer2", "speaker",
-    "sensor_read", "status"
+    "light",
+    "servo",
+    "servo2",
+    "rgb",
+    "rgb1",
+    "rgb2",
+    "rgb3",
+    "neopixel",
+    "buzzer",
+    "buzzer2",
+    "speaker",
+    "sensor_read",
+    "status",
 }
+
 
 class ArduinoTool:
     def __init__(self):
-        self.connection  = None
-        self.simulated   = not SERIAL_AVAILABLE
-        self.sim_state   = {
+        self.connection = None
+        self.simulated = not SERIAL_AVAILABLE
+        self.sim_state = {
             "light": False,
-            "servo": 0, "servo2": 0,
-            "rgb1": [0, 0, 0], "rgb2": [0, 0, 0], "rgb3": [0, 0, 0],
+            "servo": 0,
+            "servo2": 0,
+            "rgb1": [0, 0, 0],
+            "rgb2": [0, 0, 0],
+            "rgb3": [0, 0, 0],
             "neo_effect": 0,
-            "buzzer": False, "buzz2_playing": False,
+            "buzzer": False,
+            "buzz2_playing": False,
         }
-        self._reader     = None
-        self._running    = False
-        self._msg_id     = 0
-        self._pending    : dict[int, asyncio.Future] = {}
+        self._reader = None
+        self._running = False
+        self._msg_id = 0
+        self._pending: dict[int, asyncio.Future] = {}
         self._event_queue: queue.Queue = queue.Queue()
-        self._telemetry  : dict = {}
+        self._telemetry: dict = {}
         self._event_hooks: list[Callable] = []
         self._sync_pending: dict[int, tuple[threading.Event, list]] = {}
-        self._lock       = threading.Lock()
+        self._lock = threading.Lock()
         self._serial_lock = threading.Lock()
 
     def initialize(self):
@@ -62,8 +77,8 @@ class ArduinoTool:
             self.connection = serial.Serial(port, BAUD_RATE, timeout=0.1)
             time.sleep(2)
             self.simulated = False
-            self._running  = True
-            self._reader   = threading.Thread(target=self._read_loop, daemon=True)
+            self._running = True
+            self._reader = threading.Thread(target=self._read_loop, daemon=True)
             self._reader.start()
             print(f"[ARDUINO] Connesso su {port} @ {BAUD_RATE}")
         except serial.SerialException as e:
@@ -82,7 +97,7 @@ class ArduinoTool:
                     continue
 
                 line = self.connection.readline().decode("utf-8", errors="ignore").strip()
-                if not line or set(line) == {'.'}:  # Ignora linee vuote o solo puntini (WiFi waiting)
+                if not line or set(line) == {"."}:  # Ignora linee vuote o solo puntini (WiFi waiting)
                     continue
 
                 try:
@@ -128,17 +143,19 @@ class ArduinoTool:
 
             if "state" in data:
                 s = data["state"]
-                self.sim_state.update({
-                    "light": s.get("light", self.sim_state["light"]),
-                    "servo": s.get("servo", self.sim_state["servo"]),
-                    "servo2": s.get("servo2", self.sim_state.get("servo2", 0)),
-                    "rgb1": s.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
-                    "rgb2": s.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
-                    "rgb3": s.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
-                    "neo_effect": s.get("neo_effect", self.sim_state.get("neo_effect", 0)),
-                    "buzzer": s.get("buzzer", self.sim_state["buzzer"]),
-                    "buzz2_playing": s.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
-                })
+                self.sim_state.update(
+                    {
+                        "light": s.get("light", self.sim_state["light"]),
+                        "servo": s.get("servo", self.sim_state["servo"]),
+                        "servo2": s.get("servo2", self.sim_state.get("servo2", 0)),
+                        "rgb1": s.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
+                        "rgb2": s.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
+                        "rgb3": s.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
+                        "neo_effect": s.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                        "buzzer": s.get("buzzer", self.sim_state["buzzer"]),
+                        "buzz2_playing": s.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
+                    }
+                )
 
         elif "telemetry" in data:
             self._telemetry = data["telemetry"]
@@ -156,21 +173,21 @@ class ArduinoTool:
                 pass
 
     def execute(self, action: dict) -> dict:
-        cmd    = action.get("command", "").upper()
+        cmd = action.get("command", "").upper()
         target = action.get("target", "")
-        value  = action.get("value", None)
-        op     = action.get("op", "SET")
+        value = action.get("value", None)
+        op = action.get("op", "SET")
 
         # Alias: speaker → buzzer2 (stesso pin, protocollo invariato)
         if target == "speaker":
             target = "buzzer2"
 
         legacy_map = {
-            "LIGHT_ON":    ("SET", "light",  1),
-            "LIGHT_OFF":   ("SET", "light",  0),
-            "SERVO_OPEN":  ("SET", "servo",  90),
-            "SERVO_CLOSE": ("SET", "servo",  0),
-            "STATUS":      ("GET", "status", None),
+            "LIGHT_ON": ("SET", "light", 1),
+            "LIGHT_OFF": ("SET", "light", 0),
+            "SERVO_OPEN": ("SET", "servo", 90),
+            "SERVO_CLOSE": ("SET", "servo", 0),
+            "STATUS": ("GET", "status", None),
         }
         if cmd in legacy_map:
             op, target, value = legacy_map[cmd]
@@ -189,12 +206,12 @@ class ArduinoTool:
             return self._msg_id
 
     def _send_sync(self, op: str, target: str, value, timeout=1.0) -> dict:
-        msg_id  = self._next_id()
+        msg_id = self._next_id()
         payload = {"id": msg_id, "cmd": op, "target": target}
         if value is not None:
             payload["value"] = value
 
-        event  = threading.Event()
+        event = threading.Event()
         holder: list = [None]
         with self._lock:
             self._sync_pending[msg_id] = (event, holder)
@@ -209,20 +226,22 @@ class ArduinoTool:
             return {"status": "error", "message": str(e)}
 
         if event.wait(timeout=timeout):
-            data  = holder[0] or {}
+            data = holder[0] or {}
             state = data.get("state", {})
             if state:
-                self.sim_state.update({
-                    "light":  state.get("light",  self.sim_state["light"]),
-                    "servo":  state.get("servo",  self.sim_state["servo"]),
-                    "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
-                    "rgb1":   state.get("rgb1",   self.sim_state.get("rgb1", [0, 0, 0])),
-                    "rgb2":   state.get("rgb2",   self.sim_state.get("rgb2", [0, 0, 0])),
-                    "rgb3":   state.get("rgb3",   self.sim_state.get("rgb3", [0, 0, 0])),
-                    "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
-                    "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
-                    "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
-                })
+                self.sim_state.update(
+                    {
+                        "light": state.get("light", self.sim_state["light"]),
+                        "servo": state.get("servo", self.sim_state["servo"]),
+                        "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
+                        "rgb1": state.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
+                        "rgb2": state.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
+                        "rgb3": state.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
+                        "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                        "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
+                        "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
+                    }
+                )
             return {"status": "ok", "state": self.sim_state.copy()}
         else:
             with self._lock:
@@ -266,10 +285,10 @@ class ArduinoTool:
         if self.simulated:
             return {"temp": 22.0, "humidity": 55.0}
 
-        msg_id  = self._next_id()
+        msg_id = self._next_id()
         payload = {"id": msg_id, "cmd": "GET", "target": "sensor_read"}
 
-        event  = threading.Event()
+        event = threading.Event()
         holder: list = [None]
         with self._lock:
             self._sync_pending[msg_id] = (event, holder)
@@ -286,7 +305,7 @@ class ArduinoTool:
         if event.wait(timeout=1.5):
             data = holder[0] or {}
             temp = data.get("temp")
-            hum  = data.get("humidity")
+            hum = data.get("humidity")
             res = {}
             if temp is not None:
                 res["temp"] = float(temp)

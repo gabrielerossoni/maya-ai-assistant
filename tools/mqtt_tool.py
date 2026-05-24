@@ -4,22 +4,23 @@ import os
 
 import paho.mqtt.client as mqtt
 
-MQTT_BROKER     = os.getenv("MQTT_BROKER", "localhost")
-MQTT_PORT       = int(os.getenv("MQTT_PORT", 1883))
-TOPIC_PREFIX    = "maya/rooms/"
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
+TOPIC_PREFIX = "maya/rooms/"
+
 
 class MqttTool:
     """Tool per la gestione multi-room via MQTT (bidirectional con WebSocket broadcast)."""
 
     def __init__(self):
         self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        self._ws_manager = None   # iniettato da main.py
-        self._loop       = None   # event loop asyncio
+        self._ws_manager = None  # iniettato da main.py
+        self._loop = None  # event loop asyncio
 
     def set_ws_manager(self, ws_manager, loop):
         """Chiamato in lifespan dopo che il loop è pronto."""
         self._ws_manager = ws_manager
-        self._loop       = loop
+        self._loop = loop
 
     def initialize(self):
         """Setup MQTT callbacks e connessione."""
@@ -36,7 +37,7 @@ class MqttTool:
         """Callback: sottoscrizione ai topic state/telemetry di tutte le stanze."""
         if rc == 0:
             # Subscribe a tutti i topic state e telemetry di tutte le stanze
-            client.subscribe(f"{TOPIC_PREFIX}+/state",     qos=1)
+            client.subscribe(f"{TOPIC_PREFIX}+/state", qos=1)
             client.subscribe(f"{TOPIC_PREFIX}+/telemetry", qos=0)
         else:
             print(f"[MQTT] Connessione fallita, code {rc}")
@@ -52,13 +53,13 @@ class MqttTool:
 
         try:
             payload = json.loads(msg.payload.decode())
-            parts = msg.topic.split("/")   # maya/rooms/<room>/<type>
+            parts = msg.topic.split("/")  # maya/rooms/<room>/<type>
 
             if len(parts) < 4:
                 return
 
             room = parts[2]
-            kind = parts[3]   # "state" o "telemetry"
+            kind = parts[3]  # "state" o "telemetry"
 
             if kind == "state":
                 state = payload.get("state", {})
@@ -84,10 +85,7 @@ class MqttTool:
                 return
 
             # Broadcast al WebSocket in modo thread-safe
-            asyncio.run_coroutine_threadsafe(
-                self._ws_manager.broadcast(broadcast_payload),
-                self._loop
-            )
+            asyncio.run_coroutine_threadsafe(self._ws_manager.broadcast(broadcast_payload), self._loop)
 
         except json.JSONDecodeError:
             print(f"[MQTT] Errore parsing JSON: {msg.payload}")
@@ -101,46 +99,30 @@ class MqttTool:
         - Old: {"tool": "mqtt", "room": "kitchen", "device": "light", "state": "ON"}
         - New: {"tool": "mqtt", "op": "SET", "target": "light", "value": 1, "room": "studio"}
         """
-        room   = action.get("room", os.getenv("MQTT_DEFAULT_ROOM", "studio"))
+        room = action.get("room", os.getenv("MQTT_DEFAULT_ROOM", "studio"))
 
         # Format detection: nuovo è più simile a Arduino
         if "op" in action and "target" in action:
             # Nuovo formato (simile a Arduino protocol)
-            op     = action.get("op", "SET")
+            op = action.get("op", "SET")
             target = action.get("target", "light")
-            value  = action.get("value", 0)
+            value = action.get("value", 0)
 
-            cmd_payload = json.dumps({
-                "cmd": op,
-                "target": target,
-                "value": value,
-                "id": 1
-            })
+            cmd_payload = json.dumps({"cmd": op, "target": target, "value": value, "id": 1})
         else:
             # Vecchio formato per backward compatibility
             device = action.get("device", "light")
-            state  = action.get("state", "TOGGLE")
+            state = action.get("state", "TOGGLE")
 
-            cmd_payload = json.dumps({
-                "device": device,
-                "state": state,
-                "sender": "maya_core"
-            })
+            cmd_payload = json.dumps({"device": device, "state": state, "sender": "maya_core"})
 
         topic = f"{TOPIC_PREFIX}{room}/cmd"
 
         try:
             self.client.publish(topic, cmd_payload, qos=1, retain=False)
-            return {
-                "status": "ok",
-                "message": f"Cmd → '{room}'",
-                "topic": topic
-            }
+            return {"status": "ok", "message": f"Cmd → '{room}'", "topic": topic}
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore MQTT publish: {e}"
-            }
+            return {"status": "error", "message": f"Errore MQTT publish: {e}"}
 
     def close(self):
         """Chiudi connessione MQTT."""

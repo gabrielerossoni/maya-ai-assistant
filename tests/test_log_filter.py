@@ -17,12 +17,14 @@ from core.log_utils import DashboardLogFilter
 
 class MockWebSocketManager:
     """Mock di manager per testare il broadcast dei messaggi."""
+
     def __init__(self):
         self.messages = []
 
     async def broadcast(self, message: dict):
         self.messages.append(message)
         print(f"  [BROADCAST] {message['text']} (level: {message['level']})")
+
 
 @pytest.mark.asyncio
 async def test_log_filter():
@@ -86,6 +88,7 @@ async def test_log_filter():
     print("  - Test 4: [V] Errore critico inviato")
     print("  - Test 5: [V] Messaggio di connessione inviato")
     print("=" * 60)
+
 
 if __name__ == "__main__":
     asyncio.run(test_log_filter())

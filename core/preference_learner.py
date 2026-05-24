@@ -63,17 +63,13 @@ class PreferenceLearner:
         # Traccia scene attivate
         for scene in _KNOWN_SCENES:
             if scene in lower:
-                self.prefs["scene_frequency"][scene] = (
-                    self.prefs["scene_frequency"].get(scene, 0) + 1
-                )
+                self.prefs["scene_frequency"][scene] = self.prefs["scene_frequency"].get(scene, 0) + 1
 
         # Traccia frequenza tool
         for action in actions_executed:
             tool = action.get("tool", "")
             if tool and tool != "none":
-                self.prefs["tool_frequency"][tool] = (
-                    self.prefs["tool_frequency"].get(tool, 0) + 1
-                )
+                self.prefs["tool_frequency"][tool] = self.prefs["tool_frequency"].get(tool, 0) + 1
 
         self._save()
 
@@ -85,11 +81,7 @@ class PreferenceLearner:
         lines = []
 
         # Scene più usate (almeno 2 attivazioni)
-        frequent_scenes = [
-            (s, n)
-            for s, n in self.prefs.get("scene_frequency", {}).items()
-            if n >= 2
-        ]
+        frequent_scenes = [(s, n) for s, n in self.prefs.get("scene_frequency", {}).items() if n >= 2]
         if frequent_scenes:
             top = sorted(frequent_scenes, key=lambda x: x[1], reverse=True)[:3]
             scenes_str = ", ".join(f"'{s}' ({n}x)" for s, n in top)

@@ -245,10 +245,7 @@ class VoiceManager:
 
     async def broadcast_status(self, status):
         if self.socket_manager:
-            await self.socket_manager.broadcast({
-                "type": "voice_status",
-                "status": status
-            })
+            await self.socket_manager.broadcast({"type": "voice_status", "status": status})
 
     def _voice_event_loop(self):
         """Stesso loop di uvicorn: preferisci manager.loop (impostato nel lifespan)."""
@@ -258,9 +255,7 @@ class VoiceManager:
 
     def _broadcast(self, status: str):
         """Accoda lo stato voce sul loop principale (thread-safe)."""
-        self._dashboard_voice_status = (
-            status.strip().upper() if isinstance(status, str) else "IDLE"
-        )
+        self._dashboard_voice_status = status.strip().upper() if isinstance(status, str) else "IDLE"
         # Attendi che il loop sia pronto (timeout per non bloccare il thread vocale all'infinito)
         if not self._loop_ready.is_set():
             if not self._loop_ready.wait(timeout=2.0):
@@ -271,9 +266,7 @@ class VoiceManager:
         if not loop:
             return
         try:
-            fut = asyncio.run_coroutine_threadsafe(
-                self.broadcast_status(self._dashboard_voice_status), loop
-            )
+            fut = asyncio.run_coroutine_threadsafe(self.broadcast_status(self._dashboard_voice_status), loop)
 
             def _log_err(f):
                 try:
@@ -298,14 +291,15 @@ class VoiceManager:
             except Exception as e:
                 print(f"[VOICE] Caricamento modelli fallito: {e}")
                 import traceback
+
                 traceback.print_exc()
                 self.is_running = False
                 return
 
             audio = pyaudio.PyAudio()
-            stream = audio.open(format=self.FORMAT, channels=self.CHANNELS,
-                                rate=self.RATE, input=True,
-                                frames_per_buffer=self.CHUNK)
+            stream = audio.open(
+                format=self.FORMAT, channels=self.CHANNELS, rate=self.RATE, input=True, frames_per_buffer=self.CHUNK
+            )
 
             self._calibrate_vad_from_stream(stream)
 
@@ -339,7 +333,6 @@ class VoiceManager:
                     self._broadcast("IDLE")
                     continue
 
-
                 # LISTENING è già emesso dentro _record_utterance_*; dopo wake + comando inline va in PROCESSING
                 if cmd:
                     # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
@@ -357,6 +350,7 @@ class VoiceManager:
         except Exception as e:
             print(f"[VOICE] ERRORE CRITICO nel loop vocale: {e}")
             import traceback
+
             traceback.print_exc()
             self.is_running = False
 
@@ -404,16 +398,14 @@ class VoiceManager:
 
     def _split_sentences(self, text: str) -> list[str]:
         """Divide il testo in frasi complete (separatori: . ! ? e a-capo con elenco)."""
-        parts = re.split(r'(?<=[.!?])\s+|\n[-*]\s*|\n{2,}', text)
-        return [p.strip().lstrip('-').lstrip('*').strip() for p in parts if p.strip()]
+        parts = re.split(r"(?<=[.!?])\s+|\n[-*]\s*|\n{2,}", text)
+        return [p.strip().lstrip("-").lstrip("*").strip() for p in parts if p.strip()]
 
     async def _process_voice_text(self, text: str):
         self._broadcast("PROCESSING")
         # Mostra il testo trascritto sulla dashboard
         if self.socket_manager:
-            await self.socket_manager.broadcast({
-                "type": "stream", "token": f"🎤 {text}\n", "full_text": f"🎤 {text}"
-            })
+            await self.socket_manager.broadcast({"type": "stream", "token": f"🎤 {text}\n", "full_text": f"🎤 {text}"})
         print(f"Richiesta (voce): {text}")
         try:
             is_news_request = any(word in text.lower() for word in ["notizie", "news", "notiziario", "aggiornamenti"])
@@ -432,7 +424,7 @@ class VoiceManager:
                 first = True
                 while True:
                     sentence = tts_queue.get()
-                    if sentence is None:          # sentinella di fine
+                    if sentence is None:  # sentinella di fine
                         break
                     if first:
                         self.is_speaking = True
@@ -477,15 +469,17 @@ class VoiceManager:
 
             # Recupera dati finali (layout) salvati dall'agente
             layout_data = {"type": "orb", "params": {}}
-            if hasattr(self.agent, '_last_final_data'):
+            if hasattr(self.agent, "_last_final_data"):
                 _, layout_data = self.agent._last_final_data
 
             if full_reply.strip() and self.socket_manager:
-                await self.socket_manager.broadcast({
-                    "type": "layout",
-                    "layout": layout_data.get("type", "orb"),
-                    "params": layout_data.get("params", {})
-                })
+                await self.socket_manager.broadcast(
+                    {
+                        "type": "layout",
+                        "layout": layout_data.get("type", "orb"),
+                        "params": layout_data.get("params", {}),
+                    }
+                )
 
             if not spoke_something:
                 print("[VOICE] Risposta agente vuota, niente TTS.")
@@ -493,6 +487,7 @@ class VoiceManager:
         except Exception as e:
             print(f"[VOICE] Errore durante l'elaborazione: {e}")
             import traceback
+
             traceback.print_exc()
         finally:
             self.is_speaking = False
@@ -504,17 +499,9 @@ class VoiceManager:
             return
         try:
             output_wav = "voice/response.wav"
-            command = [
-                self.piper_exe,
-                "--model", self.piper_model,
-                "--output_file", output_wav
-            ]
+            command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
             subprocess.run(
-                command,
-                input=text.encode('utf-8'),
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
             self._play_wav(output_wav)
         except Exception as e:
@@ -533,17 +520,9 @@ class VoiceManager:
             output_wav = "voice/response.wav"
             # Comando per Piper: passa il testo e genera il wav
             # Fix shell injection: use list of args and pass text via input
-            command = [
-                self.piper_exe,
-                "--model", self.piper_model,
-                "--output_file", output_wav
-            ]
+            command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
             subprocess.run(
-                command,
-                input=text.encode('utf-8'),
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
 
             # Riproduzione controllata via PyAudio (niente lettore multimediale)
@@ -557,12 +536,14 @@ class VoiceManager:
     def _play_wav(self, file_path):
         """Riproduce un file WAV usando PyAudio in modo sincrono e controllato."""
         try:
-            wf = wave.open(file_path, 'rb')
+            wf = wave.open(file_path, "rb")
             p = pyaudio.PyAudio()
-            stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-                            channels=wf.getnchannels(),
-                            rate=wf.getframerate(),
-                            output=True)
+            stream = p.open(
+                format=p.get_format_from_width(wf.getsampwidth()),
+                channels=wf.getnchannels(),
+                rate=wf.getframerate(),
+                output=True,
+            )
 
             chunk_size = 4096
             data = wf.readframes(chunk_size)
@@ -579,9 +560,10 @@ class VoiceManager:
 
     def stop(self):
         self.is_running = False
-        if hasattr(self, 'thread'):
+        if hasattr(self, "thread"):
             self.thread.join(timeout=2)
         print("[VOICE] Sistema vocale fermato.")
+
 
 if __name__ == "__main__":
     # Test stub

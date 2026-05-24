@@ -16,14 +16,17 @@ from core.tool_manager import ToolManager
 class MockTool:
     def initialize(self):
         self.initialized = True
+
     def execute(self, action):
         return {"status": "ok", "message": "hello"}
+
 
 @pytest.fixture
 def tool_manager():
     tm = ToolManager()
     tm.initialize()
     return tm
+
 
 def test_register_unregister_tool(tool_manager):
     mock_tool = MockTool()
@@ -32,6 +35,7 @@ def test_register_unregister_tool(tool_manager):
 
     tool_manager.unregister_tool("mock")
     assert "mock" not in tool_manager.tools
+
 
 def test_hot_reload_logic(tool_manager, tmp_path):
     # Crea una cartella plugins temporanea

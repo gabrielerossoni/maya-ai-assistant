@@ -99,10 +99,7 @@ def ensure_ollama_running(max_wait_sec: int = 45) -> None:
 
     ollama_exe = _resolve_ollama_executable()
     if not ollama_exe:
-        print(
-            "[OLLAMA] Eseguibile non trovato. Installa Ollama da https://ollama.com "
-            "oppure avvialo manualmente."
-        )
+        print("[OLLAMA] Eseguibile non trovato. Installa Ollama da https://ollama.com oppure avvialo manualmente.")
         return
 
     print("[OLLAMA] Avvio del server locale in background...")

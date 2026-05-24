@@ -7,12 +7,15 @@ import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
-SCOPE = " ".join([
-    "user-read-playback-state",
-    "user-modify-playback-state",
-    "user-read-currently-playing",
-    "user-read-private",
-])
+SCOPE = " ".join(
+    [
+        "user-read-playback-state",
+        "user-modify-playback-state",
+        "user-read-currently-playing",
+        "user-read-private",
+    ]
+)
+
 
 class SpotifyTool:
     def __init__(self):
@@ -137,6 +140,7 @@ class SpotifyTool:
                 # Fallback: tasti sistema
                 try:
                     import keyboard
+
                     # Normalizza: 0-100 → n pressioni
                     current = self._get_current_volume()
                     diff = level - current
@@ -162,7 +166,14 @@ class SpotifyTool:
     def _current_track(self) -> dict:
         track = self.sp.current_user_playing_track()
         if not track or not track.get("item"):
-            return {"status": "ok", "message": "Nessun brano in riproduzione.", "track": "", "artist": "", "is_playing": False, "album_art": ""}
+            return {
+                "status": "ok",
+                "message": "Nessun brano in riproduzione.",
+                "track": "",
+                "artist": "",
+                "is_playing": False,
+                "album_art": "",
+            }
         item = track["item"]
         name = item["name"]
         artist = item["artists"][0]["name"]

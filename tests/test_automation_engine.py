@@ -31,6 +31,7 @@ from core.automation_engine import (
 
 # ── Fixture locali ────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def engine(mock_tool_manager, fresh_context, fresh_registry):
     """AutomationEngine pulito con ToolManager mock."""
@@ -38,8 +39,9 @@ def engine(mock_tool_manager, fresh_context, fresh_registry):
     return eng
 
 
-def _simple_automation(name="test_scene", aliases=None, priority=Priority.NORMAL,
-                       cooldown=0, conditions=None, exclusive=False) -> Automation:
+def _simple_automation(
+    name="test_scene", aliases=None, priority=Priority.NORMAL, cooldown=0, conditions=None, exclusive=False
+) -> Automation:
     """Helper per creare un'automazione minimale."""
     return Automation(
         scene=Scene(
@@ -57,6 +59,7 @@ def _simple_automation(name="test_scene", aliases=None, priority=Priority.NORMAL
 
 
 # ── Test registrazione ────────────────────────────────────────────────────────
+
 
 class TestRegistration:
     def test_register_single(self, engine):
@@ -83,6 +86,7 @@ class TestRegistration:
 
 
 # ── Test resolve ──────────────────────────────────────────────────────────────
+
 
 class TestResolve:
     def test_resolve_by_name(self, engine):
@@ -111,6 +115,7 @@ class TestResolve:
 
 # ── Test execute ──────────────────────────────────────────────────────────────
 
+
 class TestExecute:
     @pytest.mark.asyncio
     async def test_execute_ok(self, engine, mock_tool_manager):
@@ -133,9 +138,7 @@ class TestExecute:
 
     @pytest.mark.asyncio
     async def test_execute_with_action_error(self, engine, mock_tool_manager):
-        mock_tool_manager.execute = AsyncMock(
-            return_value={"status": "error", "message": "device offline"}
-        )
+        mock_tool_manager.execute = AsyncMock(return_value={"status": "error", "message": "device offline"})
         auto = _simple_automation("scena_errore")
         engine.register(auto)
         result = await engine.execute(auto)
@@ -156,6 +159,7 @@ class TestExecute:
     async def test_execute_action_timeout(self, engine, mock_tool_manager):
         async def slow_execute(_):
             await asyncio.sleep(10)
+
         mock_tool_manager.execute = slow_execute
 
         auto = Automation(
@@ -188,6 +192,7 @@ class TestExecute:
 
 # ── Test condizioni ───────────────────────────────────────────────────────────
 
+
 class TestConditions:
     @pytest.mark.asyncio
     async def test_condition_blocks_execution(self, engine, fresh_context):
@@ -203,8 +208,9 @@ class TestConditions:
     @pytest.mark.asyncio
     async def test_condition_allows_execution(self, engine, mock_tool_manager, fresh_context):
         fresh_context.set("presence", "home")
-        with patch.object(type(fresh_context), "_compute_time_slot",
-                          return_value=fresh_context.get("time_slot", "afternoon")):
+        with patch.object(
+            type(fresh_context), "_compute_time_slot", return_value=fresh_context.get("time_slot", "afternoon")
+        ):
             auto = _simple_automation(
                 "quando_casa",
                 conditions=[Condition({"presence": "home"})],
@@ -215,6 +221,7 @@ class TestConditions:
 
 
 # ── Test EventBus ─────────────────────────────────────────────────────────────
+
 
 class TestEventBus:
     @pytest.mark.asyncio
@@ -292,6 +299,7 @@ class TestEventBus:
 
 # ── Test scene_executed event ─────────────────────────────────────────────────
 
+
 class TestEngineEvents:
     @pytest.mark.asyncio
     async def test_scene_executed_event_published(self, engine, mock_tool_manager):
@@ -316,6 +324,7 @@ class TestEngineEvents:
 
 
 # ── Test build_default_automations ────────────────────────────────────────────
+
 
 class TestDefaults:
     def test_defaults_build(self, fresh_context, fresh_registry):

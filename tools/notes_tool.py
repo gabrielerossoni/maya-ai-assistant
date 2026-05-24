@@ -1,6 +1,7 @@
 """
 notes_tool.py - Gestione appunti e todo
 """
+
 import json
 import os
 
@@ -16,7 +17,7 @@ class NotesTool:
                 json.dump({"todo": [], "notes": []}, f)
 
     def execute(self, action: dict) -> dict:
-        operation = action.get("operation", "list") # add, remove, list
+        operation = action.get("operation", "list")  # add, remove, list
         item = action.get("item", "")
         category = action.get("category", "todo")
 

@@ -17,10 +17,13 @@ class MLStripper(HTMLParser):
         self.strict = False
         self.convert_charrefs = True
         self.text = []
+
     def handle_data(self, d):
         self.text.append(d)
+
     def get_data(self):
-        return ''.join(self.text)
+        return "".join(self.text)
+
 
 def strip_tags(html_content):
     if not html_content:
@@ -28,6 +31,7 @@ def strip_tags(html_content):
     s = MLStripper()
     s.feed(html_content)
     return s.get_data().strip()
+
 
 class NewsTool:
     def initialize(self):
@@ -58,12 +62,12 @@ class NewsTool:
                     image_url = img_match.group(1)
 
                 # 2. Prova media_content
-                if not image_url and 'media_content' in entry and entry.media_content:
-                    image_url = entry.media_content[0]['url']
+                if not image_url and "media_content" in entry and entry.media_content:
+                    image_url = entry.media_content[0]["url"]
 
                 # 3. Prova enclosure
-                if not image_url and 'enclosures' in entry and entry.enclosures:
-                    image_url = entry.enclosures[0]['href']
+                if not image_url and "enclosures" in entry and entry.enclosures:
+                    image_url = entry.enclosures[0]["href"]
 
                 summary = self._clean_html(raw_summary)
                 raw_title = self._clean_html(entry.get("title", ""))
@@ -77,20 +81,18 @@ class NewsTool:
                     source = parts[1]
 
                 news_list.append(f"- {title} ({source})")
-                structured_news.append({
-                    "title": title,
-                    "source": source,
-                    "link": entry.link,
-                    "image": image_url,
-                    "summary": summary[:200] + ("..." if len(summary) > 200 else ""),
-                    "published": entry.get("published", "")
-                })
+                structured_news.append(
+                    {
+                        "title": title,
+                        "source": source,
+                        "link": entry.link,
+                        "image": image_url,
+                        "summary": summary[:200] + ("..." if len(summary) > 200 else ""),
+                        "published": entry.get("published", ""),
+                    }
+                )
 
             msg = "Ecco le ultime notizie:\n" + "\n".join(news_list)
-            return {
-                "status": "ok",
-                "message": msg,
-                "news": structured_news
-            }
+            return {"status": "ok", "message": msg, "news": structured_news}
         except Exception as e:
             return {"status": "error", "message": str(e)}

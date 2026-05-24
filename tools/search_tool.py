@@ -16,11 +16,7 @@ class SearchTool:
 
         try:
             with DDGS() as ddgs:
-                results = list(
-                    ddgs.text(
-                        query, region="it-it", safesearch="moderate", max_results=3
-                    )
-                )
+                results = list(ddgs.text(query, region="it-it", safesearch="moderate", max_results=3))
 
             if not results:
                 return {"status": "error", "message": "Nessun risultato trovato."}

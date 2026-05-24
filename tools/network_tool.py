@@ -29,10 +29,7 @@ class NetworkTool:
         """
         message = action.get("message", "PING")
 
-        payload = json.dumps({
-            "command": message,
-            "source": "jarvis"
-        })
+        payload = json.dumps({"command": message, "source": "jarvis"})
 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -60,6 +57,7 @@ class NetworkTool:
 # python -c "from tools.network_tool import run_server; run_server()"
 # ══════════════════════════════════════════════
 
+
 def run_server(host="0.0.0.0", port=9999):
     """
     Server TCP da avviare sul secondo PC.
@@ -68,10 +66,10 @@ def run_server(host="0.0.0.0", port=9999):
     import subprocess
 
     COMMAND_HANDLERS = {
-        "GOODNIGHT":   lambda: print("[SERVER] Buonanotte ricevuto!"),
-        "WORK_MODE":   lambda: print("[SERVER] Modalità lavoro attivata!"),
+        "GOODNIGHT": lambda: print("[SERVER] Buonanotte ricevuto!"),
+        "WORK_MODE": lambda: print("[SERVER] Modalità lavoro attivata!"),
         "OPEN_APP:spotify": lambda: subprocess.Popen(["spotify"]),
-        "PING":        lambda: print("[SERVER] PONG"),
+        "PING": lambda: print("[SERVER] PONG"),
     }
 
     print(f"[SERVER] In ascolto su {host}:{port}...")

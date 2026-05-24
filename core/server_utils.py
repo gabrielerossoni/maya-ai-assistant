@@ -49,9 +49,7 @@ def print_banner():
             pass
 
     print(f"\n{PEACH}╭───────────────────────────────────────────────────╮")
-    print(
-        f"│ {RESET}✷ Welcome to the {BOLD}MAYA{RESET} research preview!            {PEACH}│"
-    )
+    print(f"│ {RESET}✷ Welcome to the {BOLD}MAYA{RESET} research preview!            {PEACH}│")
     print("╰───────────────────────────────────────────────────╯\n")
 
     print(f"{PEACH}{BOLD}")

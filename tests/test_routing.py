@@ -31,5 +31,6 @@ async def test_routing():
         status = "[OK]" if intent == expected else "[FALLITO]"
         print(f"Intent rilevato: {intent} (Atteso: {expected}) {status}")
 
+
 if __name__ == "__main__":
     asyncio.run(test_routing())

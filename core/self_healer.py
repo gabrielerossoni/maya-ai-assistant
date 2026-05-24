@@ -60,6 +60,7 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
             original_code = f.read()
 
         import traceback as _tb
+
         tb_text = _tb.format_exc()
 
         user_msg = (
@@ -106,12 +107,8 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
 
         # Validazione strutturale: la patch deve contenere le stesse classi del sorgente
         try:
-            orig_classes = {
-                n.name for n in ast.walk(ast.parse(original_code)) if isinstance(n, ast.ClassDef)
-            }
-            patch_classes = {
-                n.name for n in ast.walk(ast.parse(patched_code)) if isinstance(n, ast.ClassDef)
-            }
+            orig_classes = {n.name for n in ast.walk(ast.parse(original_code)) if isinstance(n, ast.ClassDef)}
+            patch_classes = {n.name for n in ast.walk(ast.parse(patched_code)) if isinstance(n, ast.ClassDef)}
             if not orig_classes.intersection(patch_classes):
                 print(f"[SELF_HEALER] Patch non contiene classi originali {orig_classes}")
                 return

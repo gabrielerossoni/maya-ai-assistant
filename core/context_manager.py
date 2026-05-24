@@ -45,13 +45,13 @@ class ContextManager:
 
     def _default_state(self) -> dict:
         return {
-            "time_slot":    self._compute_time_slot(),
-            "presence":     "unknown",
-            "weather":      "unknown",
-            "activity":     "idle",
+            "time_slot": self._compute_time_slot(),
+            "presence": "unknown",
+            "weather": "unknown",
+            "activity": "idle",
             "active_scene": None,
-            "devices":      {},
-            "flags":        {"guests": False, "children_sleeping": False},
+            "devices": {},
+            "flags": {"guests": False, "children_sleeping": False},
             "last_updated": time.time(),
         }
 
@@ -173,4 +173,3 @@ class ContextManager:
 
 # Istanza globale singleton
 context = ContextManager()
-

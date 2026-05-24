@@ -28,16 +28,18 @@ logger = logging.getLogger("maya.automation")
 # PRIORITÀ
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class Priority(IntEnum):
-    LOW      = 10
-    NORMAL   = 50
-    HIGH     = 80
+    LOW = 10
+    NORMAL = 50
+    HIGH = 80
     CRITICAL = 100
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ACTION — unità atomica di esecuzione
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class Action:
@@ -46,11 +48,12 @@ class Action:
 
     Struttura pulita e validabile, compatibile con ToolManager.execute().
     """
-    tool:    str
-    params:  dict = field(default_factory=dict)
-    delay:   float = 0.0     # secondi di attesa prima dell'esecuzione
-    retry:   int   = 1       # tentativi in caso di errore
-    timeout: float = 5.0     # timeout per tool lenti (es. Arduino seriale)
+
+    tool: str
+    params: dict = field(default_factory=dict)
+    delay: float = 0.0  # secondi di attesa prima dell'esecuzione
+    retry: int = 1  # tentativi in caso di errore
+    timeout: float = 5.0  # timeout per tool lenti (es. Arduino seriale)
 
     def to_tool_action(self) -> dict:
         """Converte in formato atteso da ToolManager.execute()."""
@@ -68,17 +71,22 @@ def arduino(target: str, value: Any = None, **kwargs) -> Action:
     params.update(kwargs)
     return Action(tool="arduino", params={"op": "SET", **params})
 
+
 def spotify(command: str, **kwargs) -> Action:
     return Action(tool="spotify", params={"command": command, **kwargs})
+
 
 def timer_action(minutes: int, message: str) -> Action:
     return Action(tool="timer", params={"minutes": minutes, "message": message})
 
+
 def weather_action() -> Action:
     return Action(tool="weather", params={"location": None})
 
+
 def news_action(limit: int = 3) -> Action:
     return Action(tool="news", params={"limit": limit})
+
 
 def calendar_action(act: str = "list") -> Action:
     return Action(tool="calendar", params={"action": act})
@@ -87,6 +95,7 @@ def calendar_action(act: str = "list") -> Action:
 # ─────────────────────────────────────────────────────────────────────────────
 # CONDITION — predicato sul contesto
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class Condition:
@@ -98,6 +107,7 @@ class Condition:
         Condition({"presence": "home", "weather": ["rain", "cloud"]})
         Condition({"presence": {"not": "away"}})
     """
+
     requirements: dict = field(default_factory=dict)
 
     def evaluate(self) -> bool:
@@ -113,6 +123,7 @@ class Condition:
 # TRIGGER — cosa attiva l'automazione
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Trigger:
     """
@@ -123,15 +134,17 @@ class Trigger:
           "event"    → su evento del bus interno
           "context"  → quando il contesto soddisfa le condizioni
     """
-    type:       str   = "manual"
-    time:       str   = ""       # "HH:MM" per type="time"
-    event_name: str   = ""       # nome evento per type="event"
-    context:    dict  = field(default_factory=dict)  # condizioni per type="context"
+
+    type: str = "manual"
+    time: str = ""  # "HH:MM" per type="time"
+    event_name: str = ""  # nome evento per type="event"
+    context: dict = field(default_factory=dict)  # condizioni per type="context"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SCENE — raccolta di azioni con metadati
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class Scene:
@@ -139,13 +152,14 @@ class Scene:
     Insieme di azioni con nome, condizioni e priorità.
     Sostituisce le liste nel dizionario AUTOMATIONS.
     """
-    name:       str
-    actions:    list[Action]
-    priority:   Priority     = Priority.NORMAL
+
+    name: str
+    actions: list[Action]
+    priority: Priority = Priority.NORMAL
     conditions: list[Condition] = field(default_factory=list)
-    exclusive:  bool         = False   # se True, sospende altre scene attive
-    cooldown:   float        = 0.0     # secondi minimi tra due esecuzioni
-    _last_run:  float        = field(default=0.0, init=False, repr=False)
+    exclusive: bool = False  # se True, sospende altre scene attive
+    cooldown: float = 0.0  # secondi minimi tra due esecuzioni
+    _last_run: float = field(default=0.0, init=False, repr=False)
 
     def can_run(self) -> bool:
         """Verifica condizioni e cooldown."""
@@ -161,18 +175,20 @@ class Scene:
 # AUTOMATION — scene + trigger (unità completa)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Automation:
     """
     Unità completa: una Scene con uno o più Trigger associati.
     Supporta scadenza (per automazioni temporanee).
     """
-    scene:      Scene
-    triggers:   list[Trigger]     = field(default_factory=list)
-    aliases:    list[str]         = field(default_factory=list)
-    enabled:    bool              = True
-    expires_at: float | None      = None   # timestamp Unix, None = permanente
-    tags:       list[str]         = field(default_factory=list)
+
+    scene: Scene
+    triggers: list[Trigger] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
+    enabled: bool = True
+    expires_at: float | None = None  # timestamp Unix, None = permanente
+    tags: list[str] = field(default_factory=list)
 
     @property
     def name(self) -> str:
@@ -198,6 +214,7 @@ class Automation:
 # ─────────────────────────────────────────────────────────────────────────────
 # EVENT BUS — comunicazione interna disaccoppiata
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class EventBus:
     """
@@ -236,6 +253,7 @@ class EventBus:
 # AUTOMATION ENGINE — orchestratore principale
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class AutomationEngine:
     """
     Motore centrale che gestisce tutte le automazioni di Maya.
@@ -249,12 +267,12 @@ class AutomationEngine:
     """
 
     def __init__(self, tool_manager=None):
-        self._tool_manager   = tool_manager
-        self._automations:   dict[str, Automation] = {}
-        self._active_tasks:  dict[str, asyncio.Task] = {}
+        self._tool_manager = tool_manager
+        self._automations: dict[str, Automation] = {}
+        self._active_tasks: dict[str, asyncio.Task] = {}
         self._scheduler_task: asyncio.Task | None = None
         self.bus = EventBus()
-        self._event_log: list[dict] = []   # ultimi N eventi eseguiti
+        self._event_log: list[dict] = []  # ultimi N eventi eseguiti
 
     # ── Registrazione ─────────────────────────────────────────────────────────
 
@@ -284,12 +302,10 @@ class AutomationEngine:
         Ordina per priorità decrescente.
         """
         import re
+
         lower = re.sub(r"\s+", " ", user_input.lower().strip())
 
-        candidates = [
-            a for a in self._automations.values()
-            if a.is_valid() and a.matches_input(lower)
-        ]
+        candidates = [a for a in self._automations.values() if a.is_valid() and a.matches_input(lower)]
         if not candidates:
             return None
 
@@ -330,7 +346,7 @@ class AutomationEngine:
         logger.info(f"[ENGINE] Esecuzione '{scene.name}' (priorità={scene.priority}, source={source})")
 
         results = []
-        errors  = []
+        errors = []
         start_ts = time.time()
 
         for action in scene.actions:
@@ -355,15 +371,15 @@ class AutomationEngine:
         context.set_scene(scene.name)
 
         elapsed = round(time.time() - start_ts, 3)
-        status  = "ok" if not errors else "partial"
+        status = "ok" if not errors else "partial"
 
         event_entry = {
-            "scene":   scene.name,
-            "source":  source,
-            "status":  status,
-            "errors":  errors,
+            "scene": scene.name,
+            "source": source,
+            "status": status,
+            "errors": errors,
             "elapsed": elapsed,
-            "ts":      start_ts,
+            "ts": start_ts,
         }
         self._log_event(event_entry)
 
@@ -404,7 +420,7 @@ class AutomationEngine:
                     return result
                 last_result = result
                 if attempt < action.retry - 1:
-                    logger.debug(f"[ENGINE] Retry {attempt+1}/{action.retry} per {action}")
+                    logger.debug(f"[ENGINE] Retry {attempt + 1}/{action.retry} per {action}")
                     await asyncio.sleep(0.5 * (attempt + 1))
             except asyncio.TimeoutError:
                 last_result = {"status": "error", "message": f"timeout ({action.timeout}s)"}
@@ -434,18 +450,14 @@ class AutomationEngine:
                             last = automation.scene._last_run
                             if time.time() - last > 59:
                                 logger.info(f"[SCHEDULER] Trigger temporale: '{automation.name}' ({now})")
-                                asyncio.create_task(
-                                    self.execute(automation, source=f"scheduler:{now}")
-                                )
+                                asyncio.create_task(self.execute(automation, source=f"scheduler:{now}"))
 
                         elif trigger.type == "context" and trigger.context:
                             if context.matches(trigger.context):
                                 last = automation.scene._last_run
                                 if time.time() - last > 300:  # max ogni 5 min per context trigger
                                     logger.info(f"[SCHEDULER] Trigger contesto: '{automation.name}'")
-                                    asyncio.create_task(
-                                        self.execute(automation, source="context_trigger")
-                                    )
+                                    asyncio.create_task(self.execute(automation, source="context_trigger"))
 
             except Exception as e:
                 logger.error(f"[SCHEDULER] Errore: {e}")
@@ -470,6 +482,7 @@ class AutomationEngine:
 # SCENE PREDEFINITE — conversione da AUTOMATIONS statico
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def build_default_automations() -> list[Automation]:
     """
     Costruisce tutte le automazioni predefinite usando il nuovo sistema OO.
@@ -477,7 +490,6 @@ def build_default_automations() -> list[Automation]:
     """
 
     return [
-
         # ── Buonanotte ────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -496,7 +508,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="time", time="23:30"),
             ],
         ),
-
         # ── Buongiorno ────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -520,7 +531,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="context", context={"time_slot": "morning", "presence": "home"}),
             ],
         ),
-
         # ── Sveglia ───────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -536,7 +546,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["svegliami", "dammi la sveglia"],
         ),
-
         # ── Modalità lavoro ───────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -555,7 +564,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="event", event_name="app_opened:jetbrains"),
             ],
         ),
-
         # ── Modalità studio ───────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -570,7 +578,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["studio"],
         ),
-
         # ── Modalità film ─────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -585,7 +592,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["film", "cinema", "guardo un film"],
         ),
-
         # ── Modalità gaming ───────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -603,7 +609,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="event", event_name="headphones_connected"),
             ],
         ),
-
         # ── Modalità relax ────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -617,7 +622,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["relax"],
         ),
-
         # ── Modalità notte ────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -638,7 +642,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="context", context={"time_slot": "night", "presence": "home"}),
             ],
         ),
-
         # ── Modalità ospite ───────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -653,7 +656,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["ospite"],
         ),
-
         # ── Ospiti in arrivo ──────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -669,7 +671,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["arrivano ospiti", "stanno arrivando"],
         ),
-
         # ── Vado fuori ────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -691,7 +692,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="event", event_name="phone_left_wifi"),
             ],
         ),
-
         # ── Sono rientrato ────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -713,7 +713,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="event", event_name="phone_joined_wifi"),
             ],
         ),
-
         # ── Ora di dormire ────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -731,7 +730,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["dormo", "vado a letto", "a letto"],
         ),
-
         # ── Modalità uscita ───────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -748,7 +746,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["uscita"],
         ),
-
         # ── Allarme ───────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -756,13 +753,12 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.CRITICAL,
                 exclusive=True,
                 actions=[
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer",  "value": 1}),
+                    Action(tool="arduino", params={"op": "SET", "target": "buzzer", "value": 1}),
                     Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "alarm"}),
-                    Action(tool="arduino", params={"op": "SET", "target": "neopixel","value": 0xFF0000, "effect": 3}),
+                    Action(tool="arduino", params={"op": "SET", "target": "neopixel", "value": 0xFF0000, "effect": 3}),
                 ],
             ),
         ),
-
         # ── Piove ─────────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -783,7 +779,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="context", context={"weather": "rain"}),
             ],
         ),
-
         # ── Pausa caffè ───────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -800,7 +795,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["caffe", "caffè", "faccio un caffè"],
         ),
-
         # ── Cena ──────────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -820,7 +814,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="context", context={"time_slot": "evening", "presence": "home"}),
             ],
         ),
-
         # ── Bambini dormono ───────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -836,7 +829,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["bambini a letto"],
         ),
-
         # ── Weekend mattina ───────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -854,7 +846,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["weekend", "sabato mattina", "domenica mattina"],
         ),
-
     ]
 
 
@@ -863,4 +854,3 @@ def build_default_automations() -> list[Automation]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 engine = AutomationEngine()
-

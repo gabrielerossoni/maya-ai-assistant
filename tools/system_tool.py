@@ -23,14 +23,14 @@ class SystemTool:
 
         # Mappa comandi → funzioni
         dispatch = {
-            "shutdown":        self._shutdown,
-            "open_browser":    self._open_browser,
-            "open_spotify":    self._open_spotify,
-            "screenshot":      self._screenshot,
-            "open_notepad":    self._open_notepad,
-            "volume_up":       self._volume_up,
-            "volume_down":     self._volume_down,
-            "lock_screen":     self._lock_screen,
+            "shutdown": self._shutdown,
+            "open_browser": self._open_browser,
+            "open_spotify": self._open_spotify,
+            "screenshot": self._screenshot,
+            "open_notepad": self._open_notepad,
+            "volume_up": self._volume_up,
+            "volume_down": self._volume_down,
+            "lock_screen": self._lock_screen,
         }
 
         handler = dispatch.get(command)
@@ -74,8 +74,13 @@ class SystemTool:
     def _screenshot(self):
         try:
             import pyautogui
+
             # Get the correct Desktop path on Windows
-            desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop') if self.os == "Windows" else os.path.expanduser("~/Desktop")
+            desktop = (
+                os.path.join(os.path.join(os.environ["USERPROFILE"]), "Desktop")
+                if self.os == "Windows"
+                else os.path.expanduser("~/Desktop")
+            )
             path = os.path.join(desktop, "jarvis_screenshot.png")
             pyautogui.screenshot(path)
             return f"screenshot salvato in {path}"
@@ -94,7 +99,8 @@ class SystemTool:
     def _volume_up(self):
         try:
             import keyboard
-            keyboard.press_and_release('volume up')
+
+            keyboard.press_and_release("volume up")
             return "volume aumentato"
         except ImportError:
             return "keyboard non installato"
@@ -102,7 +108,8 @@ class SystemTool:
     def _volume_down(self):
         try:
             import keyboard
-            keyboard.press_and_release('volume down')
+
+            keyboard.press_and_release("volume down")
             return "volume diminuito"
         except ImportError:
             return "keyboard non installato"

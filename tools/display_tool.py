@@ -19,8 +19,8 @@ class DisplayTool:
 
     def __init__(self):
         self._running = False
-        self._thread  = None
-        self.status   = {
+        self._thread = None
+        self.status = {
             "light": "OFF",
             "relay": "OFF",
             "servo": "CLOSED",
@@ -59,14 +59,14 @@ class DisplayTool:
     def _draw(self):
         """Disegna il pannello di stato."""
         now = datetime.now().strftime("%H:%M:%S")
-        s   = self.status
+        s = self.status
 
         # Usa colori ANSI
-        CYAN  = "\033[96m"
+        CYAN = "\033[96m"
         GREEN = "\033[92m"
-        RED   = "\033[91m"
+        RED = "\033[91m"
         RESET = "\033[0m"
-        BOLD  = "\033[1m"
+        BOLD = "\033[1m"
 
         def color_state(state):
             if state in ("ON", "OPEN"):
@@ -75,12 +75,12 @@ class DisplayTool:
 
         panel = f"""
 {BOLD}{CYAN}┌─── JARVIS STATUS ─── {now} ───────────────┐{RESET}
-│  💡 Luce  : {color_state(s['light']):<20}              │
-│  🔌 Relè  : {color_state(s['relay']):<20}              │
-│  ⚙  Servo : {color_state(s['servo']):<20}              │
+│  💡 Luce  : {color_state(s["light"]):<20}              │
+│  🔌 Relè  : {color_state(s["relay"]):<20}              │
+│  ⚙  Servo : {color_state(s["servo"]):<20}              │
 │                                              │
-│  Ultimo cmd : {s['last_cmd'][:35]:<35} │
-│  Risposta   : {s['last_reply'][:35]:<35} │
+│  Ultimo cmd : {s["last_cmd"][:35]:<35} │
+│  Risposta   : {s["last_reply"][:35]:<35} │
 {BOLD}{CYAN}└──────────────────────────────────────────────┘{RESET}"""
 
         print(panel)

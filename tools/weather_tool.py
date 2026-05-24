@@ -22,7 +22,7 @@ class WeatherTool:
         61: ("Pioggia Leggera", "cloud-rain"),
         63: ("Pioggia", "cloud-rain"),
         71: ("Neve Leggera", "cloud-snow"),
-        95: ("Temporale", "cloud-lightning")
+        95: ("Temporale", "cloud-lightning"),
     }
 
     def execute(self, action: dict) -> dict:
@@ -38,7 +38,14 @@ class WeatherTool:
                 geo_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=10"
                 geo_res = requests.get(geo_url, headers=headers, timeout=3).json()
                 address = geo_res.get("address", {})
-                city = address.get("city") or address.get("town") or address.get("village") or address.get("municipality") or address.get("county") or address.get("state")
+                city = (
+                    address.get("city")
+                    or address.get("town")
+                    or address.get("village")
+                    or address.get("municipality")
+                    or address.get("county")
+                    or address.get("state")
+                )
                 if city:
                     name = city
                 elif "display_name" in geo_res:
@@ -49,7 +56,10 @@ class WeatherTool:
         else:
             location = action.get("location") or os.getenv("DEFAULT_WEATHER_LOCATION")
             if not location:
-                return {"status": "error", "message": "Località non specificata. Fornire 'location' o impostare 'DEFAULT_WEATHER_LOCATION'."}
+                return {
+                    "status": "error",
+                    "message": "Località non specificata. Fornire 'location' o impostare 'DEFAULT_WEATHER_LOCATION'.",
+                }
             # Primo step: Geocoding
             geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=it&format=json"
             try:
@@ -97,21 +107,23 @@ class WeatherTool:
                 "code": code,
                 "condition": condition,
                 "icon": icon,
-                "daily": []
+                "daily": [],
             }
 
             # Prepara previsioni per i prossimi 5 giorni
             for i in range(1, 6):
                 day_code = daily.get("weathercode")[i]
                 day_cond, day_icon = self.WMO_CODES.get(day_code, ("Variabile", "cloud-sun"))
-                data["daily"].append({
-                    "date": daily.get("time")[i],
-                    "max": daily.get("temperature_2m_max")[i],
-                    "min": daily.get("temperature_2m_min")[i],
-                    "code": day_code,
-                    "condition": day_cond,
-                    "icon": day_icon
-                })
+                data["daily"].append(
+                    {
+                        "date": daily.get("time")[i],
+                        "max": daily.get("temperature_2m_max")[i],
+                        "min": daily.get("temperature_2m_min")[i],
+                        "code": day_code,
+                        "condition": day_cond,
+                        "icon": day_icon,
+                    }
+                )
 
             return {"status": "ok", "message": f"Meteo a {name}: {data['temp']}°C", "data": data}
         except Exception as e:

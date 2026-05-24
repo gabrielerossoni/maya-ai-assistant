@@ -26,7 +26,11 @@ class PluginHandler(FileSystemEventHandler):
         try:
             # Rimuovi eventuali moduli orfani (vecchi nomi di plugin rinominati)
             existing_plugin_files = {p.stem for p in self.plugins_dir.glob("*.py") if p.name != "__init__.py"}
-            stale_keys = [k for k in list(sys.modules.keys()) if k not in existing_plugin_files and k.startswith(module_name.split("_")[0])]
+            stale_keys = [
+                k
+                for k in list(sys.modules.keys())
+                if k not in existing_plugin_files and k.startswith(module_name.split("_")[0])
+            ]
             for k in stale_keys:
                 sys.modules.pop(k, None)
 
@@ -66,6 +70,7 @@ class PluginHandler(FileSystemEventHandler):
             tool_name = Path(event.src_path).stem.replace("_tool", "")
             print(f"[PLUGIN] File eliminato: {event.src_path}")
             self.tool_manager.unregister_tool(tool_name)
+
 
 class PluginLoader:
     def __init__(self, tool_manager, plugins_dir="plugins"):

@@ -14,17 +14,18 @@ from core.proactive_manager import CalendarChecker, ProactiveManager, SysMonitor
 @pytest.mark.asyncio
 async def test_sys_monitor_checker():
     # Mock psutil per evitare dipendenze dall'hardware nel test
-    with patch("psutil.cpu_percent", return_value=90.0), \
-         patch("psutil.virtual_memory") as mock_ram:
+    with patch("psutil.cpu_percent", return_value=90.0), patch("psutil.virtual_memory") as mock_ram:
         mock_ram.return_value.percent = 50.0
 
         checker = SysMonitorChecker(cpu_threshold=80)
         result = await checker.check()
         assert "Allerta Sistema: Utilizzo CPU" in result
 
+
 @pytest.mark.asyncio
 async def test_proactive_loop_broadcast():
     from core.websocket_manager import manager
+
     mock_tm = MagicMock()
     # Mock del WebSocket manager
     with patch("core.websocket_manager.manager.broadcast", new_callable=AsyncMock) as mock_broadcast:

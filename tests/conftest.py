@@ -30,6 +30,7 @@ def fresh_context(tmp_data_dir, monkeypatch):
     monkeypatch.setattr("core.context_manager._STATE_PATH", state_path)
     # Reset singleton
     from core.context_manager import ContextManager
+
     ContextManager._instance = None
     ctx = ContextManager()
     # Patch all module-level references to the global context singleton
@@ -45,6 +46,7 @@ def fresh_registry(tmp_data_dir, monkeypatch):
     reg_path = str(tmp_data_dir / "device_registry.json")
     monkeypatch.setattr("core.device_registry._REGISTRY_PATH", reg_path)
     from core.device_registry import DeviceRegistry
+
     DeviceRegistry._instance = None
     reg = DeviceRegistry()
     monkeypatch.setattr("core.device_registry.registry", reg)

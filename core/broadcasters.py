@@ -42,9 +42,7 @@ async def broadcast_weather_update(agent, manager, lat=None, lon=None):
                 action = {"location": location}
             result = await asyncio.to_thread(weather_tool.execute, action)
             if result.get("status") == "ok":
-                await manager.broadcast(
-                    {"type": "weather", "data": result.get("data")}
-                )
+                await manager.broadcast({"type": "weather", "data": result.get("data")})
             else:
                 await manager.broadcast({"type": "weather", "error": True})
     except Exception as e:
@@ -67,9 +65,7 @@ async def weather_broadcaster(agent, manager):
                         action = {"lat": client_lat, "lon": client_lon}
                 result = await asyncio.to_thread(weather_tool.execute, action)
                 if result.get("status") == "ok":
-                    await manager.broadcast(
-                        {"type": "weather", "data": result.get("data")}
-                    )
+                    await manager.broadcast({"type": "weather", "data": result.get("data")})
                 else:
                     await manager.broadcast({"type": "weather", "error": True})
         except Exception as e:
@@ -98,9 +94,7 @@ async def news_broadcaster(agent, manager):
                 # Wrap blocking feedparser call in a thread
                 result = await asyncio.to_thread(news_tool.execute, {"limit": 10})
                 if result.get("status") == "ok":
-                    await manager.broadcast(
-                        {"type": "news", "articles": result.get("news", [])}
-                    )
+                    await manager.broadcast({"type": "news", "articles": result.get("news", [])})
         except Exception as e:
             print(f"[BROADCASTER] Errore news: {e}")
         await asyncio.sleep(600)
@@ -146,10 +140,12 @@ async def sensor_broadcaster(agent, manager):
             if arduino_tool:
                 result = await asyncio.to_thread(arduino_tool.get_sensor_data)
                 if result is not None:
-                    await manager.broadcast({
-                        "type": "arduino_event",
-                        "telemetry": result,
-                    })
+                    await manager.broadcast(
+                        {
+                            "type": "arduino_event",
+                            "telemetry": result,
+                        }
+                    )
         except Exception:
             pass
         await asyncio.sleep(30)
@@ -236,9 +232,7 @@ async def broadcast_state(agent, manager, MODELS):
     models_status = _cached_models_status
     ollama_online = any(m.get("online", False) for m in models_status.values())
 
-    _debug_reset_client = os.environ.get(
-        "MAYA_DEBUG_RESET_CLIENT", ""
-    ).strip().lower() in ("1", "true", "yes")
+    _debug_reset_client = os.environ.get("MAYA_DEBUG_RESET_CLIENT", "").strip().lower() in ("1", "true", "yes")
 
     state_payload = {
         "type": "state",
@@ -257,13 +251,11 @@ async def broadcast_state(agent, manager, MODELS):
             else str(arduino_tool.sim_state.get("servo"))
         ).lower(),
         "servo2": (
-            arduino_tool.sim_state.get("servo2", 0)
-            if isinstance(arduino_tool.sim_state.get("servo2"), int)
-            else 0
+            arduino_tool.sim_state.get("servo2", 0) if isinstance(arduino_tool.sim_state.get("servo2"), int) else 0
         ),
-        "rgb1":   list(arduino_tool.sim_state.get("rgb1", [0, 0, 0])),
-        "rgb2":   list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])),
-        "rgb3":   list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])),
+        "rgb1": list(arduino_tool.sim_state.get("rgb1", [0, 0, 0])),
+        "rgb2": list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])),
+        "rgb3": list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])),
         "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)),
         "system": {
             "model": MODELS.get("router", "llama3.2").upper(),
@@ -342,25 +334,19 @@ async def execute_and_broadcast(cmd: str, agent, manager):
 
     # Callback per inviare il filler message al frontend quando elabora
     async def send_progress(msg: str):
-        await manager.broadcast(
-            {"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"}
-        )
+        await manager.broadcast({"type": "log", "text": f"🤖 MAYA: {msg}", "level": "info"})
 
     # Streaming dei token
     full_reply = ""
     # Inizia con l'emoji
-    await manager.broadcast(
-        {"type": "stream", "token": "🤖 MAYA: ", "full_text": "🤖 MAYA: "}
-    )
+    await manager.broadcast({"type": "stream", "token": "🤖 MAYA: ", "full_text": "🤖 MAYA: "})
     full_reply = "🤖 MAYA: "
 
     layout_data = {"type": "orb", "params": {}}
     try:
         async for token in agent.process(cmd, progress_cb=send_progress):
             full_reply += token
-            await manager.broadcast(
-                {"type": "stream", "token": token, "full_text": full_reply}
-            )
+            await manager.broadcast({"type": "stream", "token": token, "full_text": full_reply})
 
         # Dopo la fine del generatore, recuperiamo i dati finali dall'attributo dell'agente
         task = asyncio.current_task()

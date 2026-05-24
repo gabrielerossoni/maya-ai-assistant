@@ -9,6 +9,7 @@ class DashboardLogFilter:
     - Risposte di MAYA (iniziano con "MAYA >")
     - I log tecnici rimangono solo nel terminale
     """
+
     def __init__(self, original_stdout, ws_manager):
         self.terminal = original_stdout
         self.manager = ws_manager
@@ -74,9 +75,11 @@ class DashboardLogFilter:
         """Necessario per alcuni sistemi di logging di basso livello."""
         return self.terminal.fileno()
 
+
 def setup_dashboard_log_filter(manager):
     """Sostituisce sys.stdout con il filtro dashboard."""
     sys.stdout = DashboardLogFilter(sys.stdout, manager)
+
 
 def user_log(message: str, is_error: bool = False):
     """

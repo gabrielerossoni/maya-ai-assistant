@@ -59,9 +59,9 @@ class DeviceRegistry:
         """Aggiorna lo stato di un dispositivo con traccia della sorgente."""
         with self._lock:
             self._devices[device] = {
-                "value":       value,
+                "value": value,
                 "last_set_by": scene,
-                "ts":          time.time(),
+                "ts": time.time(),
             }
             self._save()
 

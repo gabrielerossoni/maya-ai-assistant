@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ── ContextManager ────────────────────────────────────────────────────────────
 
+
 class TestContextManager:
     def test_default_state(self, fresh_context):
         assert fresh_context.get("presence") == "unknown"
@@ -57,6 +58,7 @@ class TestContextManager:
         fresh_context.set("activity", "working")
         # Forza reload
         from core.context_manager import ContextManager
+
         ContextManager._instance = None
         ctx2 = ContextManager()
         # activity persiste, ma weather/presence vengono resettati al reload
@@ -71,6 +73,7 @@ class TestContextManager:
 
 
 # ── DeviceRegistry ────────────────────────────────────────────────────────────
+
 
 class TestDeviceRegistry:
     def test_update_and_get(self, fresh_registry):
@@ -126,6 +129,7 @@ class TestDeviceRegistry:
     def test_persistence(self, fresh_registry, tmp_data_dir):
         fresh_registry.update("relay", True, scene="test_persist")
         from core.device_registry import DeviceRegistry
+
         DeviceRegistry._instance = None
         reg2 = DeviceRegistry()
         assert reg2.get_value("relay") is True

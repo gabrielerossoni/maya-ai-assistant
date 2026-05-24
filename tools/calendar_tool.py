@@ -16,13 +16,15 @@ from googleapiclient.discovery import build
 CALENDAR_FILE = "data/calendar.json"
 GOOGLE_TOKEN_FILE = "data/token.json"
 GOOGLE_CREDENTIALS_FILE = "data/credentials.json"
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
 
 # Imposta qui l'ID del calendario da usare.
 # 'primary' = calendario principale dell'account.
 # Per trovare altri ID esegui: python -c "from tools.calendar_tool import CalendarTool; c=CalendarTool(); c.initialize(); c.list_google_calendars()"
 def _get_calendar_id():
     return os.environ.get("GOOGLE_CALENDAR_ID", "primary")
+
 
 class CalendarTool:
     """Tool calendario unificato (Locale + Google)."""
@@ -58,7 +60,9 @@ class CalendarTool:
                     try:
                         creds = flow.run_local_server(port=0)
                     except Exception:
-                        print("[CALENDAR] Ambiente headless rilevato o browser non disponibile. Fallback console OAuth.")
+                        print(
+                            "[CALENDAR] Ambiente headless rilevato o browser non disponibile. Fallback console OAuth."
+                        )
                         # flow.run_console() is deprecated in some versions,
                         # using urn:ietf:wg:oauth:2.0:oob logic if supported by the flow
                         creds = flow.run_console()
@@ -66,11 +70,11 @@ class CalendarTool:
                     print(f"[CALENDAR] Errore autenticazione Google: {e}")
                     return
 
-            with open(GOOGLE_TOKEN_FILE, 'w') as token:
+            with open(GOOGLE_TOKEN_FILE, "w") as token:
                 token.write(creds.to_json())
 
         try:
-            self.google_service = build('calendar', 'v3', credentials=creds)
+            self.google_service = build("calendar", "v3", credentials=creds)
         except Exception as e:
             print(f"[CALENDAR] Errore build service Google: {e}")
 
@@ -95,9 +99,9 @@ class CalendarTool:
     # ── Operazioni ────────────────────────────
 
     def _add_event(self, action: dict) -> dict:
-        title    = action.get("title", "Evento senza titolo")
+        title = action.get("title", "Evento senza titolo")
         time_str = action.get("time", "")
-        notes    = action.get("notes", "")
+        notes = action.get("notes", "")
 
         # Parse della data/ora
         dt = self._parse_time(time_str)
@@ -108,10 +112,10 @@ class CalendarTool:
         events = self._load()
         temp_id = len(events) + 1
         event = {
-            "id":      temp_id,
-            "title":   title,
-            "time":    dt.strftime("%Y-%m-%d %H:%M"),
-            "notes":   notes,
+            "id": temp_id,
+            "title": title,
+            "time": dt.strftime("%Y-%m-%d %H:%M"),
+            "notes": notes,
             "created": datetime.now().strftime("%Y-%m-%d %H:%M"),
         }
         events.append(event)
@@ -124,10 +128,10 @@ class CalendarTool:
         if self.google_service:
             try:
                 event_body = {
-                    'summary': title,
-                    'description': notes,
-                    'start': {'dateTime': dt.isoformat(), 'timeZone': 'Europe/Rome'},
-                    'end': {'dateTime': (dt + timedelta(hours=1)).isoformat(), 'timeZone': 'Europe/Rome'},
+                    "summary": title,
+                    "description": notes,
+                    "start": {"dateTime": dt.isoformat(), "timeZone": "Europe/Rome"},
+                    "end": {"dateTime": (dt + timedelta(hours=1)).isoformat(), "timeZone": "Europe/Rome"},
                 }
                 self.google_service.events().insert(calendarId=_get_calendar_id(), body=event_body).execute()
                 google_success = True
@@ -143,11 +147,13 @@ class CalendarTool:
             self._save(events)
             event["id"] = "google"
 
-        print(f"[CALENDAR] {google_msg if google_success else '[LOCALE]'} Evento: '{title}' il {dt.strftime('%d/%m/%Y alle %H:%M')}")
+        print(
+            f"[CALENDAR] {google_msg if google_success else '[LOCALE]'} Evento: '{title}' il {dt.strftime('%d/%m/%Y alle %H:%M')}"
+        )
         return {
             "status": "ok",
             "message": f"Evento '{title}' aggiunto per il {dt.strftime('%d/%m/%Y alle %H:%M')}{google_msg}",
-            "event": event
+            "event": event,
         }
 
     def _list_events(self, action: dict) -> dict:
@@ -160,20 +166,22 @@ class CalendarTool:
         if self.google_service:
             try:
                 cal_id = _get_calendar_id()
-                events_result = self.google_service.events().list(
-                    calendarId=cal_id, timeMin=now_iso,
-                    maxResults=50, singleEvents=True,
-                    orderBy='startTime'
-                ).execute()
-                g_events = events_result.get('items', [])
+                events_result = (
+                    self.google_service.events()
+                    .list(calendarId=cal_id, timeMin=now_iso, maxResults=50, singleEvents=True, orderBy="startTime")
+                    .execute()
+                )
+                g_events = events_result.get("items", [])
                 for ge in g_events:
-                    start = ge['start'].get('dateTime', ge['start'].get('date'))
-                    dt_g = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                    all_events.append({
-                        "title": ge.get('summary', 'Senza titolo'),
-                        "time": dt_g.strftime("%Y-%m-%d %H:%M"),
-                        "source": "google"
-                    })
+                    start = ge["start"].get("dateTime", ge["start"].get("date"))
+                    dt_g = datetime.fromisoformat(start.replace("Z", "+00:00"))
+                    all_events.append(
+                        {
+                            "title": ge.get("summary", "Senza titolo"),
+                            "time": dt_g.strftime("%Y-%m-%d %H:%M"),
+                            "source": "google",
+                        }
+                    )
             except Exception as e:
                 print(f"[CALENDAR] Errore fetch Google: {e}")
 
@@ -202,15 +210,11 @@ class CalendarTool:
                 when = f"tra {days} giorni"
             lines.append(f"• {e['title']} — {dt.strftime('%d/%m alle %H:%M')} ({when})")
 
-        return {
-            "status": "ok",
-            "message": "Prossimi eventi:\n" + "\n".join(lines),
-            "events": all_events
-        }
+        return {"status": "ok", "message": "Prossimi eventi:\n" + "\n".join(lines), "events": all_events}
 
     def _delete_event(self, action: dict) -> dict:
         event_id = action.get("id")
-        title    = action.get("title", "").lower()
+        title = action.get("title", "").lower()
 
         events = self._load()
         before = len(events)
@@ -226,18 +230,18 @@ class CalendarTool:
 
     def _next_event(self) -> dict:
         events = self._load()
-        now    = datetime.now()
+        now = datetime.now()
         future = [e for e in events if self._parse_time(e["time"]) >= now]
 
         if not future:
             return {"status": "ok", "message": "Nessun evento imminente."}
 
-        e  = future[0]
+        e = future[0]
         dt = self._parse_time(e["time"])
         return {
             "status": "ok",
             "message": f"Prossimo evento: '{e['title']}' il {dt.strftime('%d/%m alle %H:%M')}",
-            "event": e
+            "event": e,
         }
 
     def sync_local_to_google(self) -> int:
@@ -259,10 +263,10 @@ class CalendarTool:
                     continue
 
                 event_body = {
-                    'summary': e["title"],
-                    'description': e.get("notes", ""),
-                    'start': {'dateTime': dt.isoformat(), 'timeZone': 'Europe/Rome'},
-                    'end': {'dateTime': (dt + timedelta(hours=1)).isoformat(), 'timeZone': 'Europe/Rome'},
+                    "summary": e["title"],
+                    "description": e.get("notes", ""),
+                    "start": {"dateTime": dt.isoformat(), "timeZone": "Europe/Rome"},
+                    "end": {"dateTime": (dt + timedelta(hours=1)).isoformat(), "timeZone": "Europe/Rome"},
                 }
                 self.google_service.events().insert(calendarId=_get_calendar_id(), body=event_body).execute()
                 synced_count += 1
@@ -281,7 +285,7 @@ class CalendarTool:
             print("[CALENDAR] Google Calendar non disponibile.")
             return
         result = self.google_service.calendarList().list().execute()
-        for cal in result.get('items', []):
+        for cal in result.get("items", []):
             print(f"  {cal['summary']:40s}  ID: {cal['id']}")
 
     # ── Helpers ───────────────────────────────

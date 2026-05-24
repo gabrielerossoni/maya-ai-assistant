@@ -34,7 +34,7 @@ class CodeGeneratorTool:
 
             return {
                 "status": "ok",
-                "message": f"Tool '{filename}' generato e salvato in {self.plugins_dir}. Il caricamento avverrà automaticamente via Hot-Reload."
+                "message": f"Tool '{filename}' generato e salvato in {self.plugins_dir}. Il caricamento avverrà automaticamente via Hot-Reload.",
             }
         except Exception as e:
             return {"status": "error", "message": f"Errore durante il salvataggio del file: {e}"}

@@ -75,9 +75,9 @@ async def lifespan(app: FastAPI):
     # Avvia ngrok
     ngrok_url = await asyncio.to_thread(start_ngrok, http_port)
     if ngrok_url:
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"  \U0001f310 MAYA pubblica su: {ngrok_url}")
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
     else:
         print("[NGROK] Tunnel non avviato, solo accesso locale.")
 
@@ -131,7 +131,6 @@ async def lifespan(app: FastAPI):
     # Registra hook Arduino per eventi push
     arduino_tool = agent.tool_manager.tools.get("arduino")
     if arduino_tool:
-
         _main_loop = asyncio.get_running_loop()  # cattura il loop del lifespan
 
         def arduino_event_handler(event: dict):
@@ -139,15 +138,9 @@ async def lifespan(app: FastAPI):
                 if "telemetry" in event or event.get("type") == "telemetry":
                     telemetry_data = event.copy()
                     telemetry_data.pop("type", None)
-                    payload = {
-                        "type": "arduino_event",
-                        "telemetry": telemetry_data
-                    }
+                    payload = {"type": "arduino_event", "telemetry": telemetry_data}
                 else:
-                    payload = {
-                        "type": "arduino_event",
-                        **event
-                    }
+                    payload = {"type": "arduino_event", **event}
 
                 asyncio.run_coroutine_threadsafe(
                     manager.broadcast(payload),

@@ -93,10 +93,7 @@ async def websocket_endpoint(websocket: WebSocket, agent, manager, voice_manager
                                     "events": result.get("events", []),
                                 }
                             )
-                        elif (
-                            action.get("tool") == "trading"
-                            and result.get("status") == "ok"
-                        ):
+                        elif action.get("tool") == "trading" and result.get("status") == "ok":
                             rdata = result.get("data", {})
                             if rdata.get("overview"):
                                 # Broadcast ogni item singolarmente (accumulator nel frontend)
@@ -108,13 +105,15 @@ async def websocket_endpoint(websocket: WebSocket, agent, manager, voice_manager
                             # Dopo next/prev/play_pause, aggiorna widget con brano corrente
                             await asyncio.sleep(0.5)  # attendi che Spotify aggiorni lo stato
                             current = await agent.tool_manager.execute({"tool": "spotify", "command": "current"})
-                            await manager.broadcast({
-                                "type": "spotify",
-                                "track": current.get("track", ""),
-                                "artist": current.get("artist", ""),
-                                "album_art": current.get("album_art", ""),
-                                "is_playing": current.get("is_playing", False),
-                            })
+                            await manager.broadcast(
+                                {
+                                    "type": "spotify",
+                                    "track": current.get("track", ""),
+                                    "artist": current.get("artist", ""),
+                                    "album_art": current.get("album_art", ""),
+                                    "is_playing": current.get("is_playing", False),
+                                }
+                            )
                         else:
                             await manager.broadcast(
                                 {
