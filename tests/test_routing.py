@@ -1,18 +1,20 @@
-import sys
-import os
 import asyncio
+import os
+import sys
 
 # Aggiungi la root del progetto al path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+
 from core.agent_core import AgentCore
+
 
 @pytest.mark.asyncio
 async def test_routing():
     agent = AgentCore()
     await agent.initialize()
-    
+
     test_queries = [
         ("Accendi la luce in cucina", "DOMOTIC"),
         ("Spiegami la teoria della relatività", "REASONING"),
@@ -21,7 +23,7 @@ async def test_routing():
         ("Che tempo fa a Roma?", "DOMOTIC"),
         ("Qual è la radice quadrata di 144?", "REASONING"),
     ]
-    
+
     print("\n--- TEST ROUTING SPECIALISTI ---")
     for query, expected in test_queries:
         print(f"\nQuery: '{query}'")

@@ -4,6 +4,7 @@ translate_tool.py - Traduzione testo
 
 from deep_translator import GoogleTranslator
 
+
 class TranslateTool:
     def initialize(self):
         pass

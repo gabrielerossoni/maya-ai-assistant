@@ -4,6 +4,7 @@ wikipedia_tool.py - Ricerca su Wikipedia
 
 import wikipedia
 
+
 class WikipediaTool:
     def initialize(self):
         wikipedia.set_lang("it")

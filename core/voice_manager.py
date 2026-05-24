@@ -1,15 +1,17 @@
+import asyncio
 import os
-import sys
-import time
-import threading
 import queue
 import re
+import subprocess
+import sys
+import threading
+import time
+import wave
+
 import numpy as np
 import pyaudio
-import wave
-import subprocess
-import asyncio
 from faster_whisper import WhisperModel
+
 
 class VoiceManager:
     def __init__(self, agent, socket_manager=None):
@@ -18,19 +20,19 @@ class VoiceManager:
         self.is_running = False
         self.is_listening = False
         self.is_speaking = False
-        
+
         # Parametri Audio
         self.FORMAT = pyaudio.paInt16
         self.CHANNELS = 1
         self.RATE = 16000
         self.CHUNK = 1280  # 80 ms @ 16 kHz
-        
+
         # Code per la comunicazione tra thread
         self.audio_queue = queue.Queue()
-        
+
         # Inizializzazione Modelli (Lazy loading per non bloccare l'avvio)
         self.stt_model = None
-        
+
         # Path per Piper (assumiamo siano in voice/)
         self.piper_exe = os.path.join("voice", "piper.exe")
         self.piper_model = os.path.join("voice", "it_IT-paola-medium.onnx")
@@ -65,7 +67,6 @@ class VoiceManager:
     def _initialize_models(self):
         # STT: faster-whisper (small per accuratezza italiano)
         model_size = os.environ.get("MAYA_WHISPER_MODEL", "small")
-        beam_size = int(os.environ.get("MAYA_WHISPER_BEAM_SIZE", "3"))
         self.stt_model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
     def get_dashboard_voice_status(self) -> str:
@@ -338,7 +339,7 @@ class VoiceManager:
                     self._broadcast("IDLE")
                     continue
 
-        
+
                 # LISTENING è già emesso dentro _record_utterance_*; dopo wake + comando inline va in PROCESSING
                 if cmd:
                     # _process_voice_text è async, dobbiamo schedularlo nel loop corretto
@@ -349,7 +350,7 @@ class VoiceManager:
                     self._handle_voice_command(stream)
 
                 self._broadcast("IDLE")
-                    
+
             stream.stop_stream()
             stream.close()
             audio.terminate()
@@ -524,10 +525,10 @@ class VoiceManager:
             print(f"[VOICE] ERRORE: Piper non trovato in {self.piper_exe}")
             self._broadcast("IDLE")
             return
-            
+
         self.is_speaking = True
         self._broadcast("SPEAKING")
-        
+
         try:
             output_wav = "voice/response.wav"
             # Comando per Piper: passa il testo e genera il wav
@@ -544,10 +545,10 @@ class VoiceManager:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            
+
             # Riproduzione controllata via PyAudio (niente lettore multimediale)
             self._play_wav(output_wav)
-            
+
         except Exception as e:
             print(f"[VOICE] Errore TTS: {e}")
 
@@ -562,13 +563,13 @@ class VoiceManager:
                             channels=wf.getnchannels(),
                             rate=wf.getframerate(),
                             output=True)
-            
+
             chunk_size = 4096
             data = wf.readframes(chunk_size)
             while len(data) > 0:
                 stream.write(data)
                 data = wf.readframes(chunk_size)
-            
+
             stream.stop_stream()
             stream.close()
             wf.close()

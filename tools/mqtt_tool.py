@@ -1,7 +1,8 @@
-import paho.mqtt.client as mqtt
+import asyncio
 import json
 import os
-import asyncio
+
+import paho.mqtt.client as mqtt
 
 MQTT_BROKER     = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT       = int(os.getenv("MQTT_PORT", 1883))
@@ -48,14 +49,14 @@ class MqttTool:
         """Riceve stato/telemetria da Arduino e lo propaga via WebSocket."""
         if not self._ws_manager or not self._loop:
             return
-        
+
         try:
             payload = json.loads(msg.payload.decode())
             parts = msg.topic.split("/")   # maya/rooms/<room>/<type>
-            
+
             if len(parts) < 4:
                 return
-            
+
             room = parts[2]
             kind = parts[3]   # "state" o "telemetry"
 
@@ -71,7 +72,7 @@ class MqttTool:
                     "rgb3": state.get("rgb3", [0, 0, 0]),
                     "buzzer": state.get("buzzer", False),
                 }
-                
+
             elif kind == "telemetry":
                 # Payload: {"telemetry": {"temp": float, "humidity": float, "uptime_ms": long}}
                 broadcast_payload = {
@@ -87,7 +88,7 @@ class MqttTool:
                 self._ws_manager.broadcast(broadcast_payload),
                 self._loop
             )
-            
+
         except json.JSONDecodeError:
             print(f"[MQTT] Errore parsing JSON: {msg.payload}")
         except Exception as e:
@@ -101,14 +102,14 @@ class MqttTool:
         - New: {"tool": "mqtt", "op": "SET", "target": "light", "value": 1, "room": "studio"}
         """
         room   = action.get("room", os.getenv("MQTT_DEFAULT_ROOM", "studio"))
-        
+
         # Format detection: nuovo è più simile a Arduino
         if "op" in action and "target" in action:
             # Nuovo formato (simile a Arduino protocol)
             op     = action.get("op", "SET")
             target = action.get("target", "light")
             value  = action.get("value", 0)
-            
+
             cmd_payload = json.dumps({
                 "cmd": op,
                 "target": target,
@@ -119,17 +120,17 @@ class MqttTool:
             # Vecchio formato per backward compatibility
             device = action.get("device", "light")
             state  = action.get("state", "TOGGLE")
-            
+
             cmd_payload = json.dumps({
                 "device": device,
                 "state": state,
                 "sender": "maya_core"
             })
-        
+
         topic = f"{TOPIC_PREFIX}{room}/cmd"
-        
+
         try:
-            result = self.client.publish(topic, cmd_payload, qos=1, retain=False)
+            self.client.publish(topic, cmd_payload, qos=1, retain=False)
             return {
                 "status": "ok",
                 "message": f"Cmd → '{room}'",

@@ -1,14 +1,16 @@
-import sys
-import os
-import pytest
 import asyncio
 import json
-from unittest.mock import MagicMock, AsyncMock, patch
+import os
+import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Aggiungi la root del progetto al path per gli import
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.agent_core import AgentCore
+
 
 @pytest.fixture
 def agent():
@@ -22,7 +24,7 @@ async def test_react_loop_logic(agent):
          patch("ollama.AsyncClient.chat", new_callable=AsyncMock) as mock_chat, \
          patch.object(agent, "_route_intent", return_value="domotic"), \
          patch.object(agent.tool_manager, "execute", new_callable=AsyncMock) as mock_execute:
-        
+
         # Il tool "weather" è nella lista needs_rephrase, quindi il ReAct loop
         # fa 2 step: primo chiama il tool, secondo riformula i dati in linguaggio naturale.
         mock_chat.side_effect = [
@@ -47,14 +49,14 @@ async def test_react_loop_logic(agent):
                 }
             }
         ]
-        
+
         mock_execute.return_value = {"status": "ok", "message": "Soleggiato, 20 gradi"}
-        
+
         response_tokens = []
         async for token in agent.process("Com'è il meteo a Milano?"):
             response_tokens.append(token)
         response = "".join(response_tokens)
-        
+
         # La frase pre ("Controllo il meteo...") è streamata come primo token,
         # poi il secondo step riformula i dati meteo in linguaggio naturale
         assert "Controllo il meteo..." in response

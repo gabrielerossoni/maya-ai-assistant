@@ -5,24 +5,26 @@ Riceve azioni dal planner e le instrada al tool corretto.
 
 import asyncio
 import inspect
-from .token_juice import compress_tool_output
-from .self_healer import SelfHealer
+
 from tools.arduino_tool import ArduinoTool
-from tools.network_tool import NetworkTool
-from tools.system_tool import SystemTool
 from tools.calendar_tool import CalendarTool
-from tools.weather_tool import WeatherTool
+from tools.code_generator_tool import CodeGeneratorTool
+from tools.mqtt_tool import MqttTool
+from tools.network_tool import NetworkTool
 from tools.news_tool import NewsTool
-from tools.wikipedia_tool import WikipediaTool
 from tools.notes_tool import NotesTool
-from tools.trading_tool import TradingTool
-from tools.timer_tool import TimerTool
-from tools.translate_tool import TranslateTool
 from tools.search_tool import SearchTool
 from tools.spotify_tool import SpotifyTool
 from tools.sys_monitor_tool import SysMonitorTool
-from tools.code_generator_tool import CodeGeneratorTool
-from tools.mqtt_tool import MqttTool
+from tools.system_tool import SystemTool
+from tools.timer_tool import TimerTool
+from tools.trading_tool import TradingTool
+from tools.translate_tool import TranslateTool
+from tools.weather_tool import WeatherTool
+from tools.wikipedia_tool import WikipediaTool
+
+from .self_healer import SelfHealer
+from .token_juice import compress_tool_output
 
 
 class ToolManager:
@@ -81,7 +83,7 @@ class ToolManager:
                 tool.initialize()
             except Exception as e:
                 print(f"  [✗] Tool '{name}' errore init: {e}")
-        
+
         print(f"[TOOLS] {len(self.tools)} tool inizializzati.")
 
     async def execute(self, action: dict) -> dict:

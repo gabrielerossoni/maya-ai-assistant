@@ -2,10 +2,13 @@ import asyncio
 import json
 import os
 import time
-import psutil
-import httpx
 from datetime import datetime, timedelta
+
+import httpx
+import psutil
+
 from .websocket_manager import manager
+
 
 class BaseChecker:
     def __init__(self, name):
@@ -43,7 +46,7 @@ class CalendarChecker(BaseChecker):
             event = res["event"]
             event_time = datetime.strptime(event["time"], "%Y-%m-%d %H:%M")
             diff = event_time - datetime.now()
-            
+
             # Notifica se l'evento è tra meno di 15 minuti e non è ancora stato notificato
             if timedelta(0) < diff < timedelta(minutes=15):
                 if self.last_notified_event != event["id"]:
@@ -236,7 +239,7 @@ class ProactiveManager:
     def _initialize_checkers(self):
         # Inizializza i checker base
         self.checkers.append(SysMonitorChecker())
-        
+
         # Se il tool calendario è registrato, aggiungi il checker
         calendar_tool = self.tool_manager.tools.get("calendar")
         if calendar_tool:

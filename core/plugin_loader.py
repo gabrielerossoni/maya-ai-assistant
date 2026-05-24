@@ -1,10 +1,12 @@
+import asyncio
+import importlib.util
 import os
 import sys
-import importlib.util
-import asyncio
 from pathlib import Path
-from watchdog.observers import Observer
+
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
 
 class PluginHandler(FileSystemEventHandler):
     def __init__(self, tool_manager, plugins_dir):
@@ -42,10 +44,10 @@ class PluginHandler(FileSystemEventHandler):
                     tool_name = module_name.replace("_tool", "")
                     self.tool_manager.register_tool(tool_name, attr())
                     found = True
-            
+
             if not found:
                 print(f"[PLUGIN] Avviso: Nessuna classe *Tool trovata in {module_name}.")
-                
+
         except Exception as e:
             print(f"[PLUGIN] Errore caricamento {module_name}: {e}")
 

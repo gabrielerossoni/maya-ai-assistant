@@ -52,7 +52,7 @@ def print_banner():
     print(
         f"│ {RESET}✷ Welcome to the {BOLD}MAYA{RESET} research preview!            {PEACH}│"
     )
-    print(f"╰───────────────────────────────────────────────────╯\n")
+    print("╰───────────────────────────────────────────────────╯\n")
 
     print(f"{PEACH}{BOLD}")
     print(r" ███╗   ███╗  █████╗  ██╗   ██╗  █████╗ ")

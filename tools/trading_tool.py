@@ -7,6 +7,7 @@ import webbrowser
 import requests
 import yfinance as yf
 
+
 class TradingTool:
     def initialize(self):
         pass

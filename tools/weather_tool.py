@@ -6,6 +6,7 @@ import os
 
 import requests
 
+
 class WeatherTool:
     def initialize(self):
         pass

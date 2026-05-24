@@ -2,11 +2,12 @@
 conftest.py - Fixture condivise per la test suite Maya.
 """
 
+import json
 import os
 import sys
-import json
-import pytest
 import tempfile
+
+import pytest
 
 # Aggiungi la root del progetto al path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

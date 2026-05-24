@@ -3,21 +3,23 @@
 Test del DashboardLogFilter per verificare il corretto filtraggio dei log.
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 # Aggiungi la root del progetto al path per importare i moduli
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+
 from core.log_utils import DashboardLogFilter
+
 
 class MockWebSocketManager:
     """Mock di manager per testare il broadcast dei messaggi."""
     def __init__(self):
         self.messages = []
-    
+
     async def broadcast(self, message: dict):
         self.messages.append(message)
         print(f"  [BROADCAST] {message['text']} (level: {message['level']})")
@@ -28,45 +30,45 @@ async def test_log_filter():
     print("=" * 60)
     print("TEST: DashboardLogFilter")
     print("=" * 60)
-    
+
     manager = MockWebSocketManager()
-    
+
     # Salva stdout originale
     original_stdout = sys.stdout
-    
+
     # Crea il filtro
     filter_obj = DashboardLogFilter(original_stdout, manager)
     sys.stdout = filter_obj
-    
+
     # Test 1: Richiesta dell'utente
     print("\n--- Test 1: Richiesta dell'utente ---")
     print("Richiesta: accendi la luce")
     await asyncio.sleep(0.1)
-    
+
     # Test 2: Risposta di MAYA
     print("\n--- Test 2: Risposta di MAYA ---")
     print("MAYA > Ho acceso la luce del soggiorno!")
     await asyncio.sleep(0.1)
-    
+
     # Test 3: Log tecnico (NON dovrebbe essere inviato alla dashboard)
     print("\n--- Test 3: Log tecnico (NON dovrebbe essere inviato) ---")
     print("[SYSTEM] Inizializzazione completata")
     print("[AGENT] Tool manager pronto")
     await asyncio.sleep(0.1)
-    
+
     # Test 4: Errore critico
     print("\n--- Test 4: Errore critico (dovrebbe essere inviato) ---")
     print("[ERRORE] Connessione a Ollama fallita")
     await asyncio.sleep(0.1)
-    
+
     # Test 5: Nucleo connesso
     print("\n--- Test 5: Messaggio di connessione ---")
     print("Nucleo Maya Connesso")
     await asyncio.sleep(0.1)
-    
+
     # Ripristina stdout
     sys.stdout = original_stdout
-    
+
     # Risultati
     print("\n" + "=" * 60)
     print("RISULTATI DEL TEST")
@@ -75,7 +77,7 @@ async def test_log_filter():
     print("\nDettagli messaggi:")
     for i, msg in enumerate(manager.messages, 1):
         print(f"  {i}. {msg['text']} (level: {msg['level']})")
-    
+
     print("\n" + "=" * 60)
     print("RIEPILOGO ATTESO:")
     print("  - Test 1: [V] Richiesta inviata")

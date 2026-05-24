@@ -6,11 +6,11 @@ Supporta: aggiunta, lista, eliminazione eventi.
 
 import json
 import os
-import datetime
 import pickle
 from datetime import datetime, timedelta
-from google_auth_oauthlib.flow import InstalledAppFlow
+
 from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 CALENDAR_FILE = "data/calendar.json"
@@ -47,7 +47,7 @@ class CalendarTool:
         creds = None
         if os.path.exists(GOOGLE_TOKEN_FILE):
             creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_FILE, SCOPES)
-        
+
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
@@ -59,13 +59,13 @@ class CalendarTool:
                         creds = flow.run_local_server(port=0)
                     except Exception:
                         print("[CALENDAR] Ambiente headless rilevato o browser non disponibile. Fallback console OAuth.")
-                        # flow.run_console() is deprecated in some versions, 
+                        # flow.run_console() is deprecated in some versions,
                         # using urn:ietf:wg:oauth:2.0:oob logic if supported by the flow
                         creds = flow.run_console()
                 except Exception as e:
                     print(f"[CALENDAR] Errore autenticazione Google: {e}")
                     return
-            
+
             with open(GOOGLE_TOKEN_FILE, 'w') as token:
                 token.write(creds.to_json())
 
@@ -116,7 +116,7 @@ class CalendarTool:
         }
         events.append(event)
         self._save(events)
-        
+
         google_success = False
         google_msg = ""
 
@@ -153,9 +153,9 @@ class CalendarTool:
     def _list_events(self, action: dict) -> dict:
         now = datetime.now()
         now_iso = now.astimezone().isoformat()
-        
+
         all_events = []
-        
+
         # 1. Recupera da Google
         if self.google_service:
             try:
@@ -185,7 +185,7 @@ class CalendarTool:
 
         # Ordina per tempo
         all_events.sort(key=lambda e: e["time"])
-        
+
         if not all_events:
             return {"status": "ok", "message": "Nessun evento in programma.", "events": []}
 
@@ -194,9 +194,12 @@ class CalendarTool:
             dt = self._parse_time(e["time"])
             diff = dt - now
             days = diff.days
-            if days == 0: when = "oggi"
-            elif days == 1: when = "domani"
-            else: when = f"tra {days} giorni"
+            if days == 0:
+                when = "oggi"
+            elif days == 1:
+                when = "domani"
+            else:
+                when = f"tra {days} giorni"
             lines.append(f"• {e['title']} — {dt.strftime('%d/%m alle %H:%M')} ({when})")
 
         return {
@@ -252,7 +255,8 @@ class CalendarTool:
         for e in local_events:
             try:
                 dt = self._parse_time(e["time"])
-                if dt is None: continue
+                if dt is None:
+                    continue
 
                 event_body = {
                     'summary': e["title"],
@@ -268,7 +272,7 @@ class CalendarTool:
 
         if synced_count > 0:
             self._save(remaining_events)
-        
+
         return synced_count
 
     def list_google_calendars(self):

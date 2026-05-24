@@ -3,19 +3,22 @@ agent_core.py - Cuore dell'agente Jarvis
 Gestisce: LLM (Ollama), Planner, Executor, Validator
 """
 
-import os
-import json
-import re
-import random
-import ollama
 import asyncio
+import json
+import os
+import random
+import re
+
 import httpx
-from .tool_manager import ToolManager
+import ollama
+from dotenv import load_dotenv
+
+from .automation_engine import AutomationEngine, build_default_automations
+from .automation_engine import engine as automation_engine
+from .context_manager import context as home_context
 from .memory_manager import MemoryManager
 from .preference_learner import PreferenceLearner
-from .automation_engine import AutomationEngine, build_default_automations, engine as automation_engine
-from .context_manager import context as home_context
-from dotenv import load_dotenv
+from .tool_manager import ToolManager
 
 # Carica variabili d'ambiente da .env
 load_dotenv()
@@ -166,7 +169,6 @@ AUTOMATION_ALIASES: dict[str, str] = {
     "dormo":             "ora di dormire",
     "vado a letto":      "ora di dormire",
     "a letto":           "ora di dormire",
-    "caffe":             "pausa caffè",
     "caffe":             "pausa caffè",
     "caffè":             "pausa caffè",
     "faccio un caffè":   "pausa caffè",
@@ -941,7 +943,7 @@ class AgentCore:
         # 2. ReAct Loop
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
         intent = await self._route_intent(user_input)
-        
+
         max_steps = 2 if intent == "DOMOTIC" else 4
         current_step = 0
 
@@ -1052,7 +1054,7 @@ class AgentCore:
                         for token in re.findall(r".*?\s|.*$", final_reply):
                             yield token
                     else:
-                        print(f"[ReAct] Reply vuota — richiamo pipeline specialistica.")
+                        print("[ReAct] Reply vuota — richiamo pipeline specialistica.")
                         fallback = await self._call_llm(user_input, progress_cb)
                         final_reply = fallback.get("reply") or "Come posso aiutarti?"
                         for token in re.findall(r".*?\s|.*$", final_reply):

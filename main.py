@@ -13,37 +13,37 @@ import sys
 import threading
 import time
 import webbrowser
-
 from contextlib import asynccontextmanager
+
+import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
-import uvicorn
 
-from core.agent_core import AgentCore, MODELS
+from core.agent_core import MODELS, AgentCore
+from core.broadcasters import (
+    broadcast_state,
+    interactive_console,
+    news_broadcaster,
+    sensor_broadcaster,
+    spotify_broadcaster,
+    stats_broadcaster,
+    weather_broadcaster,
+)
+from core.ngrok_manager import start_ngrok
+from core.ollama_manager import ensure_ollama_running
 from core.plugin_loader import PluginLoader
 from core.proactive_manager import ProactiveManager
-from tools.display_tool import DisplayTool
-from core.websocket_manager import manager
-from core.voice_manager import VoiceManager
-from core.ollama_manager import ensure_ollama_running
-from core.ngrok_manager import start_ngrok
-from core.server_utils import pick_http_port, print_banner
-from core.broadcasters import (
-    interactive_console,
-    stats_broadcaster,
-    spotify_broadcaster,
-    news_broadcaster,
-    weather_broadcaster,
-    sensor_broadcaster,
-    broadcast_state,
-)
 from core.routes import (
     get_dashboard,
-    get_service_worker,
     get_manifest,
+    get_service_worker,
     health_check,
     websocket_endpoint,
 )
+from core.server_utils import pick_http_port, print_banner
+from core.voice_manager import VoiceManager
+from core.websocket_manager import manager
+from tools.display_tool import DisplayTool
 
 # ---------------------------------------------------------------------------
 # Variabili globali per i task in background

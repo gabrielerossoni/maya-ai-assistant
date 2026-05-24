@@ -1,5 +1,6 @@
-import sys
 import asyncio
+import sys
+
 
 class DashboardLogFilter:
     """
@@ -15,34 +16,34 @@ class DashboardLogFilter:
     def write(self, message):
         # Sempre scrivi nel terminale
         self.terminal.write(message)
-        
+
         msg_clean = message.strip()
         if not msg_clean:
             return
-        
+
         # Filtra i messaggi che vanno sulla dashboard
         should_broadcast = False
         log_level = "info"
         display_text = msg_clean
-        
+
         # Messaggi espliciti per l'utente (usando user_log o [USER])
         if msg_clean.startswith("[USER]"):
             should_broadcast = True
             log_level = "info"
             display_text = msg_clean.replace("[USER]", "").strip()
-        
+
         # Risposte di MAYA
         elif msg_clean.startswith("MAYA >"):
             # Ignora se è una risposta di MAYA, perché ora usiamo lo streaming WebSocket nativo
             # che invia i token uno a uno con l'emoji inclusa.
             return
-        
+
         # Errori critici (solo se contengono il tag [USER_ERR])
         elif "[USER_ERR]" in msg_clean:
             should_broadcast = True
             log_level = "warn"
             display_text = msg_clean.replace("[USER_ERR]", "").strip()
-        
+
         if should_broadcast:
             try:
                 loop = getattr(self.manager, "loop", None)

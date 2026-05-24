@@ -5,12 +5,13 @@ Copre: get/set, persistenza, time_slot, matches(), snapshot,
 conflict detection, update_from_arduino_state.
 """
 
-import sys
-import os
-import time
 import json
-import pytest
+import os
+import sys
+import time
 from unittest.mock import patch
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

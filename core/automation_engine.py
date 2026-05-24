@@ -18,8 +18,8 @@ from datetime import datetime
 from enum import IntEnum
 from typing import Any, Callable, Coroutine
 
-from .context_manager import context, ContextManager
-from .device_registry import registry, DeviceRegistry
+from .context_manager import ContextManager, context
+from .device_registry import DeviceRegistry, registry
 
 logger = logging.getLogger("maya.automation")
 
@@ -43,7 +43,7 @@ class Priority(IntEnum):
 class Action:
     """
     Rappresenta un comando da inviare a un tool.
-    
+
     Struttura pulita e validabile, compatibile con ToolManager.execute().
     """
     tool:    str
@@ -92,7 +92,7 @@ def calendar_action(act: str = "list") -> Action:
 class Condition:
     """
     Condizione booleana valutata sul ContextManager.
-    
+
     Esempi:
         Condition({"time_slot": "night"})
         Condition({"presence": "home", "weather": ["rain", "cloud"]})
@@ -117,7 +117,7 @@ class Condition:
 class Trigger:
     """
     Definisce come viene attivata un'automazione.
-    
+
     type: "manual"   → solo su richiesta esplicita
           "time"     → ogni giorno a un orario (HH:MM)
           "event"    → su evento del bus interno
@@ -203,7 +203,7 @@ class EventBus:
     """
     Bus di eventi interno. Permette a qualsiasi componente di pubblicare
     eventi e ad altri di reagire senza accoppiamento diretto.
-    
+
     Uso:
         bus.subscribe("presence_changed", my_handler)
         bus.publish("presence_changed", {"presence": "home"})
@@ -239,7 +239,7 @@ class EventBus:
 class AutomationEngine:
     """
     Motore centrale che gestisce tutte le automazioni di Maya.
-    
+
     Responsabilità:
     - Registrare automazioni (scene + trigger)
     - Eseguire scene con priorità, conflict detection e retry
@@ -423,7 +423,6 @@ class AutomationEngine:
         while True:
             try:
                 now = datetime.now().strftime("%H:%M")
-                snap = context.snapshot()
 
                 for automation in list(self._automations.values()):
                     if not automation.is_valid():
@@ -864,3 +863,4 @@ def build_default_automations() -> list[Automation]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 engine = AutomationEngine()
+

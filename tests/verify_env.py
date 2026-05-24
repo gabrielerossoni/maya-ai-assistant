@@ -1,5 +1,6 @@
 import os
 import sys
+
 from dotenv import load_dotenv
 
 # Aggiungi la directory radice al path per importare agent_core
@@ -16,14 +17,14 @@ def test_env_loading():
         "DEFAULT_WEATHER_LOCATION",
         "NEWS_FEED_URL"
     ]
-    
+
     for var in vars_to_check:
         val = os.getenv(var)
         print(f"{var}: {val}")
         if val is None:
             print(f"ERRORE: {var} non trovata!")
             return False
-    
+
     print("\n--- Verifica AgentCore (import) ---")
     try:
         from core.agent_core import MODELS, SYSTEM_PROMPT

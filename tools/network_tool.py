@@ -4,9 +4,9 @@ Comunica con il secondo PC via socket TCP.
 Invia comandi in formato JSON e riceve risposta.
 """
 
-import socket
 import json
 import os
+import socket
 
 # ──────────────────────────────────────────────
 # CONFIGURAZIONE

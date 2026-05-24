@@ -1,12 +1,14 @@
-import pytest
-from unittest.mock import patch, MagicMock
-import sys
 import os
+import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Aggiungi la root del progetto al path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tools.weather_tool import WeatherTool
+
 
 def test_weather_tool_text_location():
     tool = WeatherTool()
@@ -20,7 +22,7 @@ def test_weather_tool_text_location():
                 "name": "Milano"
             }]
         }
-        
+
         # Mock weather response
         mock_weather = MagicMock()
         mock_weather.json.return_value = {
@@ -41,9 +43,9 @@ def test_weather_tool_text_location():
                 "weathercode": [0, 1, 2, 3, 45, 48]
             }
         }
-        
+
         mock_get.side_effect = [mock_geo, mock_weather]
-        
+
         res = tool.execute({"location": "Milano"})
         assert res["status"] == "ok"
         assert res["data"]["location"] == "Milano"
@@ -60,7 +62,7 @@ def test_weather_tool_coordinates_nominatim_success():
                 "city": "Milano"
             }
         }
-        
+
         # Mock weather response
         mock_weather = MagicMock()
         mock_weather.json.return_value = {
@@ -81,9 +83,9 @@ def test_weather_tool_coordinates_nominatim_success():
                 "weathercode": [1, 2, 3, 45, 48, 51]
             }
         }
-        
+
         mock_get.side_effect = [mock_nominatim, mock_weather]
-        
+
         res = tool.execute({"lat": 45.4642, "lon": 9.1899})
         assert res["status"] == "ok"
         assert res["data"]["location"] == "Milano"
@@ -114,10 +116,10 @@ def test_weather_tool_coordinates_nominatim_failure_fallback():
                 "weathercode": [1, 2, 3, 45, 48, 51]
             }
         }
-        
+
         # First call is Nominatim (which throws/fails), second call is weather forecast
         mock_get.side_effect = [Exception("Timeout"), mock_weather]
-        
+
         res = tool.execute({"lat": 45.46, "lon": 9.19})
         assert res["status"] == "ok"
         # Falls back to "Lat 45.46, Lon 9.19"

@@ -1,9 +1,9 @@
-import threading
-import queue
-import time
+import asyncio
 import json
 import os
-import asyncio
+import queue
+import threading
+import time
 from typing import Callable, Optional
 
 try:
@@ -278,7 +278,7 @@ class ArduinoTool:
             with self._serial_lock:
                 self.connection.write((json.dumps(payload) + "\n").encode())
                 self.connection.flush()
-        except Exception as e:
+        except Exception:
             with self._lock:
                 self._sync_pending.pop(msg_id, None)
             return None
@@ -313,12 +313,12 @@ class ArduinoTool:
             except Exception:
                 pass
         self.connection = None
-        
+
         # Try to reconnect without spawning a new thread
         port = self._find_port() if SERIAL_PORT == "AUTO" else SERIAL_PORT
         if not port:
             return False
-            
+
         try:
             self.connection = serial.Serial(port, BAUD_RATE, timeout=0.1)
             time.sleep(2)

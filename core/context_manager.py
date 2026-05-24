@@ -18,7 +18,7 @@ _STATE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "context_sta
 class ContextManager:
     """
     Singleton che mantiene lo stato contestuale della casa.
-    
+
     context = {
         "time_slot":    "morning" | "afternoon" | "evening" | "night",
         "presence":     "home" | "away" | "unknown",
@@ -139,10 +139,10 @@ class ContextManager:
     def matches(self, conditions: dict) -> bool:
         """
         Verifica se il contesto corrente soddisfa un dizionario di condizioni.
-        
+
         Esempio:
             ctx.matches({"time_slot": "night", "presence": "home"})
-        
+
         Supporta:
             - valore singolo: {"presence": "home"}
             - lista OR: {"time_slot": ["evening", "night"]}
@@ -173,3 +173,4 @@ class ContextManager:
 
 # Istanza globale singleton
 context = ContextManager()
+

@@ -4,9 +4,9 @@ Output visivo del sistema Jarvis.
 Mostra stato in tempo reale su terminale separato (o GUI tkinter).
 """
 
+import os
 import threading
 import time
-import os
 from datetime import datetime
 
 

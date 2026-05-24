@@ -4,8 +4,8 @@ Se questo test passa, il refactoring non ha rotto nulla a livello di import.
 """
 
 import importlib
-import sys
 import os
+import sys
 
 # Assicura che la root del progetto sia nel path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

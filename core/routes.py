@@ -9,16 +9,15 @@ import os
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
-from core.log_utils import setup_dashboard_log_filter
+import core.broadcasters as _bc
 from core.broadcasters import (
     broadcast_state,
     broadcast_weather_update,
-    execute_and_broadcast,
     client_lat,
     client_lon,
+    execute_and_broadcast,
 )
-import core.broadcasters as _bc
-
+from core.log_utils import setup_dashboard_log_filter
 
 # Flag globale per applicare il filtro log una sola volta
 _log_filter_applied = False
@@ -61,7 +60,7 @@ async def websocket_endpoint(websocket: WebSocket, agent, manager, voice_manager
             await websocket.send_json(voice_manager.voice_status_message())
         except Exception:
             pass
-        
+
         # Invio immediato del meteo corrente (utilizzando le coordinate memorizzate o il fallback)
         asyncio.create_task(broadcast_weather_update(agent, manager, _bc.client_lat, _bc.client_lon))
 

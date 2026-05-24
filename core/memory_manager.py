@@ -4,14 +4,15 @@ Memoria semantica con ChromaDB + Ollama embeddings.
 Sostituisce il lineare memory.json — recupera contesto rilevante da mesi di conversazioni.
 """
 
+import asyncio
 import json
 import os
-import asyncio
 from datetime import datetime
 from typing import Optional
+
 import chromadb
-from chromadb.config import Settings
 import httpx
+from chromadb.config import Settings
 
 MEMORY_DIR = "data"
 METADATA_FILE = os.path.join(MEMORY_DIR, "memory_metadata.json")
@@ -41,11 +42,11 @@ class MemoryManager:
     def _init_chroma(self):
         """Inizializza ChromaDB con persistenza su disco."""
         os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
-        
+
         try:
             # Nuovo client persistente (ChromaDB 0.4+)
             self.chroma_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
-            
+
             # Crea o recupera collection
             self.collection = self.chroma_client.get_or_create_collection(
                 name="jarvis_memory",
@@ -59,7 +60,7 @@ class MemoryManager:
     def load(self):
         """Carica memoria da file JSON (metadata + ChromaDB)."""
         os.makedirs(MEMORY_DIR, exist_ok=True)
-        
+
         if os.path.exists(METADATA_FILE):
             try:
                 with open(METADATA_FILE, "r", encoding="utf-8") as f:
@@ -88,7 +89,7 @@ class MemoryManager:
         global _ollama_available
         if not _ollama_available or not text.strip():
             return None
-            
+
         try:
             import ollama
             client = ollama.AsyncClient()
@@ -112,7 +113,7 @@ class MemoryManager:
             "text": text,
             "time": timestamp,
         }
-        
+
         async with self.turn_lock:
             self.turns.append(turn)
 
@@ -244,12 +245,12 @@ class MemoryManager:
             recent_context = "--- CONVERSAZIONE RECENTE ---\n"
             for t in recent_turns:
                 recent_context += f"[{t['time']}] {t['role'].upper()}: {t['text']}\n"
-        
+
         # Se non c'è query o database, torniamo solo il recente
         if not query or not self.collection or self.collection.count() == 0:
             base = recent_context if recent_context else "Memoria vuota."
             return f"{profile_context}{base}".strip()
-        
+
         # Retrieval semantico per il passato remoto
         try:
             embedding = await self._get_embedding(query)
@@ -264,7 +265,7 @@ class MemoryManager:
                     query_texts=[query],
                     n_results=top_k
                 )
-            
+
             semantic_context = ""
             if results and results.get("documents") and results["documents"][0]:
                 semantic_context = "--- CONTESTO PASSATO RILEVANTE ---\n"
@@ -273,9 +274,9 @@ class MemoryManager:
                     role = metadata.get("role", "unknown").upper()
                     time = metadata.get("time", "unknown")
                     semantic_context += f"[{time}] {role}: {doc}\n"
-            
+
             return f"{profile_context}{semantic_context}\n{recent_context}".strip()
-            
+
         except Exception as e:
             print(f"[MEMORY] Errore retrieval semantico: {e}")
             return f"{profile_context}{recent_context}".strip()
@@ -329,7 +330,7 @@ class MemoryManager:
         """Cerca messaggi rilevanti per una query."""
         if not self.collection:
             return []
-            
+
         try:
             embedding = await self._get_embedding(query)
             if embedding:
@@ -342,7 +343,7 @@ class MemoryManager:
                     query_texts=[query],
                     n_results=top_k
                 )
-            
+
             if results and results.get("documents"):
                 return results["documents"][0]
             return []

@@ -5,20 +5,29 @@ Copre: registrazione, resolve, execute, event bus, conflict detection,
 cooldown, condizioni, automazioni temporanee.
 """
 
-import sys
-import os
-import time
 import asyncio
-import pytest
+import os
+import sys
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.automation_engine import (
-    AutomationEngine, Automation, Scene, Action, Trigger, Condition,
-    Priority, EventBus, arduino, spotify, build_default_automations,
+    Action,
+    Automation,
+    AutomationEngine,
+    Condition,
+    EventBus,
+    Priority,
+    Scene,
+    Trigger,
+    arduino,
+    build_default_automations,
+    spotify,
 )
-
 
 # ── Fixture locali ────────────────────────────────────────────────────────────
 

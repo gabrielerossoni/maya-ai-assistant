@@ -4,6 +4,7 @@ timer_tool.py - Impostazione di timer
 
 import asyncio
 
+
 class TimerTool:
     def initialize(self):
         pass

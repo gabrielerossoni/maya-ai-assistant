@@ -1,5 +1,6 @@
-import os
 import ast
+import os
+
 
 class CodeGeneratorTool:
     """Tool che permette a Maya di generare e registrare nuovi tool a runtime."""
@@ -26,13 +27,13 @@ class CodeGeneratorTool:
             return {"status": "error", "message": f"Errore di sintassi nel codice generato: {e}"}
 
         filepath = os.path.join(self.plugins_dir, filename)
-        
+
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(code)
-            
+
             return {
-                "status": "ok", 
+                "status": "ok",
                 "message": f"Tool '{filename}' generato e salvato in {self.plugins_dir}. Il caricamento avverrà automaticamente via Hot-Reload."
             }
         except Exception as e:

@@ -86,7 +86,7 @@ async def news_broadcaster(agent, manager):
     # Aspetta che almeno un client sia connesso prima di caricare le notizie all'avvio
     while not manager.active_connections:
         await asyncio.sleep(1)
-    
+
     # Jitter iniziale per non caricare tutto all'avvio (evita spike CPU/memoria)
     await asyncio.sleep(random.uniform(3, 8))
 
@@ -131,7 +131,7 @@ async def stats_broadcaster(manager, voice_manager):
                 "voice_status": voice_manager.get_dashboard_voice_status(),
             }
             await manager.broadcast(stats)
-        except:
+        except Exception:
             pass
         await asyncio.sleep(2)
 
