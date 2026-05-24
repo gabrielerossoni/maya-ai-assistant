@@ -4,16 +4,17 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-black?style=for-the-badge&logo=ollama&logoColor=white)
 ![Arduino](https://img.shields.io/badge/Arduino-Hardware-00979D?style=for-the-badge&logo=arduino&logoColor=white)
-![License](https://img.shields.io/badge/License-No%20License-red?style=for-the-badge)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge&logo=gnu)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)
 ![Stars](https://img.shields.io/github/stars/gabrielerossoni/maya-ai-assistant?style=for-the-badge&logo=github)
 ![Issues](https://img.shields.io/github/issues/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
 ![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
+![CI](https://img.shields.io/github/actions/workflow/status/gabrielerossoni/maya-ai-assistant/ci.yml?style=for-the-badge&label=CI&logo=githubactions&logoColor=white)
 
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** Maggio 2026 — **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
+> **Ultimo aggiornamento:** Maggio 2026 — **Merge `new_main → main`**, CI GitHub Actions attivo (62 test), lint fixes su `tools/`, **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -711,6 +712,8 @@ Se Mosquitto non è avviato:
 
 ---
 
+## Aggiungere un Tool Custom
+
 1. Creare `tools/my_tool.py` con classe `MyTool` che implementa `initialize()` e `execute()`
 2. Registrarlo in `core/tool_manager.py`:
    ```python
@@ -780,6 +783,8 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 | 30/05/2026 | Verifica 3 | Demo stabile, correzione bug, prova con pubblico interno, video di backup pronto | 🔲 |
 | 04/06/2026 | Arduino Day | Solo rifinitura e presentazione. **Niente nuove funzioni** | 🔲 |
 
+> **Verifica 2 completata** ✅ — flusso end-to-end funzionante, CI verde, 62/62 test passati.
+
 ---
 
 ## Roadmap
@@ -837,6 +842,9 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Velocizzazione risposte IA** — TTS streaming frase-per-frase (parla mentre genera), timeout Groq ridotti (15→8s), early exit più permissivo, cache intent pre-popolata, eliminazione sleep tra token yield, max_tokens CHITCHAT ridotto.
 - [x] **Speaker Gikfun 8Ω 2W** — Sostituisce buzzer2 su pin 3 con speaker di qualità superiore. Nuove melodie: `notify`, `error`, `welcome`. Alias `speaker` nel tool Python e nel prompt LLM.
 - [x] **Refactoring `main.py`** — Riduzione da 894 a ~230 righe. Logica estratta in moduli dedicati: `core/ollama_manager.py`, `core/ngrok_manager.py`, `core/server_utils.py`, `core/broadcasters.py`, `core/routes.py`. Zero cambiamenti di comportamento, smoke test aggiunto.
+- [x] **CI GitHub Actions** — Pipeline `ci.yml` su ogni push: lint `ruff`, test `pytest` (62 test), Python 3.13.
+- [x] **Lint fix `tools/`** — Risolti import non ordinati (I001), whitespace su righe vuote (W293/W291), variabile inutilizzata F841, newline finale W292 in tutti i tool.
+- [x] **Merge `new_main → main`** — Branch principale aggiornato via PR con fast-forward pulito.
 
 ### 🔲 In corso / Prossimi
 
