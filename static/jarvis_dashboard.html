@@ -18,7 +18,7 @@
     <meta name="theme-color" content="#0a0a0c">
     <!-- Prevent phone number detection -->
     <meta name="format-detection" content="telephone=no">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <style>
@@ -3476,7 +3476,7 @@
                 document.getElementById('spotify-track').innerText = d.track;
                 document.getElementById('spotify-artist').innerText = d.artist;
                 const _artUrl = d.album_art || '';
-                const _safeArt = /^https:\/\//.test(_artUrl) ? _artUrl : '';
+                const _safeArt = /^https?:\/\//.test(_artUrl) ? _artUrl : '';
                 document.getElementById('spotify-art').setAttribute('src', _safeArt);
                 document.getElementById('spotify-play-btn').innerText = d.is_playing ? '⏸' : '▶';
                 if (d.is_playing && !widget.classList.contains('active')) {

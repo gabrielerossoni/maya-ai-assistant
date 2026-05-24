@@ -197,6 +197,7 @@ class TestConditions:
     @pytest.mark.asyncio
     async def test_condition_blocks_execution(self, engine, fresh_context, monkeypatch):
         import core.automation_engine as _ae
+
         fresh_context.set("time_slot", "morning")
         monkeypatch.setattr(_ae, "context", fresh_context)
         auto = _simple_automation(

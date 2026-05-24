@@ -31,9 +31,7 @@ class TestCDN:
     def test_threejs_no_broken_integrity(self, html):
         """three.js non deve avere un hash SRI sbagliato che blocca il caricamento."""
         match = re.search(r'three\.min\.js[^>]*integrity="([^"]+)"', html)
-        assert match is None, (
-            "three.js ha ancora un hash SRI — rischia di bloccare il caricamento se l'hash è errato"
-        )
+        assert match is None, "three.js ha ancora un hash SRI — rischia di bloccare il caricamento se l'hash è errato"
 
     def test_threejs_has_crossorigin(self, html):
         assert 'three.min.js" crossorigin' in html
@@ -117,7 +115,7 @@ class TestReDoS:
         """re.findall(r'.*?\\s|.*$') è vulnerabile a ReDoS — non deve esistere."""
         src = self._read_agent_core()
         assert r"re.findall(r\".*?\s|.*$\"" not in src
-        assert "re.findall(r\".*?\\s|.*$\"" not in src
+        assert 're.findall(r".*?\\s|.*$"' not in src
 
     def test_spotify_regex_bounded(self):
         """La regex spotify deve avere una lunghezza massima per evitare ReDoS."""
@@ -158,7 +156,7 @@ class TestCIPermissions:
 
     def test_secrets_scan_job_has_permissions(self):
         ci = self._read_ci()
-        scan_section = ci[ci.index("secrets-scan:"):]
+        scan_section = ci[ci.index("secrets-scan:") :]
         assert "permissions:" in scan_section
         assert "contents: read" in scan_section
 
@@ -175,5 +173,5 @@ class TestSocketBinding:
         )
         with open(path, encoding="utf-8") as f:
             src = f.read()
-        assert '0.0.0.0' not in src, "run_server non deve fare binding su 0.0.0.0"
-        assert '127.0.0.1' in src
+        assert "0.0.0.0" not in src, "run_server non deve fare binding su 0.0.0.0"
+        assert "127.0.0.1" in src

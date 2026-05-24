@@ -116,6 +116,7 @@ class Condition:
         if not self.requirements:
             return True
         import core.automation_engine as _self_module
+
         return _self_module.context.matches(self.requirements)
 
     def __repr__(self):

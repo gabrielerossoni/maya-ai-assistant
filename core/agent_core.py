@@ -906,14 +906,13 @@ class AgentCore:
             import re as _re
 
             _pfx = r"(?:metti|riproduci|play|fammi sentire|cerca)\s+"
-            m = _re.match(_pfx + r"(.+?)\s+(?:su|on)\s+spotify$", _clean) \
-                or _re.match(_pfx + r"(.+)$", _clean)
+            m = _re.match(_pfx + r"(.+?)\s+(?:su|on)\s+spotify$", _clean) or _re.match(
+                _pfx + r"([^\n]{1,200})$", _clean
+            )
             if m and ("spotify" in _clean or any(w in _clean for w in ["metti", "riproduci", "fammi sentire"])):
                 query = m.group(1).strip()
                 # Rimuovi "di" come separatore artista (es. "ferrari di lilcr")
-                query = " ".join(
-                    part for part in query.split(" di ") if part
-                ) if " di " in query else query
+                query = " ".join(part for part in query.split(" di ") if part) if " di " in query else query
                 spotify_action = {"tool": "spotify", "command": "search", "query": query}
 
         if spotify_action:
