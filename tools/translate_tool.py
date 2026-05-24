@@ -1,6 +1,7 @@
 """
 translate_tool.py - Traduzione testo
 """
+
 from deep_translator import GoogleTranslator
 
 class TranslateTool:
@@ -10,7 +11,7 @@ class TranslateTool:
     def execute(self, action: dict) -> dict:
         text = action.get("text", "")
         target_lang = action.get("target", "en") # codice lingua, es. 'en', 'es', 'ja'
-        
+
         if not text:
             return {"status": "error", "message": "Nessun testo da tradurre."}
 

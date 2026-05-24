@@ -1,8 +1,10 @@
 """
 weather_tool.py - API meteo via Open-Meteo
 """
-import requests
+
 import os
+
+import requests
 
 class WeatherTool:
     def initialize(self):
@@ -53,7 +55,7 @@ class WeatherTool:
                 geo_res = requests.get(geo_url).json()
                 if "results" not in geo_res or len(geo_res["results"]) == 0:
                     return {"status": "error", "message": f"Località '{location}' non trovata."}
-                
+
                 res0 = geo_res["results"][0]
                 lat, lon, name = res0["latitude"], res0["longitude"], res0["name"]
             except Exception as e:
@@ -72,7 +74,7 @@ class WeatherTool:
             current = w_res.get("current_weather", {})
             daily = w_res.get("daily", {})
             hourly = w_res.get("hourly", {})
-            
+
             code = current.get("weathercode")
             condition, icon = self.WMO_CODES.get(code, ("Variabile", "cloud-sun"))
 
@@ -81,7 +83,7 @@ class WeatherTool:
             pressure = hourly.get("surface_pressure", [None])[0]
             visibility_m = hourly.get("visibility", [None])[0]
             visibility_km = round(visibility_m / 1000, 1) if visibility_m else None
-            
+
             data = {
                 "location": name,
                 "lat": lat,

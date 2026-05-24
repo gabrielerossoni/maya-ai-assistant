@@ -4,6 +4,7 @@ notes_tool.py - Gestione appunti e todo
 import json
 import os
 
+
 class NotesTool:
     def __init__(self):
         self.filepath = os.path.join(os.path.dirname(__file__), "..", "data", "notes.json")
@@ -22,7 +23,7 @@ class NotesTool:
         try:
             with open(self.filepath, "r") as f:
                 data = json.load(f)
-            
+
             if category not in data:
                 data[category] = []
 

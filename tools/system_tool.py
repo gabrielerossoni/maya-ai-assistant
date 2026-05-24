@@ -3,9 +3,9 @@ tools/system_tool.py
 Esegue comandi sul sistema operativo locale.
 """
 
-import subprocess
-import platform
 import os
+import platform
+import subprocess
 
 
 class SystemTool:

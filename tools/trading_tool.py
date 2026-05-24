@@ -1,9 +1,11 @@
 """
 trading_tool.py - Dati su Criptovalute e Azioni, con integrazione base TradingView
 """
+
+import webbrowser
+
 import requests
 import yfinance as yf
-import webbrowser
 
 class TradingTool:
     def initialize(self):

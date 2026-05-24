@@ -1,6 +1,7 @@
 """
 wikipedia_tool.py - Ricerca su Wikipedia
 """
+
 import wikipedia
 
 class WikipediaTool:
@@ -11,7 +12,7 @@ class WikipediaTool:
         query = action.get("query", "")
         if not query:
             return {"status": "error", "message": "Nessuna query fornita per Wikipedia."}
-        
+
         try:
             summary = wikipedia.summary(query, sentences=2)
             return {"status": "ok", "message": summary}

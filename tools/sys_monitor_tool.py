@@ -1,6 +1,7 @@
 """
 sys_monitor_tool.py - Statistiche del PC in tempo reale
 """
+
 import psutil
 
 class SysMonitorTool:

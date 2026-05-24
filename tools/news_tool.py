@@ -2,11 +2,12 @@
 news_tool.py - Lettore di notizie RSS
 """
 
-import feedparser
+import html
 import os
 import re
-import html
 from html.parser import HTMLParser
+
+import feedparser
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -49,23 +50,23 @@ class NewsTool:
                 raw_summary = entry.get("summary", "")
                 # Estrai immagine se presente
                 image_url = None
-                
+
                 # 1. Prova regex nel summary
                 img_match = re.search(r'<img[^>]+src="([^">]+)"', raw_summary)
                 if img_match:
                     image_url = img_match.group(1)
-                
+
                 # 2. Prova media_content
                 if not image_url and 'media_content' in entry and entry.media_content:
                     image_url = entry.media_content[0]['url']
-                
+
                 # 3. Prova enclosure
                 if not image_url and 'enclosures' in entry and entry.enclosures:
                     image_url = entry.enclosures[0]['href']
 
                 summary = self._clean_html(raw_summary)
                 raw_title = self._clean_html(entry.get("title", ""))
-                
+
                 # Google News usa spesso "Titolo - Fonte"
                 source = "Breaking News"
                 title = raw_title
@@ -86,8 +87,8 @@ class NewsTool:
 
             msg = "Ecco le ultime notizie:\n" + "\n".join(news_list)
             return {
-                "status": "ok", 
-                "message": msg, 
+                "status": "ok",
+                "message": msg,
                 "news": structured_news
             }
         except Exception as e:

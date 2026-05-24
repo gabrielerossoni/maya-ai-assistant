@@ -3,6 +3,7 @@ spotify_tool.py - Controllo Spotify tramite Web API (spotipy)
 """
 
 import os
+
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -36,7 +37,7 @@ class SpotifyTool:
                 open_browser=False,
             )
             self.sp = spotipy.Spotify(auth_manager=auth_manager)
-            user = self.sp.current_user()
+            self.sp.current_user()
         except Exception as e:
             print(f"[SPOTIFY] Errore init: {e}")
             self.sp = None
@@ -210,13 +211,13 @@ class SpotifyTool:
             device_list = devices.get("devices", [])
             if not device_list:
                 return {"status": "ok", "message": "Nessun dispositivo trovato. Apri Spotify su un device."}
-            
+
             msg = "Dispositivi disponibili:\n"
             for dev in device_list:
                 icon = "💻" if dev["type"] == "Computer" else "📱" if dev["type"] == "Smartphone" else "🔊"
                 status = "✓ Attivo" if dev.get("is_active") else "○"
                 msg += f"{icon} {dev['name']} ({dev['type']}) {status}\n"
-            
+
             return {"status": "ok", "message": msg.strip(), "devices": device_list}
         except Exception as e:
             return {"status": "error", "message": f"Errore nel leggere dispositivi: {e}"}
@@ -225,14 +226,14 @@ class SpotifyTool:
         try:
             if not device_id:
                 return {"status": "error", "message": "Device ID non fornito."}
-            
+
             devices = self.sp.devices()
             device_list = devices.get("devices", [])
             matching_device = next((d for d in device_list if d["id"] == device_id), None)
-            
+
             if not matching_device:
                 return {"status": "error", "message": "Dispositivo non trovato."}
-            
+
             self.current_device_id = device_id
             return {"status": "ok", "message": f"Dispositivo selezionato: {matching_device['name']}"}
         except Exception as e:
@@ -242,13 +243,13 @@ class SpotifyTool:
         try:
             devices = self.sp.devices()
             device_list = devices.get("devices", [])
-            
+
             # Cerca il primo dispositivo Computer
             pc_device = next((d for d in device_list if d["type"] == "Computer"), None)
-            
+
             if not pc_device:
                 return {"status": "error", "message": "Nessun PC trovato. Apri Spotify Desktop su questo computer."}
-            
+
             self.current_device_id = pc_device["id"]
             return {"status": "ok", "message": f"✓ PC selezionato: {pc_device['name']}"}
         except Exception as e:
