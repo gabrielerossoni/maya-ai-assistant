@@ -2719,21 +2719,15 @@
                         <span class="dom-scene-strip-label">SCENE</span>
                         <div class="dom-scene-chip" id="chip-buongiorno" onclick="sendCmdToWS('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
                         <div class="dom-scene-chip" id="chip-sveglia" onclick="sendCmdToWS('sveglia')"><span class="dom-chip-icon">⏰</span>Sveglia</div>
-                        <div class="dom-scene-chip" id="chip-studio" onclick="sendCmdToWS('modalità studio')"><span class="dom-chip-icon">📚</span>Studio</div>
-                        <div class="dom-scene-chip" id="chip-lavoro" onclick="sendCmdToWS('modalità lavoro')"><span class="dom-chip-icon">💼</span>Lavoro</div>
-                        <div class="dom-scene-chip" id="chip-film" onclick="sendCmdToWS('modalità film')"><span class="dom-chip-icon">🎬</span>Film</div>
-                        <div class="dom-scene-chip" id="chip-gaming" onclick="sendCmdToWS('modalità gaming')"><span class="dom-chip-icon">🎮</span>Gaming</div>
+                        <div class="dom-scene-chip" id="chip-film" onclick="sendCmdToWS('modalità film')"><span class="dom-chip-icon">🎦</span>Film</div>
                         <div class="dom-scene-chip" id="chip-relax" onclick="sendCmdToWS('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
                         <div class="dom-scene-chip" id="chip-notte" onclick="sendCmdToWS('modalità notte')"><span class="dom-chip-icon">🌙</span>Notte</div>
-                        <div class="dom-scene-chip" id="chip-dormire" onclick="sendCmdToWS('ora di dormire')"><span class="dom-chip-icon">😴</span>Dormi</div>
+                        <div class="dom-scene-chip" id="chip-buonanotte" onclick="sendCmdToWS('buonanotte')"><span class="dom-chip-icon">😴</span>Buonanotte</div>
                         <div class="dom-scene-chip" id="chip-cena" onclick="sendCmdToWS('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
-                        <div class="dom-scene-chip" id="chip-caffe" onclick="sendCmdToWS('pausa caffè')"><span class="dom-chip-icon">☕</span>Caffè</div>
-                        <div class="dom-scene-chip" id="chip-weekend" onclick="sendCmdToWS('weekend mattina')"><span class="dom-chip-icon">🌅</span>Weekend</div>
-                        <div class="dom-scene-chip" id="chip-ospite" onclick="sendCmdToWS('modalità ospite')"><span class="dom-chip-icon">👥</span>Ospiti</div>
+                        <div class="dom-scene-chip" id="chip-ospiti-arrivo" onclick="sendCmdToWS('ospiti in arrivo')"><span class="dom-chip-icon">👥</span>Ospiti</div>
                         <div class="dom-scene-chip" id="chip-rientro" onclick="sendCmdToWS('sono rientrato')"><span class="dom-chip-icon">🏠</span>Rientro</div>
-                        <div class="dom-scene-chip" id="chip-uscita" onclick="sendCmdToWS('modalità uscita')"><span class="dom-chip-icon">🚶</span>Uscita</div>
+                        <div class="dom-scene-chip" id="chip-uscita" onclick="sendCmdToWS('vado fuori')"><span class="dom-chip-icon">🚶</span>Uscita</div>
                         <div class="dom-scene-chip" id="chip-piove" onclick="sendCmdToWS('piove')"><span class="dom-chip-icon">🌧️</span>Piove</div>
-                        <div class="dom-scene-chip" id="chip-bambini" onclick="sendCmdToWS('bambini dormono')"><span class="dom-chip-icon">🤫</span>Silenzio</div>
                         <div class="dom-scene-chip" id="chip-allarme" onclick="sendCmdToWS('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
                     </div>
                     <!-- Main content -->
@@ -3751,24 +3745,18 @@
         // SCENE PILL — feedback scena attiva
         // =============================================
         const SCENE_CHIP_MAP = {
-            'buongiorno':      'chip-buongiorno',
-            'sveglia':         'chip-sveglia',
-            'modalità studio': 'chip-studio',
-            'modalità lavoro': 'chip-lavoro',
-            'modalità film':   'chip-film',
-            'modalità gaming': 'chip-gaming',
-            'modalità relax':  'chip-relax',
-            'modalità notte':  'chip-notte',
-            'ora di dormire':  'chip-dormire',
-            'cena':            'chip-cena',
-            'pausa caffè':     'chip-caffe',
-            'weekend mattina': 'chip-weekend',
-            'modalità ospite': 'chip-ospite',
-            'sono rientrato':  'chip-rientro',
-            'modalità uscita': 'chip-uscita',
-            'piove':           'chip-piove',
-            'bambini dormono': 'chip-bambini',
-            'allarme':         'chip-allarme',
+            'buongiorno':       'chip-buongiorno',
+            'sveglia':          'chip-sveglia',
+            'modalità film':    'chip-film',
+            'modalità relax':   'chip-relax',
+            'modalità notte':   'chip-notte',
+            'buonanotte':       'chip-buonanotte',
+            'cena':             'chip-cena',
+            'ospiti in arrivo': 'chip-ospiti-arrivo',
+            'sono rientrato':   'chip-rientro',
+            'vado fuori':       'chip-uscita',
+            'piove':            'chip-piove',
+            'allarme':          'chip-allarme',
         };
         let _activeChip = null;
         let _scenePillTimer = null;
@@ -3849,7 +3837,10 @@
                 const el = document.getElementById(`dev-${dev}`);
                 const stateEl = document.getElementById(`dev-${dev}-state`);
                 if (!el) continue;
-                if (domState[dev]) {
+                if (domState[dev] === null) {
+                    el.classList.remove('active');
+                    if (stateEl) stateEl.textContent = '—';
+                } else if (domState[dev]) {
                     el.classList.add('active');
                     if (stateEl) stateEl.textContent = labels.onLabel;
                 } else {
@@ -3877,17 +3868,26 @@
             if (d.system && d.system.reset_storage) {
                 document.getElementById('debug-controls').style.display = 'flex';
             }
-            if (d.led !== undefined) domState.light = (d.led === 'on');
-            if (d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90' || parseInt(d.servo) > 0);
-            if (d.servo2 !== undefined) domState.servo2 = (d.servo2 === 'open' || d.servo2 === '90' || parseInt(d.servo2) > 0);
+            const pill = document.getElementById('dom-arduino-pill');
+            if (d.arduino_connected === false) {
+                // Arduino non connesso: azzera tutto e mostra —
+                ['light','servo','servo2','rgb1','rgb2','rgb3','buzz2','alarm'].forEach(k => { domState[k] = null; });
+                const dot = document.getElementById('casa-buzzer-dot');
+                if (dot) dot.className = 'casa-dot';
+                if (pill) pill.classList.remove('online');
+                refreshDomUI();
+                return;
+            }
+            if (d.led !== null && d.led !== undefined) domState.light = (d.led === 'on');
+            if (d.servo !== null && d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90' || parseInt(d.servo) > 0);
+            if (d.servo2 !== null && d.servo2 !== undefined) domState.servo2 = (d.servo2 === 'open' || d.servo2 === '90' || parseInt(d.servo2) > 0);
             _rgb1Update(d);
             _rgb2Update(d);
             _rgb3Update(d);
-            if (d.buzzer !== undefined) {
+            if (d.buzzer !== null && d.buzzer !== undefined) {
                 const dot = document.getElementById('casa-buzzer-dot');
                 if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
             }
-            const pill = document.getElementById('dom-arduino-pill');
             if (pill && (d.system || d.led || d.servo)) pill.classList.add('online');
             refreshDomUI();
         }

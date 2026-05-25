@@ -141,213 +141,6 @@ FILLER_MESSAGES = [
 ]
 
 
-# ──────────────────────────────────────────────
-# AUTOMAZIONI PREDEFINITE (SCENE CASA)
-# ──────────────────────────────────────────────
-# Ogni scena è una lista di azioni eseguite in sequenza.
-# Per aggiungere una scena: AUTOMATIONS["nome scena"] = [azioni...]
-# Per aggiungere dispositivi futuri (RGB, buzzer, ventola, tapparella):
-#   {"tool": "arduino", "command": "RGB_SET", "value": "#FF8800"}
-#   {"tool": "arduino", "command": "BUZZER_ON"}
-#   {"tool": "arduino", "command": "FAN_ON"}
-#   {"tool": "arduino", "command": "BLIND_OPEN"}
-# ──────────────────────────────────────────────
-
-AUTOMATION_ALIASES: dict[str, str] = {
-    "buona notte": "buonanotte",
-    "bonne nuit": "buonanotte",
-    "notte": "buonanotte",
-    "vado a dormire": "buonanotte",
-    "va a dormire": "buonanotte",
-    "buon giorno": "buongiorno",
-    "morning": "buongiorno",
-    "svegliami": "sveglia",
-    "dammi la sveglia": "sveglia",
-    "esco": "vado fuori",
-    "me ne vado": "vado fuori",
-    "vado via": "vado fuori",
-    "sono tornato": "sono rientrato",
-    "rientro": "sono rientrato",
-    "torno": "sono rientrato",
-    "dormo": "ora di dormire",
-    "vado a letto": "ora di dormire",
-    "a letto": "ora di dormire",
-    "caffe": "pausa caffè",
-    "caffè": "pausa caffè",
-    "faccio un caffè": "pausa caffè",
-    "sta piovendo": "piove",
-    "pioggia": "piove",
-    "lavoro": "modalità lavoro",
-    "work mode": "modalità lavoro",
-    "studio": "modalità studio",
-    "relax": "modalità relax",
-    "film": "modalità film",
-    "cinema": "modalità film",
-    "guardo un film": "modalità film",
-    "gaming": "modalità gaming",
-    "gioco": "modalità gaming",
-    "uscita": "modalità uscita",
-    "ospite": "modalità ospite",
-    "arrivano ospiti": "ospiti in arrivo",
-    "stanno arrivando": "ospiti in arrivo",
-    "bambini a letto": "bambini dormono",
-    "weekend": "weekend mattina",
-    "sabato mattina": "weekend mattina",
-    "domenica mattina": "weekend mattina",
-}
-
-AUTOMATIONS = {
-    # ── Scene esistenti ──────────────────────────
-    "buonanotte": [
-        {"tool": "arduino", "command": "LIGHT_OFF"},
-        {"tool": "arduino", "command": "SERVO_CLOSE"},
-        {"tool": "network", "message": "GOODNIGHT"},
-        {"tool": "system", "command": "shutdown"},
-        # TODO: {"tool": "arduino", "command": "RGB_OFF"},
-        # TODO: {"tool": "arduino", "command": "BLIND_CLOSE"},
-    ],
-    "modalità lavoro": [
-        {"tool": "arduino", "command": "LIGHT_ON"},
-        {"tool": "system", "command": "open_browser"},
-        {"tool": "network", "message": "WORK_MODE"},
-    ],
-    "modalità film": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x220000},
-    ],
-    # ── Scene nuove (template per espansione futura) ──
-    "modalità notte": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000022},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
-        {"tool": "spotify", "command": "pause"},
-    ],
-    "modalità studio": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFEE99},
-    ],
-    "modalità relax": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x440055},
-    ],
-    "modalità uscita": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "neopixel", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # porta
-        {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0},  # cancello
-        {"tool": "arduino", "op": "SET", "target": "buzzer2", "melody": "ok"},
-    ],
-    "modalità ospite": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFFFFF},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},
-    ],
-    "modalità gaming": [
-        {"tool": "arduino", "command": "LIGHT_OFF"},
-        {"tool": "arduino", "command": "RELAY_ON"},
-        {"tool": "system", "command": "open_browser"},
-        # TODO: {"tool": "arduino", "command": "RGB_SET", "value": "#FF0044"},  # rosso gaming
-    ],
-    "allarme": [
-        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "buzzer2", "melody": "alarm"},
-        {"tool": "arduino", "op": "SET", "target": "neopixel", "value": 0xFF0000, "effect": 3},
-    ],
-    "buongiorno": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFD580},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # porta chiusa
-        {"tool": "spotify", "command": "search", "query": "buongiorno playlist mattina"},
-        {"tool": "weather", "location": None},
-        {"tool": "news", "limit": 5},
-        {"tool": "calendar", "action": "list"},
-    ],
-    "sveglia": [
-        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFFFFF},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "spotify", "command": "search", "query": "energetic morning wake up"},
-    ],
-    "cena": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF4400},  # arancio caldo candela
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
-        {"tool": "spotify", "command": "search", "query": "cena romantica musica italiana"},
-    ],
-    "ospiti in arrivo": [
-        {"tool": "arduino", "op": "SET", "target": "servo2", "value": 90},  # apri cancello
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},  # apri porta
-        {"tool": "arduino", "op": "SET", "target": "neopixel", "value": 0xFFEECC, "effect": 1},
-        {"tool": "arduino", "op": "SET", "target": "buzzer2", "melody": "startup"},
-    ],
-    "vado fuori": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # porta chiusa
-        {"tool": "arduino", "op": "SET", "target": "buzzer", "value": 1},  # bip conferma
-        {"tool": "spotify", "command": "pause"},
-        {"tool": "weather", "location": None},
-    ],
-    "sono rientrato": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFF8C42},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "spotify", "command": "search", "query": "relax after work playlist"},
-        {"tool": "timer", "minutes": 5, "message": "Ricordati di chiudere la porta!"},
-        {"tool": "news", "limit": 3},
-    ],
-    "ora di dormire": [
-        {"tool": "spotify", "command": "pause"},
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000008},  # blu notte minimo
-        {"tool": "calendar", "action": "list"},
-    ],
-    "piove": [
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},  # chiudi porta/tapparella
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 1},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x4488FF},  # blu pioggia
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},
-        {"tool": "spotify", "command": "search", "query": "rain lofi study"},
-        {"tool": "weather", "location": None},
-    ],
-    "pausa caffè": [
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 1},  # accende macchinetta via relay
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x8B4513},  # marrone caffè
-        {"tool": "spotify", "command": "search", "query": "espresso morning jazz"},
-        {"tool": "news", "limit": 3},
-        {"tool": "timer", "minutes": 3, "message": "Caffè pronto!"},
-    ],
-    "bambini dormono": [
-        {"tool": "spotify", "command": "pause"},
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0x000003},
-        {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
-    ],
-    "weekend mattina": [
-        {"tool": "arduino", "op": "SET", "target": "light", "value": 0},  # no luce piena
-        {"tool": "arduino", "op": "SET", "target": "rgb", "value": 0xFFCC88},  # ambra soffusa
-        {"tool": "arduino", "op": "SET", "target": "relay", "value": 0},
-        {"tool": "spotify", "command": "search", "query": "lazy sunday morning playlist"},
-        {"tool": "weather", "location": None},
-        {"tool": "news", "limit": 5},
-    ],
-}
-
-
 class AgentCore:
     """
     Cuore del sistema agentico.
@@ -410,28 +203,12 @@ class AgentCore:
         print("[AGENT] AgentCore pronto.\n")
 
     # ── FASE 1: PLANNER ──────────────────────────────────
-    def _check_automation(self, user_input: str) -> list | None:
-        """Controlla se l'input corrisponde a un'automazione predefinita.
-        Prima usa il nuovo AutomationEngine OO, poi fallback al dizionario statico."""
-        # 1. Nuovo engine (priorità, condizioni, alias)
+    def _check_automation(self, user_input: str) -> "Automation | None":
+        """Controlla se l'input corrisponde a un'automazione predefinita."""
         automation = self.automation_engine.resolve(user_input)
         if automation:
             print(f"[PLANNER] Engine: automazione '{automation.name}' rilevata")
-            return automation  # ritorna l'oggetto Automation, gestito in process()
-
-        # 2. Fallback: dizionario statico (retrocompatibilità)
-        lower = re.sub(r"\s+", " ", user_input.lower().strip())
-        for alias, canonical in AUTOMATION_ALIASES.items():
-            if alias in lower:
-                actions = AUTOMATIONS.get(canonical)
-                if actions:
-                    print(f"[PLANNER] Fallback (alias '{alias}' → '{canonical}') rilevata")
-                    return actions
-        for keyword, actions in AUTOMATIONS.items():
-            if keyword in lower:
-                print(f"[PLANNER] Fallback automazione: '{keyword}'")
-                return actions
-        return None
+        return automation
 
     async def _route_intent(self, user_input: str) -> str:
         """Determina l'intent dell'utente con caching."""
@@ -928,27 +705,14 @@ class AgentCore:
         # 1. Controlla automazioni (fast path)
         auto_result = self._check_automation(user_input)
         if auto_result is not None:
-            from .automation_engine import Automation as _Automation
-
-            if isinstance(auto_result, _Automation):
-                # Nuovo engine OO
-                exec_result = await self.automation_engine.execute(auto_result, source="voice")
-                scene_name = auto_result.name
-                status = exec_result.get("status", "ok")
-                reply = (
-                    f"Scena '{scene_name}' eseguita."
-                    if status == "ok"
-                    else f"Scena '{scene_name}' completata con avvisi."
-                )
-                # Broadcast WebSocket se disponibile
-                if self.socket_manager:
-                    await self.socket_manager.broadcast(
-                        {"type": "scene_executed", "scene": scene_name, "status": status}
-                    )
-            else:
-                # Fallback lista azioni statiche
-                await self._execute_actions(auto_result)
-                reply = f"Automazione '{user_input}' eseguita."
+            exec_result = await self.automation_engine.execute(auto_result, source="voice")
+            scene_name = auto_result.name
+            status = exec_result.get("status", "ok")
+            reply = (
+                f"Scena '{scene_name}' eseguita." if status == "ok" else f"Scena '{scene_name}' completata con avvisi."
+            )
+            if self.socket_manager:
+                await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
             await self.memory.add_turn("jarvis", reply)
             self._set_final_layout(reply, {"type": "orb", "params": {}})
             yield reply

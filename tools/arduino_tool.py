@@ -251,41 +251,11 @@ class ArduinoTool:
             return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
 
     def _simulate(self, op: str, target: str, value) -> dict:
-        if op == "SET":
-            if target == "light":
-                self.sim_state["light"] = bool(value)
-            elif target == "servo":
-                self.sim_state["servo"] = max(0, min(180, int(value)))
-            elif target == "servo2":
-                self.sim_state["servo2"] = max(0, min(180, int(value)))
-            elif target in ("rgb1", "rgb2", "rgb3"):
-                if isinstance(value, dict):
-                    self.sim_state[target] = [value.get("r", 0), value.get("g", 0), value.get("b", 0)]
-                else:
-                    v = int(value)
-                    self.sim_state[target] = [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
-            elif target in ("rgb", "neopixel"):
-                if isinstance(value, dict):
-                    c = [value.get("r", 0), value.get("g", 0), value.get("b", 0)]
-                else:
-                    v = int(value)
-                    c = [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
-                self.sim_state["rgb1"] = list(c)
-                self.sim_state["rgb2"] = list(c)
-                self.sim_state["rgb3"] = list(c)
-            elif target == "buzzer":
-                self.sim_state["buzzer"] = bool(value)
-            elif target in ("buzzer2", "speaker"):
-                self.sim_state["buzz2_playing"] = True
-
-        if target == "sensor_read":
-            return {"status": "ok", "simulated": True, "temp": 22.0, "humidity": 55.0}
-
-        return {"status": "ok", "simulated": True, "state": self.sim_state.copy()}
+        return {"status": "error", "message": "arduino non connesso"}
 
     def get_sensor_data(self) -> dict:
         if self.simulated:
-            return {"temp": 22.0, "humidity": 55.0}
+            return None
 
         msg_id = self._next_id()
         payload = {"id": msg_id, "cmd": "GET", "target": "sensor_read"}
