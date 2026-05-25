@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DASHBOARD = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "static",
-    "jarvis_dashboard.html",
+    "maya_dashboard.html",
 )
 
 

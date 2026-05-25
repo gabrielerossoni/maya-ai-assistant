@@ -345,7 +345,7 @@ maya/
 │       └── maya_controller.ino  # Firmware: LED, relay, servo, RGB, buzzer, DHT11
 │
 ├── static/
-│   ├── jarvis_dashboard.html  # SPA dashboard HUD — slider, Three.js orb, pannelli live
+│   ├── maya_dashboard.html    # SPA dashboard HUD — slider, Three.js orb, pannelli live
 │   ├── sfondo-maya.png
 │   ├── maya_logo.png
 │   └── maya_logo_no_sfondo.png

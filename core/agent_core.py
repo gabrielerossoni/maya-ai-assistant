@@ -665,6 +665,24 @@ class AgentCore:
         # Rimuovi prefissi vocali comuni
         _clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower_input).strip()
 
+        if _clean in ["apri chat", "apri la chat", "mostra chat", "mostra la chat", "apri console", "mostra console"]:
+            if self.socket_manager:
+                await self.socket_manager.broadcast({"type": "toggle_console", "action": "open"})
+            reply = "Console neurale aperta, signore."
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            yield reply
+            return
+
+        if _clean in ["chiudi chat", "nascondi chat", "chiudi la chat", "nascondi la chat", "chiudi console", "nascondi console"]:
+            if self.socket_manager:
+                await self.socket_manager.broadcast({"type": "toggle_console", "action": "close"})
+            reply = "Console minimizzata."
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            yield reply
+            return
+
         spotify_action = None
 
         # 0a. Comando esplicito: "spotify next", "spotify play", ecc.

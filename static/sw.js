@@ -14,7 +14,7 @@ const STATIC_ASSETS = [
 // Pagine principali: network-first (sempre aggiornate se online)
 const NETWORK_FIRST_PATHS = [
   '/',
-  '/static/jarvis_dashboard.html'
+  '/static/maya_dashboard.html'
 ];
 
 self.addEventListener('install', event => {

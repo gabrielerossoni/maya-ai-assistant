@@ -27,7 +27,7 @@ _log_filter_applied = False
 # HTTP routes
 # ---------------------------------------------------------------------------
 async def get_dashboard():
-    return FileResponse("static/jarvis_dashboard.html")
+    return FileResponse("static/maya_dashboard.html")
 
 
 async def get_service_worker():

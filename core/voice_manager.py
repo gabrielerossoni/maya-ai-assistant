@@ -430,7 +430,6 @@ class VoiceManager:
                         break
                     if first:
                         self.is_speaking = True
-                        self._broadcast("SPEAKING")
                         first = False
                     self._speak_raw(sentence)
                     if is_news_request:
@@ -505,6 +504,7 @@ class VoiceManager:
             subprocess.run(
                 command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
+            self._broadcast("SPEAKING")
             self._play_wav(output_wav)
         except Exception as e:
             print(f"[VOICE] Errore TTS raw: {e}")

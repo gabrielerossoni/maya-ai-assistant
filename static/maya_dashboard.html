@@ -1649,6 +1649,174 @@
             color: var(--accent);
         }
 
+        #chat-log-widget {
+            position: fixed;
+            bottom: 58px;
+            left: 24px;
+            width: 320px;
+            height: 380px;
+            background: rgba(10, 10, 12, 0.8);
+            border: 1px solid rgba(255, 30, 30, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        #chat-log-widget.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        body.content-open #chat-log-widget {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .chat-log-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-right: 22px;
+        }
+
+        .chat-log-title {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.82);
+        }
+
+        .chat-log-led {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(255, 40, 40, 0.95);
+            box-shadow: 0 0 12px rgba(255, 30, 30, 0.55);
+            transition: var(--transition);
+        }
+
+        .chat-log-led.online {
+            background: rgba(42, 255, 120, 0.95);
+            box-shadow: 0 0 12px rgba(42, 255, 120, 0.45);
+        }
+
+        .chat-log-toggle {
+            position: fixed;
+            bottom: 16px;
+            left: 24px;
+            z-index: 201;
+            min-width: 320px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 30, 30, 0.18);
+            background: rgba(10, 10, 12, 0.65);
+            color: rgba(255, 255, 255, 0.75);
+            font-family: 'Syncopate', sans-serif;
+            font-size: 9px;
+            letter-spacing: 2px;
+            cursor: pointer;
+            backdrop-filter: blur(18px);
+            transition: var(--transition);
+        }
+
+        .chat-log-toggle:hover {
+            color: rgba(255, 255, 255, 0.92);
+            border-color: rgba(255, 30, 30, 0.28);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        body.content-open .chat-log-toggle {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #chat-log-body {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 4px;
+        }
+
+        #chat-log-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chat-log-body::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 999px;
+        }
+
+        #chat-log-body::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.14);
+            border-radius: 999px;
+        }
+
+        .chat-log-entry {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .chat-log-entry.chat {
+            align-self: flex-start;
+            padding: 9px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .chat-log-entry.user {
+            border-color: rgba(255, 30, 30, 0.16);
+            background: rgba(255, 30, 30, 0.06);
+        }
+
+        .chat-log-entry.log {
+            padding: 7px 0;
+            color: rgba(255, 255, 255, 0.55);
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .chat-log-entry.log:last-child {
+            border-bottom: none;
+        }
+
+        .chat-log-entry.system {
+            color: rgba(255, 255, 255, 0.62);
+        }
+
+        .chat-log-role {
+            display: block;
+            margin-bottom: 4px;
+            color: rgba(255, 30, 30, 0.72);
+            font-family: 'Syncopate', sans-serif;
+            font-size: 7px;
+            letter-spacing: 1.8px;
+        }
+
+        .chat-log-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
         .spotify-mini-card {
             display: flex;
             align-items: center;
@@ -2533,6 +2701,24 @@
                 right: 12px;
                 width: auto;
             }
+
+            .chat-log-toggle {
+                top: auto;
+                bottom: 514px;
+                left: 12px;
+                right: 12px;
+                min-width: 0;
+                width: calc(100vw - 24px);
+            }
+
+            #chat-log-widget {
+                top: auto;
+                bottom: 124px;
+                left: 12px;
+                right: 12px;
+                width: auto;
+                height: 360px;
+            }
         }
 
         /* ── iOS Safe Area (notch / Dynamic Island) ── */
@@ -2613,6 +2799,15 @@
             <button class="btn-mini-ctrl" onclick="spotifyCmd('next')">⏭︎</button>
         </div>
     </div>
+    <button class="chat-log-toggle" id="chat-log-toggle" onclick="toggleConsoleWidget('toggle')">CHAT & LOG</button>
+    <div id="chat-log-widget">
+        <div class="widget-close" onclick="toggleConsoleWidget('close')">✕</div>
+        <div class="chat-log-header">
+            <div class="chat-log-title">CONSOLE LOG</div>
+            <div class="chat-log-led" id="chat-log-led"></div>
+        </div>
+        <div id="chat-log-body"></div>
+    </div>
     <div id="cmd-container">
         <input type="text" id="cmd-input" placeholder="Comando neurale..."
             onkeydown="if(event.key==='Enter') sendCmd()">
@@ -2673,7 +2868,7 @@
                     <div id="map-container"></div>
                 </div>
                 <div id="panel-browser" class="panel">
-                    <iframe id="browser-iframe" src="about:blank"></iframe>
+                    <iframe id="browser-iframe" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
                 </div>
                 <div id="panel-news" class="panel">
                     <div class="news-ticker-bar">
@@ -2994,7 +3189,9 @@
         let audioContext, analyser, dataArray;
         let orbState = 'idle';
         // Three.js globals
-        let scene, camera, renderer, mainOrb, originalPositions;
+        let scene, camera, renderer, mainOrb, orbUniforms, orbMotionState;
+        let consoleStreamEl = null;
+        let consoleOpen = false;
         // =============================================
         // SCREEN STATE MACHINE
         // Screen 1: idle  → sfondo nero, orb centrato, clock
@@ -3059,6 +3256,58 @@
                 clearTimeout(inactivityTimer);
                 inactivityTimer = null;
             }
+        }
+        function updateConsoleLed(isOnline) {
+            const led = document.getElementById('chat-log-led');
+            if (led) led.classList.toggle('online', !!isOnline);
+        }
+        function toggleConsoleWidget(action = 'toggle') {
+            const widget = document.getElementById('chat-log-widget');
+            if (!widget) return;
+            if (action === 'open') consoleOpen = true;
+            else if (action === 'close') consoleOpen = false;
+            else consoleOpen = !consoleOpen;
+            widget.classList.toggle('active', consoleOpen);
+            if (consoleOpen) {
+                const body = document.getElementById('chat-log-body');
+                if (body) body.scrollTop = body.scrollHeight;
+            }
+        }
+        function appendConsoleEntry(kind, text, role = '') {
+            const body = document.getElementById('chat-log-body');
+            if (!body || !text) return null;
+            const entry = document.createElement('div');
+            entry.className = `chat-log-entry ${kind}`;
+            if (role) {
+                const roleEl = document.createElement('span');
+                roleEl.className = 'chat-log-role';
+                roleEl.textContent = role;
+                entry.appendChild(roleEl);
+            }
+            const textEl = document.createElement('div');
+            textEl.className = 'chat-log-text';
+            textEl.textContent = text;
+            entry.appendChild(textEl);
+            body.appendChild(entry);
+            body.scrollTop = body.scrollHeight;
+            return entry;
+        }
+        function appendConsoleLog(text, level = 'system') {
+            return appendConsoleEntry(`log ${level}`.trim(), text);
+        }
+        function upsertConsoleStream(text) {
+            const body = document.getElementById('chat-log-body');
+            if (!body) return;
+            if (!consoleStreamEl) {
+                consoleStreamEl = appendConsoleEntry('chat', text, 'ASSISTANT');
+                return;
+            }
+            const textEl = consoleStreamEl.querySelector('.chat-log-text');
+            if (textEl) textEl.textContent = text;
+            body.scrollTop = body.scrollHeight;
+        }
+        function finalizeConsoleStream() {
+            consoleStreamEl = null;
         }
         // Reset timer su qualsiasi interazione utente in work-mode
         ['keydown', 'mousemove', 'click', 'touchstart'].forEach(evt => {
@@ -3162,9 +3411,94 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setClearColor(0x000000, 0);
             const coreGeom = new THREE.SphereGeometry(0.65, 64, 64);
-            const coreMat = new THREE.MeshBasicMaterial({ color: 0xff1e1e, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending });
+            orbUniforms = {
+                uTime: { value: 0 },
+                uAudioLevel: { value: 0 },
+                uStateMix: { value: 0 },
+                uPulse: { value: 0 },
+                uColor: { value: new THREE.Color(0xff1e1e) },
+                uOpacity: { value: 0.18 },
+            };
+            orbMotionState = {
+                scale: 1,
+                sceneScale: 1,
+                glowScale: 1,
+                glowOpacity: 0.18,
+                nebulaOpacity: 0.26,
+                nebulaSpeed: 0.002,
+                ringSpeed: -0.005,
+                rotationX: 0.0015,
+                rotationY: 0.003,
+                rotationZ: 0.001,
+                pulse: 0,
+                stateMix: 0,
+            };
+            const coreMat = new THREE.ShaderMaterial({
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                uniforms: orbUniforms,
+                vertexShader: `
+                    uniform float uTime;
+                    uniform float uAudioLevel;
+                    uniform float uStateMix;
+                    uniform float uPulse;
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+
+                    float hash(vec3 p) {
+                        return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+                    }
+
+                    float noise(vec3 p) {
+                        vec3 i = floor(p);
+                        vec3 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        float n000 = hash(i + vec3(0.0, 0.0, 0.0));
+                        float n100 = hash(i + vec3(1.0, 0.0, 0.0));
+                        float n010 = hash(i + vec3(0.0, 1.0, 0.0));
+                        float n110 = hash(i + vec3(1.0, 1.0, 0.0));
+                        float n001 = hash(i + vec3(0.0, 0.0, 1.0));
+                        float n101 = hash(i + vec3(1.0, 0.0, 1.0));
+                        float n011 = hash(i + vec3(0.0, 1.0, 1.0));
+                        float n111 = hash(i + vec3(1.0, 1.0, 1.0));
+                        float nx00 = mix(n000, n100, f.x);
+                        float nx10 = mix(n010, n110, f.x);
+                        float nx01 = mix(n001, n101, f.x);
+                        float nx11 = mix(n011, n111, f.x);
+                        float nxy0 = mix(nx00, nx10, f.y);
+                        float nxy1 = mix(nx01, nx11, f.y);
+                        return mix(nxy0, nxy1, f.z);
+                    }
+
+                    void main() {
+                        vNormal = normal;
+                        vec3 p = position;
+                        float liquid = noise(normal * 3.4 + uTime * 0.45) * 2.0 - 1.0;
+                        float ripple = sin((normal.y + uTime * 1.2) * 8.0 + uAudioLevel * 6.0);
+                        float speakingWave = sin(length(position.xy) * 12.0 - uTime * 5.5) * (uAudioLevel * 0.08 + uPulse * 0.04);
+                        float displacement = liquid * (0.08 + uStateMix * 0.05) + ripple * 0.02 + speakingWave;
+                        vec3 displaced = p + normal * displacement;
+                        vPosition = displaced;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 uColor;
+                    uniform float uOpacity;
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+
+                    void main() {
+                        float fresnel = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 2.4);
+                        float core = 1.0 - smoothstep(0.15, 0.95, length(vPosition));
+                        float energy = clamp(core + fresnel * 1.3, 0.0, 1.0);
+                        vec3 color = uColor * (0.35 + energy * 1.4);
+                        gl_FragColor = vec4(color, energy * uOpacity);
+                    }
+                `,
+            });
             mainOrb = new THREE.Mesh(coreGeom, coreMat);
-            originalPositions = coreGeom.attributes.position.array.slice();
             scene.add(mainOrb);
             window.glowSpheres = [];
             [{ r: 0.68, op: 0.20 }, { r: 0.78, op: 0.10 }, { r: 0.95, op: 0.04 }].forEach(layer => {
@@ -3211,28 +3545,56 @@
                 for (let i = 0; i < 64; i++) sum += dataArray[i];
                 audioLevel = (sum / (64 * 255)) * 1.5;
             }
-            const isSpeaking = audioLevel > 0.05;
-            const pos = mainOrb.geometry.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-                const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
-                const ox = originalPositions[ix], oy = originalPositions[iy], oz = originalPositions[iz];
-                const vec = new THREE.Vector3(ox, oy, oz).normalize();
-                const deform = (Math.sin(t * 1.3 + ox * 2.1) + Math.sin(t * 0.7 + oy * 1.8) + Math.sin(t * 1.9 + oz * 2.4)) / 3.0;
-                const d = 0.65 + deform * 0.06;
-                pos.array[ix] = vec.x * d; pos.array[iy] = vec.y * d; pos.array[iz] = vec.z * d;
-            }
-            pos.needsUpdate = true;
-            if (window.glowSpheres) window.glowSpheres.forEach(l => { l.mesh.scale.setScalar(1.0 + audioLevel * 0.15); l.mesh.material.color = color; });
+            const stateTargets = {
+                idle: { scale: 1.0, sceneScale: 1.0, glowScale: 1.0, glowOpacity: 0.18, nebulaOpacity: 0.24, nebulaSpeed: 0.0018, ringSpeed: -0.004, rotationX: 0.0012, rotationY: 0.0022, rotationZ: 0.0009, pulse: Math.sin(t * 1.4) * 0.04, stateMix: 0.22 },
+                listening: { scale: 0.95, sceneScale: 0.99, glowScale: 0.94, glowOpacity: 0.22, nebulaOpacity: 0.34, nebulaSpeed: 0.010, ringSpeed: -0.014, rotationX: 0.0020, rotationY: 0.008, rotationZ: 0.0028, pulse: Math.sin(t * 3.4) * 0.03, stateMix: 0.45 },
+                processing: { scale: 1.03, sceneScale: 1.02, glowScale: 1.08, glowOpacity: 0.28, nebulaOpacity: 0.4, nebulaSpeed: 0.006, ringSpeed: -0.01, rotationX: 0.006, rotationY: 0.012, rotationZ: 0.005, pulse: Math.sin(t * 8.0) * 0.05, stateMix: 0.68 },
+                speaking: { scale: 1.02 + audioLevel * 0.04, sceneScale: 1.03 + audioLevel * 0.05, glowScale: 1.08 + audioLevel * 0.18, glowOpacity: 0.34 + audioLevel * 0.18, nebulaOpacity: 0.32 + audioLevel * 0.35, nebulaSpeed: 0.006 + audioLevel * 0.03, ringSpeed: -0.008 - audioLevel * 0.02, rotationX: 0.004, rotationY: 0.01, rotationZ: 0.003, pulse: Math.sin(t * 9.0) * 0.03 + audioLevel * 0.1, stateMix: 0.92 },
+                calibrating: { scale: 1.0, sceneScale: 1.01, glowScale: 1.04, glowOpacity: 0.24, nebulaOpacity: 0.3, nebulaSpeed: 0.004, ringSpeed: -0.008, rotationX: 0.003, rotationY: 0.005, rotationZ: 0.002, pulse: Math.sin(t * 4.0) * 0.02, stateMix: 0.5 },
+            };
+            const target = stateTargets[orbState] || stateTargets.idle;
+            const lerp = THREE.MathUtils.lerp;
+            orbMotionState.scale = lerp(orbMotionState.scale, target.scale, 0.08);
+            orbMotionState.sceneScale = lerp(orbMotionState.sceneScale, target.sceneScale, 0.08);
+            orbMotionState.glowScale = lerp(orbMotionState.glowScale, target.glowScale, 0.08);
+            orbMotionState.glowOpacity = lerp(orbMotionState.glowOpacity, target.glowOpacity, 0.08);
+            orbMotionState.nebulaOpacity = lerp(orbMotionState.nebulaOpacity, target.nebulaOpacity, 0.08);
+            orbMotionState.nebulaSpeed = lerp(orbMotionState.nebulaSpeed, target.nebulaSpeed, 0.08);
+            orbMotionState.ringSpeed = lerp(orbMotionState.ringSpeed, target.ringSpeed, 0.08);
+            orbMotionState.rotationX = lerp(orbMotionState.rotationX, target.rotationX, 0.08);
+            orbMotionState.rotationY = lerp(orbMotionState.rotationY, target.rotationY, 0.08);
+            orbMotionState.rotationZ = lerp(orbMotionState.rotationZ, target.rotationZ, 0.08);
+            orbMotionState.pulse = lerp(orbMotionState.pulse, target.pulse, 0.12);
+            orbMotionState.stateMix = lerp(orbMotionState.stateMix, target.stateMix, 0.08);
+            orbUniforms.uTime.value = t;
+            orbUniforms.uAudioLevel.value = lerp(orbUniforms.uAudioLevel.value, audioLevel, 0.12);
+            orbUniforms.uStateMix.value = orbMotionState.stateMix;
+            orbUniforms.uPulse.value = orbMotionState.pulse;
+            orbUniforms.uColor.value.copy(color);
+            orbUniforms.uOpacity.value = lerp(orbUniforms.uOpacity.value, orbMotionState.glowOpacity, 0.1);
+            mainOrb.scale.setScalar(orbMotionState.scale);
+            mainOrb.rotation.x += orbMotionState.rotationX;
+            mainOrb.rotation.y += orbMotionState.rotationY;
+            mainOrb.rotation.z += orbMotionState.rotationZ;
+            if (window.glowSpheres) window.glowSpheres.forEach((l, index) => {
+                const layerScale = orbMotionState.glowScale + index * 0.025 + audioLevel * 0.04;
+                l.mesh.scale.setScalar(layerScale);
+                l.mesh.material.opacity = lerp(l.mesh.material.opacity, l.baseOpacity + orbMotionState.glowOpacity * 0.45, 0.08);
+                l.mesh.material.color = color;
+            });
             if (window.nebulaParticles) {
-                window.nebulaParticles.rotation.y += 0.002 + (isSpeaking ? audioLevel * 0.03 : 0);
-                window.nebulaParticles.rotation.z += 0.001;
-                window.nebulaParticles.material.opacity = isSpeaking ? (0.3 + audioLevel * 0.4) : 0.25;
+                window.nebulaParticles.rotation.y += orbMotionState.nebulaSpeed;
+                window.nebulaParticles.rotation.z += orbMotionState.nebulaSpeed * 0.45;
+                window.nebulaParticles.material.opacity = lerp(window.nebulaParticles.material.opacity, orbMotionState.nebulaOpacity, 0.08);
                 window.nebulaParticles.material.color = color;
             }
-            if (window.outerRingPoints) { window.outerRingPoints.rotation.z -= 0.005; window.outerRingPoints.material.color = color; }
-            mainOrb.material.color = color;
-            const pulse = isSpeaking ? (Math.sin(t * 10) * 0.01 + audioLevel * 0.05) : (Math.sin(t * 2) * 0.005);
-            scene.scale.setScalar(1.0 + pulse);
+            if (window.outerRingPoints) {
+                window.outerRingPoints.rotation.z += orbMotionState.ringSpeed;
+                window.outerRingPoints.rotation.y += orbMotionState.ringSpeed * -0.18;
+                window.outerRingPoints.material.color = color;
+                window.outerRingPoints.material.opacity = lerp(window.outerRingPoints.material.opacity, 0.48 + orbMotionState.stateMix * 0.22, 0.08);
+            }
+            scene.scale.setScalar(orbMotionState.sceneScale + orbMotionState.pulse);
             renderer.render(scene, camera);
         }
         window.addEventListener('load', async () => {
@@ -3351,15 +3713,33 @@
                     }
                 }
                 if (d.type === 'spotify') updateSpotify(d);
-                if (d.type === 'stream') document.getElementById('log-strip').innerText = d.full_text;
+                if (d.type === 'stream') {
+                    document.getElementById('log-strip').innerText = d.full_text;
+                    upsertConsoleStream(d.full_text);
+                }
+                if (d.type === 'log') {
+                    appendConsoleLog(d.text || '', d.level || 'system');
+                    document.getElementById('log-strip').innerText = d.text || 'MAYA LOG';
+                    finalizeConsoleStream();
+                }
+                if (d.type === 'toggle_console') {
+                    toggleConsoleWidget(d.action || 'toggle');
+                }
                 if (d.type === 'scene_executed') updateScenePill(d.scene, d.status);
             };
             ws.onopen = () => {
                 document.getElementById('log-strip').innerText = "MAYA Neural Link Established.";
+                updateConsoleLed(true);
+                appendConsoleLog('MAYA Neural Link Established.', 'system');
                 initAudio();
                 requestGeolocation();
             };
-            ws.onclose = () => setTimeout(initWS, 3000);
+            ws.onclose = () => {
+                updateConsoleLed(false);
+                appendConsoleLog('Connessione WebSocket persa. Riconnessione in corso...', 'system');
+                finalizeConsoleStream();
+                setTimeout(initWS, 3000);
+            };
         }
         // =============================================
         // ORB STATE — integrato con screen state machine
@@ -3413,8 +3793,7 @@
                 try {
                     const _u = new URL(params.url);
                     if (_u.protocol === 'https:' || _u.protocol === 'http:') {
-                        const _safeHref = _u.href;
-                        document.getElementById('browser-iframe').setAttribute('src', _safeHref);
+                        document.getElementById('browser-iframe').src = _u.href;
                     }
                 } catch (_) { /* invalid url — ignore */ }
             }
@@ -3445,6 +3824,8 @@
         function sendCmd() {
             const input = document.getElementById('cmd-input');
             if (!input.value.trim()) return;
+            appendConsoleEntry('chat user', input.value, 'USER');
+            finalizeConsoleStream();
             ws.send(JSON.stringify({ type: 'command', text: input.value }));
             input.value = '';
         }
@@ -3471,7 +3852,7 @@
                 document.getElementById('spotify-artist').innerText = d.artist;
                 const _artUrl = d.album_art || '';
                 const _safeArt = /^https?:\/\//.test(_artUrl) ? _artUrl : '';
-                document.getElementById('spotify-art').setAttribute('src', _safeArt);
+                document.getElementById('spotify-art').src = _safeArt;
                 document.getElementById('spotify-play-btn').innerText = d.is_playing ? '⏸' : '▶';
                 if (d.is_playing && !widget.classList.contains('active')) {
                     widget.style.display = 'block';
@@ -3508,31 +3889,62 @@
             const future = _calEvents
                 .filter(e => { try { return new Date(e.time.replace(' ', 'T')) >= now; } catch { return true; } })
                 .slice(0, 12);
+            list.innerHTML = '';
             if (!future.length) {
-                list.innerHTML = '<div class="cal-empty">NESSUN EVENTO</div>';
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'cal-empty';
+                emptyDiv.textContent = 'NESSUN EVENTO';
+                list.appendChild(emptyDiv);
                 return;
             }
             const _esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-            list.innerHTML = future.map(e => {
+            future.forEach(e => {
                 const dt = new Date(e.time.replace(' ', 'T'));
                 const isToday = dt.toDateString() === now.toDateString();
                 const dateLabel = isToday ? 'OGGI' : dt.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
                 const timeLabel = isNaN(dt) ? _esc(e.time) : dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
                 const title = _esc(e.title || '');
-                const _lnk = e.link ? (() => { try { const _p = new URL(e.link); return (_p.protocol==='https:'||_p.protocol==='http:') ? _p.href : ''; } catch(_){return '';} })() : '';
-                return `<div class="cal-event-item${isToday ? ' today' : ''}"${_lnk ? ` data-url="${_esc(_lnk)}"` : ''} style="${_lnk ? 'cursor:pointer;' : ''}">
-                    <div class="cal-event-info">
-                        <div class="cal-event-title">${title}</div>
-                        <div class="cal-event-source">${e.source === 'google' ? 'GOOGLE' : 'MAYA'}</div>
-                    </div>
-                    <div class="cal-event-date">
-                        <div class="cal-date-sub">${dateLabel}</div>
-                        <div class="cal-time-main">${timeLabel}</div>
-                    </div>
-                </div>`;
-            }).join('');
-            list.querySelectorAll('[data-url]').forEach(el => {
-                el.addEventListener('click', () => setLayout('browser', { url: el.dataset.url }));
+                const _lnk = e.link ? (() => { try { const _p = new URL(e.link); return (_p.protocol === 'https:' || _p.protocol === 'http:') ? _p.href : ''; } catch (_) { return ''; } })() : '';
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'cal-event-item' + (isToday ? ' today' : '');
+                if (_lnk) {
+                    itemDiv.dataset.url = _lnk;
+                    itemDiv.style.cursor = 'pointer';
+                    itemDiv.addEventListener('click', () => setLayout('browser', { url: _lnk }));
+                }
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'cal-event-info';
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'cal-event-title';
+                titleDiv.textContent = title;
+                
+                const sourceDiv = document.createElement('div');
+                sourceDiv.className = 'cal-event-source';
+                sourceDiv.textContent = e.source === 'google' ? 'GOOGLE' : 'MAYA';
+                
+                infoDiv.appendChild(titleDiv);
+                infoDiv.appendChild(sourceDiv);
+                
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'cal-event-date';
+                
+                const dateSubDiv = document.createElement('div');
+                dateSubDiv.className = 'cal-date-sub';
+                dateSubDiv.textContent = dateLabel;
+                
+                const timeMainDiv = document.createElement('div');
+                timeMainDiv.className = 'cal-time-main';
+                timeMainDiv.textContent = timeLabel;
+                
+                dateDiv.appendChild(dateSubDiv);
+                dateDiv.appendChild(timeMainDiv);
+                
+                itemDiv.appendChild(infoDiv);
+                itemDiv.appendChild(dateDiv);
+                list.appendChild(itemDiv);
             });
         }
 
@@ -3630,15 +4042,36 @@
             const fc = document.getElementById('weather-forecast-col');
             if (fc && data.daily) {
                 const _e = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                fc.innerHTML = data.daily.slice(0, 5).map(day => {
+                fc.innerHTML = '';
+                data.daily.slice(0, 5).forEach(day => {
                     const d = new Date(day.date).toLocaleDateString('it-IT', { weekday: 'short' }).toUpperCase();
                     const desc = _e((day.condition || day.description || '').toLowerCase());
-                    return `<div class="wx-fc-row">
-                        <span class="wx-fc-day">${d}</span>
-                        <span class="wx-fc-desc">${desc}</span>
-                        <span class="wx-fc-temps">${Math.round(day.max)}°<span class="wx-fc-min">${Math.round(day.min)}°</span></span>
-                    </div>`;
-                }).join('');
+                    
+                    const rowDiv = document.createElement('div');
+                    rowDiv.className = 'wx-fc-row';
+                    
+                    const daySpan = document.createElement('span');
+                    daySpan.className = 'wx-fc-day';
+                    daySpan.textContent = d;
+                    
+                    const descSpan = document.createElement('span');
+                    descSpan.className = 'wx-fc-desc';
+                    descSpan.textContent = desc;
+                    
+                    const tempsSpan = document.createElement('span');
+                    tempsSpan.className = 'wx-fc-temps';
+                    tempsSpan.textContent = `${Math.round(day.max)}°`;
+                    
+                    const minSpan = document.createElement('span');
+                    minSpan.className = 'wx-fc-min';
+                    minSpan.textContent = `${Math.round(day.min)}°`;
+                    
+                    tempsSpan.appendChild(minSpan);
+                    rowDiv.appendChild(daySpan);
+                    rowDiv.appendChild(descSpan);
+                    rowDiv.appendChild(tempsSpan);
+                    fc.appendChild(rowDiv);
+                });
             }
             if (data.lat && data.lon) {
                 lastWeatherLatLon = { lat: data.lat, lon: data.lon };
@@ -3708,10 +4141,11 @@
                 if (iframe && iframe.src) {
                     try {
                         const _ru = new URL(iframe.src);
-                        if (_ru.protocol !== 'https:') continue;
-                        const _safeSrc = _ru.href;
-                        iframe.setAttribute('src', '');
-                        setTimeout(() => { iframe.setAttribute('src', _safeSrc); }, 300 * i);
+                        if (_ru.protocol === 'https:') {
+                            const _safeSrc = _ru.href;
+                            iframe.src = 'about:blank';
+                            setTimeout(() => { iframe.src = _safeSrc; }, 300 * i);
+                        }
                     } catch (_) { /* invalid src — skip */ }
                 }
             }
@@ -3721,25 +4155,74 @@
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
             const _en = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
             const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? _en(p.href) : '#'; } catch(_){return '#';} };
-            document.getElementById('news-sidebar-list').innerHTML = articles.map((a, i) => {
+            const sidebarList = document.getElementById('news-sidebar-list');
+            sidebarList.innerHTML = '';
+            
+            articles.forEach((a, i) => {
                 const _u = _safeUrl(a.link);
-                return `<div class="ns-item"${_u !== '#' ? ` data-url="${_en(_u)}"` : ''} style="cursor:pointer;">
-                    <div class="ns-rank">${String(i + 1).padStart(2, '0')}</div>
-                    <div class="ns-content">
-                        <div class="ns-source">${_en(a.source || 'MAYA FEED')}</div>
-                        <div class="ns-title">${_en(a.title)}</div>
-                    </div>
-                </div>`;
-            }).join('');
-            document.getElementById('news-sidebar-list').querySelectorAll('[data-url]').forEach(el => {
-                el.addEventListener('click', () => setLayout('browser', { url: el.dataset.url }));
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'ns-item';
+                itemDiv.style.cursor = 'pointer';
+                if (_u !== '#') {
+                    itemDiv.dataset.url = _u;
+                    itemDiv.addEventListener('click', () => setLayout('browser', { url: _u }));
+                }
+                
+                const rankDiv = document.createElement('div');
+                rankDiv.className = 'ns-rank';
+                rankDiv.textContent = String(i + 1).padStart(2, '0');
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'ns-content';
+                
+                const sourceDiv = document.createElement('div');
+                sourceDiv.className = 'ns-source';
+                sourceDiv.textContent = _en(a.source || 'MAYA FEED');
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'ns-title';
+                titleDiv.textContent = _en(a.title);
+                
+                contentDiv.appendChild(sourceDiv);
+                contentDiv.appendChild(titleDiv);
+                itemDiv.appendChild(rankDiv);
+                itemDiv.appendChild(contentDiv);
+                sidebarList.appendChild(itemDiv);
             });
+
             // Ticker — all headlines scrolling
-            const tickerItems = articles.map(a =>
-                `<span class="ntk-label">${_en(a.source || 'NEWS')}</span><span class="ntk-sep">//</span><span class="ntk-item">${_en(a.title)}</span><span class="ntk-sep">///</span>`
-            ).join('');
             const track = document.getElementById('news-ticker-track');
-            track.innerHTML = tickerItems + tickerItems;
+            track.innerHTML = '';
+            
+            const appendTickerItems = () => {
+                articles.forEach(a => {
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'ntk-label';
+                    labelSpan.textContent = _en(a.source || 'NEWS');
+                    
+                    const sepSpan1 = document.createElement('span');
+                    sepSpan1.className = 'ntk-sep';
+                    sepSpan1.textContent = '//';
+                    
+                    const itemSpan = document.createElement('span');
+                    itemSpan.className = 'ntk-item';
+                    itemSpan.textContent = _en(a.title);
+                    
+                    const sepSpan2 = document.createElement('span');
+                    sepSpan2.className = 'ntk-sep';
+                    sepSpan2.textContent = '///';
+                    
+                    track.appendChild(labelSpan);
+                    track.appendChild(sepSpan1);
+                    track.appendChild(itemSpan);
+                    track.appendChild(sepSpan2);
+                });
+            };
+            
+            // Append twice to loop
+            appendTickerItems();
+            appendTickerItems();
         }
         // =============================================
         // SCENE PILL — feedback scena attiva
