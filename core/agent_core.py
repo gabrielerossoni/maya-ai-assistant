@@ -15,7 +15,7 @@ import httpx
 import ollama
 from dotenv import load_dotenv
 
-from .automation_engine import AutomationEngine, build_default_automations
+from .automation_engine import Automation, AutomationEngine, build_default_automations
 from .automation_engine import engine as automation_engine
 from .context_manager import context as home_context
 from .memory_manager import MemoryManager
