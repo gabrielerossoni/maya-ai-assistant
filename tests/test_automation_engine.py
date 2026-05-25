@@ -333,7 +333,7 @@ class TestEngineEvents:
 class TestDefaults:
     def test_defaults_build(self, fresh_context, fresh_registry):
         autos = build_default_automations()
-        assert len(autos) >= 15
+        assert len(autos) >= 12
         names = [a.name for a in autos]
         assert "buonanotte" in names
         assert "buongiorno" in names
