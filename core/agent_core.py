@@ -141,7 +141,6 @@ FILLER_MESSAGES = [
 ]
 
 
-
 class AgentCore:
     """
     Cuore del sistema agentico.
@@ -710,14 +709,10 @@ class AgentCore:
             scene_name = auto_result.name
             status = exec_result.get("status", "ok")
             reply = (
-                f"Scena '{scene_name}' eseguita."
-                if status == "ok"
-                else f"Scena '{scene_name}' completata con avvisi."
+                f"Scena '{scene_name}' eseguita." if status == "ok" else f"Scena '{scene_name}' completata con avvisi."
             )
             if self.socket_manager:
-                await self.socket_manager.broadcast(
-                    {"type": "scene_executed", "scene": scene_name, "status": status}
-                )
+                await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
             await self.memory.add_turn("jarvis", reply)
             self._set_final_layout(reply, {"type": "orb", "params": {}})
             yield reply

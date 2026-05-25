@@ -248,7 +248,8 @@ async def broadcast_state(agent, manager, MODELS):
                 if isinstance(arduino_tool.sim_state.get("light"), str)
                 else ("ON" if arduino_tool.sim_state.get("light") else "OFF")
             ).lower()
-            if arduino_connected else None
+            if arduino_connected
+            else None
         ),
         "servo": (
             (
@@ -256,11 +257,13 @@ async def broadcast_state(agent, manager, MODELS):
                 if isinstance(arduino_tool.sim_state.get("servo"), str)
                 else str(arduino_tool.sim_state.get("servo"))
             ).lower()
-            if arduino_connected else None
+            if arduino_connected
+            else None
         ),
         "servo2": (
             (arduino_tool.sim_state.get("servo2", 0) if isinstance(arduino_tool.sim_state.get("servo2"), int) else 0)
-            if arduino_connected else None
+            if arduino_connected
+            else None
         ),
         "rgb1": list(arduino_tool.sim_state.get("rgb1", [0, 0, 0])) if arduino_connected else None,
         "rgb2": list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])) if arduino_connected else None,
