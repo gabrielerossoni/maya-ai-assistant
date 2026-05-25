@@ -126,6 +126,7 @@ async def stats_broadcaster(manager, voice_manager):
             }
             try:
                 import GPUtil
+
                 gpus = GPUtil.getGPUs()
                 if gpus:
                     stats["gpu"] = round(gpus[0].load * 100, 1)

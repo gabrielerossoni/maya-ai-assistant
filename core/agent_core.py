@@ -674,7 +674,14 @@ class AgentCore:
             yield reply
             return
 
-        if _clean in ["chiudi chat", "nascondi chat", "chiudi la chat", "nascondi la chat", "chiudi console", "nascondi console"]:
+        if _clean in [
+            "chiudi chat",
+            "nascondi chat",
+            "chiudi la chat",
+            "nascondi la chat",
+            "chiudi console",
+            "nascondi console",
+        ]:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "toggle_console", "action": "close"})
             reply = "Console minimizzata."
