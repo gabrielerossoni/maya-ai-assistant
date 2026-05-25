@@ -32,7 +32,7 @@
             --text-dim: rgba(255, 255, 255, 0.4);
             --panel-bg: rgba(0, 0, 0, 0.95);
             --glass-border: 1px solid rgba(255, 0, 0, 0.5);
-            --transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition: all 0.9s cubic-bezier(0.4, 0, 0.2, 1);
             --hud-color: rgba(255, 0, 0, 0.4);
         }
 
@@ -314,11 +314,11 @@
             position: fixed;
             top: 45%;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%) scale(1);
             width: 420px;
             height: 420px;
             z-index: 100;
-            transition: var(--transition);
+            transition: top 0.9s cubic-bezier(0.25,0.1,0.25,1), left 0.9s cubic-bezier(0.25,0.1,0.25,1), transform 0.9s cubic-bezier(0.25,0.1,0.25,1);
             cursor: pointer;
             background: transparent;
         }
@@ -326,9 +326,8 @@
         #maya-orb-container.corner {
             top: 24px;
             left: 24px;
-            transform: translate(0, 0);
-            width: 80px;
-            height: 80px;
+            transform: translate(0, 0) scale(0.19);
+            transform-origin: top left;
             border: none !important;
             box-shadow: none !important;
             background: none !important;
@@ -1589,19 +1588,7 @@
            LOG STRIP
            ============================================= */
         #log-strip {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 10px 20px;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-            font-size: 12px;
-            color: var(--text-dim);
-            z-index: 100;
-            pointer-events: none;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: none;
         }
 
         /* =============================================
@@ -1694,6 +1681,22 @@
             font-size: 10px;
             letter-spacing: 2px;
             color: rgba(255, 255, 255, 0.82);
+        }
+
+        #chat-log-status-bar {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 10px;
+            color: rgba(255, 30, 30, 0.8);
+            letter-spacing: 1px;
+            padding: 5px 8px;
+            margin-bottom: 8px;
+            background: rgba(255, 30, 30, 0.06);
+            border: 1px solid rgba(255, 30, 30, 0.12);
+            border-radius: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
         }
 
         .chat-log-led {
@@ -2289,9 +2292,8 @@
             #maya-orb-container.corner {
                 top: calc(10px + env(safe-area-inset-top));
                 left: 15px;
-                transform: none;
-                width: 52px;
-                height: 52px;
+                transform: translate(0, 0) scale(0.236);
+                transform-origin: top left;
             }
 
             body.content-open #orb-branding {
@@ -2422,9 +2424,7 @@
 
             /* Log strip sopra la bottom nav */
             #log-strip {
-                bottom: 50px;
-                font-size: 9px;
-                padding: 4px 14px;
+                display: none;
                 background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
             }
 
@@ -2729,9 +2729,6 @@
                     padding-bottom: env(safe-area-inset-bottom);
                 }
 
-                #log-strip {
-                    bottom: calc(50px + env(safe-area-inset-bottom));
-                }
 
                 #cmd-container,
                 #cmd-container.corner {
@@ -2806,6 +2803,7 @@
             <div class="chat-log-title">CONSOLE LOG</div>
             <div class="chat-log-led" id="chat-log-led"></div>
         </div>
+        <div id="chat-log-status-bar">MAYA System Online...</div>
         <div id="chat-log-body"></div>
     </div>
     <div id="cmd-container">
@@ -3066,6 +3064,15 @@
                                         <div class="dom-metric-fill green" id="dom-ram-fill"></div>
                                     </div>
                                 </div>
+                                <div class="dom-metric">
+                                    <div class="dom-metric-row">
+                                        <span class="dom-metric-name">GPU</span>
+                                        <span class="dom-metric-val" id="dash-gpu">--%</span>
+                                    </div>
+                                    <div class="dom-metric-bar">
+                                        <div class="dom-metric-fill" id="dom-gpu-fill" style="background:linear-gradient(90deg,#a020f0,#ff1e1e);"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3188,6 +3195,11 @@
         let map;
         let audioContext, analyser, dataArray;
         let orbState = 'idle';
+        function setStatus(text) {
+            document.getElementById('log-strip').innerText = text;
+            const sb = document.getElementById('chat-log-status-bar');
+            if (sb) sb.textContent = text;
+        }
         // Three.js globals
         let scene, camera, renderer, mainOrb, orbUniforms, orbMotionState;
         let consoleStreamEl = null;
@@ -3242,7 +3254,7 @@
             cmdInput.placeholder = "Comando neurale...";
             // Nasconde tutti i panel
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            setTimeout(handleResize, 600);
+            smoothResize();
         }
         function startInactivityTimer(ms) {
             clearInactivityTimer();
@@ -3532,10 +3544,26 @@
             window.outerRingPoints = new THREE.Points(ringGeom, new THREE.PointsMaterial({ color: 0xff1e1e, size: 0.015, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }));
             scene.add(window.outerRingPoints);
         }
+        let _orbLastTime = null;
+        let _orbT = 0;
+        let _orbSkipFrame = false;
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                _orbLastTime = null;
+                _orbSkipFrame = true;
+                _orbSnapOnReturn = true;
+            }
+        });
+        let _orbSnapOnReturn = false;
         function animate(time) {
             requestAnimationFrame(animate);
             if (!renderer || !mainOrb) return;
-            const t = time * 0.001;
+            if (_orbLastTime === null) _orbLastTime = time;
+            const _dt = Math.min(time - _orbLastTime, 50);
+            _orbLastTime = time;
+            if (_orbSkipFrame) { _orbSkipFrame = false; _orbT += 0; }
+            else { _orbT += _dt * 0.001; }
+            const t = _orbT;
             const rgb = getComputedStyle(document.documentElement).getPropertyValue('--orb-color').trim() || "255, 30, 30";
             const color = new THREE.Color(`rgb(${rgb})`);
             let audioLevel = 0;
@@ -3554,18 +3582,33 @@
             };
             const target = stateTargets[orbState] || stateTargets.idle;
             const lerp = THREE.MathUtils.lerp;
-            orbMotionState.scale = lerp(orbMotionState.scale, target.scale, 0.08);
-            orbMotionState.sceneScale = lerp(orbMotionState.sceneScale, target.sceneScale, 0.08);
-            orbMotionState.glowScale = lerp(orbMotionState.glowScale, target.glowScale, 0.08);
-            orbMotionState.glowOpacity = lerp(orbMotionState.glowOpacity, target.glowOpacity, 0.08);
-            orbMotionState.nebulaOpacity = lerp(orbMotionState.nebulaOpacity, target.nebulaOpacity, 0.08);
-            orbMotionState.nebulaSpeed = lerp(orbMotionState.nebulaSpeed, target.nebulaSpeed, 0.08);
-            orbMotionState.ringSpeed = lerp(orbMotionState.ringSpeed, target.ringSpeed, 0.08);
-            orbMotionState.rotationX = lerp(orbMotionState.rotationX, target.rotationX, 0.08);
-            orbMotionState.rotationY = lerp(orbMotionState.rotationY, target.rotationY, 0.08);
-            orbMotionState.rotationZ = lerp(orbMotionState.rotationZ, target.rotationZ, 0.08);
-            orbMotionState.pulse = lerp(orbMotionState.pulse, target.pulse, 0.12);
-            orbMotionState.stateMix = lerp(orbMotionState.stateMix, target.stateMix, 0.08);
+            if (_orbSnapOnReturn) {
+                _orbSnapOnReturn = false;
+                orbMotionState.scale = target.scale;
+                orbMotionState.sceneScale = target.sceneScale;
+                orbMotionState.glowScale = target.glowScale;
+                orbMotionState.glowOpacity = target.glowOpacity;
+                orbMotionState.nebulaOpacity = target.nebulaOpacity;
+                orbMotionState.nebulaSpeed = target.nebulaSpeed;
+                orbMotionState.ringSpeed = target.ringSpeed;
+                orbMotionState.rotationX = target.rotationX;
+                orbMotionState.rotationY = target.rotationY;
+                orbMotionState.rotationZ = target.rotationZ;
+                orbMotionState.pulse = target.pulse;
+                orbMotionState.stateMix = target.stateMix;
+            } else {
+                orbMotionState.scale = lerp(orbMotionState.scale, target.scale, 0.08);
+                orbMotionState.sceneScale = lerp(orbMotionState.sceneScale, target.sceneScale, 0.08);
+                orbMotionState.glowScale = lerp(orbMotionState.glowScale, target.glowScale, 0.08);
+                orbMotionState.glowOpacity = lerp(orbMotionState.glowOpacity, target.glowOpacity, 0.08);
+                orbMotionState.nebulaOpacity = lerp(orbMotionState.nebulaOpacity, target.nebulaOpacity, 0.08);
+                orbMotionState.nebulaSpeed = lerp(orbMotionState.nebulaSpeed, target.nebulaSpeed, 0.08);
+                orbMotionState.ringSpeed = lerp(orbMotionState.ringSpeed, target.ringSpeed, 0.08);
+                orbMotionState.rotationX = lerp(orbMotionState.rotationX, target.rotationX, 0.08);
+                orbMotionState.rotationY = lerp(orbMotionState.rotationY, target.rotationY, 0.08);
+                orbMotionState.rotationZ = lerp(orbMotionState.rotationZ, target.rotationZ, 0.08);
+                orbMotionState.pulse = lerp(orbMotionState.pulse, target.pulse, 0.12);
+            }
             orbUniforms.uTime.value = t;
             orbUniforms.uAudioLevel.value = lerp(orbUniforms.uAudioLevel.value, audioLevel, 0.12);
             orbUniforms.uStateMix.value = orbMotionState.stateMix;
@@ -3607,7 +3650,10 @@
         function handleResize() {
             const container = document.getElementById('maya-orb-container');
             const w = container.clientWidth, h = container.clientHeight;
-            if (renderer) { renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+            if (renderer && w > 10 && h > 10) { renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+        }
+        function smoothResize() {
+            handleResize();
         }
         window.addEventListener('resize', () => {
             const bgCanvas = document.getElementById('bg-canvas');
@@ -3711,15 +3757,20 @@
                         const f = document.getElementById('dom-ram-fill');
                         if (f) f.style.width = Math.min(100, d.memory) + '%';
                     }
+                    if (d.gpu !== undefined) {
+                        document.getElementById('dash-gpu').innerText = `${Math.round(d.gpu)}%`;
+                        const f = document.getElementById('dom-gpu-fill');
+                        if (f) f.style.width = Math.min(100, d.gpu) + '%';
+                    }
                 }
                 if (d.type === 'spotify') updateSpotify(d);
                 if (d.type === 'stream') {
-                    document.getElementById('log-strip').innerText = d.full_text;
+                    setStatus(d.full_text);
                     upsertConsoleStream(d.full_text);
                 }
                 if (d.type === 'log') {
                     appendConsoleLog(d.text || '', d.level || 'system');
-                    document.getElementById('log-strip').innerText = d.text || 'MAYA LOG';
+                    setStatus(d.text || 'MAYA LOG');
                     finalizeConsoleStream();
                 }
                 if (d.type === 'toggle_console') {
@@ -3728,7 +3779,7 @@
                 if (d.type === 'scene_executed') updateScenePill(d.scene, d.status);
             };
             ws.onopen = () => {
-                document.getElementById('log-strip').innerText = "MAYA Neural Link Established.";
+                setStatus('MAYA Neural Link Established.');
                 updateConsoleLed(true);
                 appendConsoleLog('MAYA Neural Link Established.', 'system');
                 initAudio();
@@ -3749,7 +3800,7 @@
             const voiceClasses = ['idle', 'listening', 'processing', 'speaking', 'calibrating'];
             voiceClasses.forEach(c => document.body.classList.remove(c));
             if (status) document.body.classList.add(status.toLowerCase());
-            document.getElementById('log-strip').innerText = `MAYA | ${orbState.toUpperCase()}`;
+            setStatus(`MAYA | ${orbState.toUpperCase()}`);
             if (status === 'listening' || status === 'processing' || status === 'speaking') {
                 // Qualsiasi attività vocale → entra in work-mode (prima attivazione)
                 enterWorkMode();
@@ -3774,7 +3825,7 @@
                 cmd.classList.remove('corner');
                 document.body.classList.remove('content-open');
                 cmdInput.placeholder = "Comando neurale...";
-                setTimeout(handleResize, 600);
+                smoothResize();
                 return;
             }
             // Apre work-mode se non già attivo
@@ -3784,7 +3835,7 @@
             cmd.classList.add('corner');
             document.body.classList.add('content-open');
             cmdInput.placeholder = "comando...";
-            setTimeout(handleResize, 600);
+            smoothResize();
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             const target = document.getElementById(`panel-${layout}`);
             if (target) target.classList.add('active');
@@ -3860,7 +3911,7 @@
                     if (spotifyTimeout) clearTimeout(spotifyTimeout);
                     spotifyTimeout = setTimeout(closeSpotifyWidget, 60000);
                 }
-                document.getElementById('log-strip').innerText = `♫ SPOTIFY: ${d.track} - ${d.artist}`;
+                setStatus(`♫ SPOTIFY: ${d.track} - ${d.artist}`);
             }
         }
         function closeSpotifyWidget() {
@@ -4275,7 +4326,7 @@
                 pill.style.opacity = '1';
             }
             // Log strip
-            document.getElementById('log-strip').innerText = `[SCENA] ${sceneName} — ${status.toUpperCase()}`;
+            setStatus(`[SCENA] ${sceneName} — ${status.toUpperCase()}`);
         }
         // Stato locale dispositivi per la mappa casa
         const domState = {
