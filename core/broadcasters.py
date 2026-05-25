@@ -234,29 +234,38 @@ async def broadcast_state(agent, manager, MODELS):
 
     _debug_reset_client = os.environ.get("MAYA_DEBUG_RESET_CLIENT", "").strip().lower() in ("1", "true", "yes")
 
+    arduino_connected = arduino_tool and not arduino_tool.simulated
     state_payload = {
         "type": "state",
         "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, "memory") else 0,
         "memTurns": len(agent.memory.turns) if hasattr(agent, "memory") else 0,
         "ollama": "ONLINE" if ollama_online else "OFFLINE",
         "models": models_status,
+        "arduino_connected": arduino_connected,
         "led": (
-            arduino_tool.sim_state.get("light", "OFF")
-            if isinstance(arduino_tool.sim_state.get("light"), str)
-            else ("ON" if arduino_tool.sim_state.get("light") else "OFF")
-        ).lower(),
-        "servo": (
-            arduino_tool.sim_state.get("servo", "CLOSED")
-            if isinstance(arduino_tool.sim_state.get("servo"), str)
-            else str(arduino_tool.sim_state.get("servo"))
-        ).lower(),
-        "servo2": (
-            arduino_tool.sim_state.get("servo2", 0) if isinstance(arduino_tool.sim_state.get("servo2"), int) else 0
+            (
+                arduino_tool.sim_state.get("light", "OFF")
+                if isinstance(arduino_tool.sim_state.get("light"), str)
+                else ("ON" if arduino_tool.sim_state.get("light") else "OFF")
+            ).lower()
+            if arduino_connected else None
         ),
-        "rgb1": list(arduino_tool.sim_state.get("rgb1", [0, 0, 0])),
-        "rgb2": list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])),
-        "rgb3": list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])),
-        "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)),
+        "servo": (
+            (
+                arduino_tool.sim_state.get("servo", "CLOSED")
+                if isinstance(arduino_tool.sim_state.get("servo"), str)
+                else str(arduino_tool.sim_state.get("servo"))
+            ).lower()
+            if arduino_connected else None
+        ),
+        "servo2": (
+            (arduino_tool.sim_state.get("servo2", 0) if isinstance(arduino_tool.sim_state.get("servo2"), int) else 0)
+            if arduino_connected else None
+        ),
+        "rgb1": list(arduino_tool.sim_state.get("rgb1", [0, 0, 0])) if arduino_connected else None,
+        "rgb2": list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])) if arduino_connected else None,
+        "rgb3": list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])) if arduino_connected else None,
+        "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)) if arduino_connected else None,
         "system": {
             "model": MODELS.get("router", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),

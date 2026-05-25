@@ -501,13 +501,16 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.HIGH,
                 cooldown=300,
                 actions=[
+                    spotify("pause"),
                     arduino("light", 0),
+                    arduino("relay", 0),
                     arduino("servo", 0),
-                    Action(tool="network", params={"message": "GOODNIGHT"}),
-                    Action(tool="system", params={"command": "shutdown"}),
+                    arduino("rgb", 0x000008),
+                    calendar_action("list"),
                 ],
             ),
-            aliases=["buona notte", "bonne nuit", "notte", "vado a dormire", "va a dormire"],
+            aliases=["buona notte", "bonne nuit", "notte", "vado a dormire", "va a dormire",
+                     "dormo", "vado a letto", "a letto", "ora di dormire"],
             triggers=[
                 Trigger(type="time", time="23:30"),
             ],
@@ -550,38 +553,6 @@ def build_default_automations() -> list[Automation]:
             ),
             aliases=["svegliami", "dammi la sveglia"],
         ),
-        # ── Modalità lavoro ───────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="modalità lavoro",
-                priority=Priority.NORMAL,
-                cooldown=60,
-                actions=[
-                    arduino("light", 1),
-                    Action(tool="system", params={"command": "open_browser"}),
-                    Action(tool="network", params={"message": "WORK_MODE"}),
-                ],
-            ),
-            aliases=["lavoro", "work mode"],
-            triggers=[
-                Trigger(type="event", event_name="app_opened:vscode"),
-                Trigger(type="event", event_name="app_opened:jetbrains"),
-            ],
-        ),
-        # ── Modalità studio ───────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="modalità studio",
-                priority=Priority.NORMAL,
-                cooldown=60,
-                actions=[
-                    arduino("light", 1),
-                    arduino("relay", 0),
-                    arduino("rgb", 0xFFEE99),
-                ],
-            ),
-            aliases=["studio"],
-        ),
         # ── Modalità film ─────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -595,23 +566,6 @@ def build_default_automations() -> list[Automation]:
                 ],
             ),
             aliases=["film", "cinema", "guardo un film"],
-        ),
-        # ── Modalità gaming ───────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="modalità gaming",
-                priority=Priority.NORMAL,
-                cooldown=60,
-                actions=[
-                    arduino("light", 0),
-                    arduino("relay", 1),
-                    Action(tool="system", params={"command": "open_browser"}),
-                ],
-            ),
-            aliases=["gaming", "gioco"],
-            triggers=[
-                Trigger(type="event", event_name="headphones_connected"),
-            ],
         ),
         # ── Modalità relax ────────────────────────────────────────────────────
         Automation(
@@ -646,20 +600,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="context", context={"time_slot": "night", "presence": "home"}),
             ],
         ),
-        # ── Modalità ospite ───────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="modalità ospite",
-                priority=Priority.HIGH,
-                actions=[
-                    arduino("light", 1),
-                    arduino("relay", 1),
-                    arduino("rgb", 0xFFFFFF),
-                    arduino("servo", 90),
-                ],
-            ),
-            aliases=["ospite"],
-        ),
         # ── Ospiti in arrivo ──────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -667,13 +607,15 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.HIGH,
                 cooldown=120,
                 actions=[
-                    arduino("servo2", 90),
+                    arduino("light", 1),
+                    arduino("relay", 1),
+                    arduino("rgb", 0xFFFFFF),
                     arduino("servo", 90),
-                    arduino("neopixel", 0xFFEECC, effect=1),
+                    arduino("servo2", 90),
                     Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "startup"}),
                 ],
             ),
-            aliases=["arrivano ospiti", "stanno arrivando"],
+            aliases=["ospite", "modalità ospite", "arrivano ospiti", "stanno arrivando"],
         ),
         # ── Vado fuori ────────────────────────────────────────────────────────
         Automation(
@@ -686,15 +628,13 @@ def build_default_automations() -> list[Automation]:
                     arduino("relay", 0),
                     arduino("rgb", 0),
                     arduino("servo", 0),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer", "value": 1}),
+                    arduino("servo2", 0),
+                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "ok"}),
                     spotify("pause"),
                     weather_action(),
                 ],
             ),
-            aliases=["esco", "me ne vado", "vado via"],
-            triggers=[
-                Trigger(type="event", event_name="phone_left_wifi"),
-            ],
+            aliases=["esco", "me ne vado", "vado via", "uscita", "modalità uscita"],
         ),
         # ── Sono rientrato ────────────────────────────────────────────────────
         Automation(
@@ -716,39 +656,6 @@ def build_default_automations() -> list[Automation]:
             triggers=[
                 Trigger(type="event", event_name="phone_joined_wifi"),
             ],
-        ),
-        # ── Ora di dormire ────────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="ora di dormire",
-                priority=Priority.HIGH,
-                cooldown=600,
-                actions=[
-                    spotify("pause"),
-                    arduino("light", 0),
-                    arduino("relay", 0),
-                    arduino("servo", 0),
-                    arduino("rgb", 0x000008),
-                    calendar_action("list"),
-                ],
-            ),
-            aliases=["dormo", "vado a letto", "a letto"],
-        ),
-        # ── Modalità uscita ───────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="modalità uscita",
-                priority=Priority.HIGH,
-                actions=[
-                    arduino("light", 0),
-                    arduino("relay", 0),
-                    arduino("rgb", 0),
-                    arduino("servo", 0),
-                    arduino("servo2", 0),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "ok"}),
-                ],
-            ),
-            aliases=["uscita"],
         ),
         # ── Allarme ───────────────────────────────────────────────────────────
         Automation(
@@ -783,22 +690,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="context", context={"weather": "rain"}),
             ],
         ),
-        # ── Pausa caffè ───────────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="pausa caffè",
-                priority=Priority.NORMAL,
-                cooldown=1200,
-                actions=[
-                    arduino("relay", 1),
-                    arduino("rgb", 0x8B4513),
-                    spotify("search", query="espresso morning jazz"),
-                    news_action(limit=3),
-                    timer_action(3, "Caffè pronto!"),
-                ],
-            ),
-            aliases=["caffe", "caffè", "faccio un caffè"],
-        ),
         # ── Cena ──────────────────────────────────────────────────────────────
         Automation(
             scene=Scene(
@@ -817,38 +708,6 @@ def build_default_automations() -> list[Automation]:
                 Trigger(type="time", time="20:00"),
                 Trigger(type="context", context={"time_slot": "evening", "presence": "home"}),
             ],
-        ),
-        # ── Bambini dormono ───────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="bambini dormono",
-                priority=Priority.HIGH,
-                actions=[
-                    spotify("pause"),
-                    arduino("light", 0),
-                    arduino("relay", 0),
-                    arduino("rgb", 0x000003),
-                    arduino("servo", 0),
-                ],
-            ),
-            aliases=["bambini a letto"],
-        ),
-        # ── Weekend mattina ───────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="weekend mattina",
-                priority=Priority.LOW,
-                cooldown=3600,
-                actions=[
-                    arduino("light", 0),
-                    arduino("rgb", 0xFFCC88),
-                    arduino("relay", 0),
-                    spotify("search", query="lazy sunday morning playlist"),
-                    weather_action(),
-                    news_action(limit=5),
-                ],
-            ),
-            aliases=["weekend", "sabato mattina", "domenica mattina"],
         ),
     ]
 

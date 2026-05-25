@@ -14,7 +14,7 @@
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** Maggio 2026 — **Merge `new_main → main`**, CI GitHub Actions attivo (62 test), lint fixes su `tools/`, **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
+> **Ultimo aggiornamento:** Maggio 2026 — **Merge `new_main → main`**, CI GitHub Actions attivo (62 test), lint fixes su `tools/`, **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione automazioni statiche legacy** (`AUTOMATIONS` + `AUTOMATION_ALIASES` + fallback in `_check_automation` rimossi — solo engine OO), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -31,7 +31,7 @@ La differenza rispetto ai sistemi già esistenti:
 - **Gestione multi-scenario** — non un singolo dispositivo acceso/spento, ma un ambiente coordinato
 - **Dashboard HUD dinamica** — pannello "STATO CASA // LIVE" con stato real-time di ogni dispositivo
 - **Linguaggio naturale in italiano** — comandi normali, senza formule rigide
-- **21+ scene OO** — modalità studio, notte, film, relax, gaming, lavoro, uscita, ospite, allarme + scene giornaliere (buongiorno, sveglia, cena, piove, weekend, pausa caffè e altre) con priorità, cooldown e trigger automatici
+- **12 scene OO** — modalità notte, film, relax, allarme + scene giornaliere (buongiorno, buonanotte, sveglia, cena, piove, ospiti in arrivo, vado fuori, sono rientrato) con priorità, cooldown e trigger automatici
 
 ---
 
@@ -220,25 +220,22 @@ Comunicazione seriale **115200 baud**, una riga JSON per messaggio, terminata co
 {"id": -1, "status": "error", "msg": "parse_fail"}
 ```
 
-Senza Arduino connesso il sistema entra automaticamente in **modalità simulazione** — nessuna modifica al codice necessaria.
+Senza Arduino connesso i comandi hardware ritornano errore e la dashboard mostra `—` su tutti i dispositivi — nessun dato fittizio.
 
 ---
 
 ## Scene e Automazioni
 
-Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), pulsanti dashboard o voce.
+Le scene sono attivabili via linguaggio naturale (*"Maya, modalità notte"*), pulsanti dashboard o voce.
 
 **Scene ambiente:**
 
 | Scena | Luci | Relay | Servo | RGB | Buzzer | Altro |
 |---|---|---|---|---|---|---|
 | `modalità notte` | ❌ | ❌ | 0° | `#000022` blu scuro | — | Spotify pause |
-| `modalità studio` | ✅ | ❌ | — | `#FFEE99` caldo | — | — |
 | `modalità film` | ❌ | ✅ | — | `#220000` rosso tenue | — | — |
 | `modalità relax` | ❌ | ✅ | — | `#440055` viola | — | — |
-| `modalità uscita` | ❌ | ❌ | 0° | spento | ✅ 1 bip | — |
-| `modalità ospite` | ✅ | ✅ | 90° | `#FFFFFF` bianco | — | — |
-| `allarme` | — | — | — | `#FF0000` rosso | ✅ | — |
+| `allarme` | — | — | — | `#FF0000` rosso | ✅ melody alarm | — |
 
 **Scene giornaliere:**
 
@@ -246,32 +243,29 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità studio"*), p
 |---|---|---|
 | `buongiorno` | Luce + RGB alba `#FFD580` | Meteo, notizie, calendario, Spotify mattina |
 | `sveglia` | Buzzer + luce piena + RGB bianco | Spotify energetico |
+| `buonanotte` | Tutto spento, RGB blu notte `#000008` | Spotify pause, calendario domani |
 | `cena` | RGB arancio `#FF4400`, tutto soffuso | Spotify cena romantica |
-| `ospiti in arrivo` | Luce + porta aperta 90° + RGB caldo | Spotify house party |
-| `vado fuori` | Tutto spento, porta chiusa, bip | Spotify pause, meteo |
+| `ospiti in arrivo` | Luce + relay ON, RGB bianco `#FFFFFF`, porta + cancello 90°, melody startup | — |
+| `vado fuori` | Tutto spento, servo + cancello chiusi, melody ok | Spotify pause, meteo |
 | `sono rientrato` | Luce + porta 90° + RGB `#FF8C42` | Timer 5min chiudi porta, notizie |
-| `ora di dormire` | Tutto spento, RGB blu `#000008` | Spotify pause, calendario domani |
 | `piove` | Porta chiusa, luce + RGB blu `#4488FF` | Spotify lofi, meteo |
-| `pausa caffè` | Relay ON (macchinetta) + RGB marrone | Spotify jazz, timer 3min, notizie |
-| `bambini dormono` | Tutto spento silenzioso | Spotify pause |
-| `weekend mattina` | RGB ambra `#FFCC88` soffusa | Spotify lazy, meteo, notizie |
 
 ---
 
 ## Caratteristiche
 
 - **Agentic ReAct Loop** — ciclo asincrono Ragiona → Agisci → Osserva con routing ibrido dell'intent
-- **Automation Engine OO** — 21+ scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno, scheduler asincrono
+- **Automation Engine OO** — 12 scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno, scheduler asincrono
 - **Context Manager** — stato globale casa thread-safe e persistente: time slot, presenza, meteo, attività, scena attiva, flag custom
 - **Device Registry** — memoria persistente dei dispositivi con tracciamento `last_set_by` e conflict detection tra scene
 - **Voice I/O Integrato** — STT via `faster-whisper` (small) e TTS via `Piper` (voce Paola) con VAD adattivo
 - **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window
-- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 18 chip scene con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify
+- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 12 chip scene con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify
 - **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`
 - **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout
 - **Stato Casa Live** — pannello aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
 - **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` pubblica ai client ogni 30 s
-- **Graceful Degradation** — senza Arduino → simulazione automatica; `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline
+- **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline
 - **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente i card della dashboard via WebSocket
 
 ---
@@ -849,7 +843,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Firmware Arduino JSON 115200 baud** — controllo completo di LED, relay, servo, RGB, buzzer, DHT11.
 - [x] **Protocollo telemetria automatica da DHT11** — invio automatico dei dati sensore ogni 5 s.
 - [x] **Pannello "STATO CASA // LIVE"** — visualizzazione istantanea del funzionamento di ogni dispositivo.
-- [x] **21+ scene OO configurate** — scenari domotici pronti all'uso con priorità, cooldown, condizioni contestuali e trigger automatici.
+- [x] **12 scene OO configurate** — scenari domotici pronti all'uso con priorità, cooldown, condizioni contestuali e trigger automatici.
 - [x] **`sensor_broadcaster`** — aggiornamento automatico temperatura/umidità ogni 30 s.
 - [x] **`SPOTIFY_ENABLED` flag** — abilitazione e disattivazione dinamica del controllo Spotify.
 - [x] **`OLLAMA_ENABLED` flag** — fallback sicuro su Groq o Keyword parser se Ollama locale è offline.
@@ -885,19 +879,21 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Automation Engine OO** — refactoring completo del sistema automazioni: classi `Action`, `Condition`, `Trigger`, `Scene`, `Automation`, `AutomationEngine`, `EventBus`. Supporto priorità, cooldown, conflict detection, retry, timeout, scheduler asincrono, event log strutturato, automazioni temporanee con scadenza.
 - [x] **ContextManager** — singleton thread-safe con persistenza JSON: traccia time slot, presenza, meteo, attività, scena attiva, flag. Metodo `matches()` per condizioni complesse (valore singolo, lista OR, negazione).
 - [x] **DeviceRegistry** — singleton con persistenza JSON: ogni dispositivo ha stato, `last_set_by` e timestamp. Conflict detection tra scene, sync automatico dallo stato Arduino.
-- [x] **Dashboard scene chips** — 18 chip scene con feedback visivo live: il chip attivo si evidenzia verde/arancio al completamento via `scene_executed` WebSocket; pill header mostra la scena corrente.
+- [x] **Dashboard scene chips** — 12 chip scene con feedback visivo live: il chip attivo si evidenzia verde/arancio al completamento via `scene_executed` WebSocket; pill header mostra la scena corrente.
 - [x] **Velocizzazione risposte IA** — TTS streaming frase-per-frase (parla mentre genera), timeout Groq ridotti (15→8s), early exit più permissivo, cache intent pre-popolata, eliminazione sleep tra token yield, max_tokens CHITCHAT ridotto.
 - [x] **Speaker Gikfun 8Ω 2W** — Sostituisce buzzer2 su pin 3 con speaker di qualità superiore. Nuove melodie: `notify`, `error`, `welcome`. Alias `speaker` nel tool Python e nel prompt LLM.
 - [x] **Refactoring `main.py`** — Riduzione da 894 a ~230 righe. Logica estratta in moduli dedicati: `core/ollama_manager.py`, `core/ngrok_manager.py`, `core/server_utils.py`, `core/broadcasters.py`, `core/routes.py`. Zero cambiamenti di comportamento, smoke test aggiunto.
 - [x] **CI GitHub Actions** — Pipeline `ci.yml` su ogni push: lint `ruff`, test `pytest` (62 test), Python 3.13.
 - [x] **Lint fix `tools/`** — Risolti import non ordinati (I001), whitespace su righe vuote (W293/W291), variabile inutilizzata F841, newline finale W292 in tutti i tool.
 - [x] **Merge `new_main → main`** — Branch principale aggiornato via PR con fast-forward pulito.
+- [x] **Rimozione automazioni statiche legacy** — Eliminati `AUTOMATIONS`, `AUTOMATION_ALIASES` e il fallback `isinstance` in `_check_automation()` da `agent_core.py`. Il sistema usa esclusivamente l'`AutomationEngine` OO per risoluzione, alias e esecuzione delle scene.
+- [x] **Pulizia scene** — Ridotte da 21 a 12 scene: rimosse modalità lavoro, studio, gaming, pausa caffè, bambini dormono, weekend mattina; `ora di dormire` accorpata in `buonanotte`; `modalità uscita` accorpata in `vado fuori`; `modalità ospite` accorpata in `ospiti in arrivo` (luce, relay, RGB bianco, porta+cancello 90°, melody). Dashboard chip e `SCENE_CHIP_MAP` aggiornati di conseguenza.
+- [x] **Rimozione simulazione Arduino** — `_simulate()` ritorna errore invece di dati fittizi; `broadcast_state` invia `null` per tutti i campi hardware se Arduino non connesso; dashboard mostra `—` sui card invece di valori falsi.
 
 ### 🔲 In corso / Prossimi
 
 - [ ] **Trigger da processi OS** — `app_opened:vscode` / `app_opened:spotify` rilevati via `psutil` nel `ProactiveManager` → pubblica su `EventBus` per attivare automazioni contestuali.
 - [ ] **Trigger Wi-Fi telefono** — monitor DHCP lease → `bus.publish("phone_joined_wifi" | "phone_left_wifi")` per automazioni presenze.
-- [ ] **Rimozione dizionario statico** — una volta stabilizzato il nuovo engine, eliminare `AUTOMATIONS` e `AUTOMATION_ALIASES` legacy da `agent_core.py`.
 - [ ] **Multi-room multi-board MQTT** — Espansione del protocollo MQTT per gestire schede Arduino R4 WiFi multiple allocate in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
 - [ ] **Suite di test asincroni end-to-end** — Consolidamento e riscrittura dei test di integrazione per validare il comportamento dei moduli asincroni (`proactive_manager`, `self_healer`, `automation_engine`) simulando risposte hardware e interruzioni di rete.
 
