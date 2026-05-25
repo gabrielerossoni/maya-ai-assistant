@@ -21,6 +21,7 @@ deep-translator
 duckduckgo-search
 yfinance
 psutil
+GPUtil
 keyboard
 python-dotenv
 spotipy

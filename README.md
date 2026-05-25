@@ -14,7 +14,7 @@
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** Maggio 2026 — **Merge `new_main → main`**, CI GitHub Actions attivo (62 test), lint fixes su `tools/`, **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione automazioni statiche legacy** (`AUTOMATIONS` + `AUTOMATION_ALIASES` + fallback in `_check_automation` rimossi — solo engine OO), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
+> **Ultimo aggiornamento:** 25 Maggio 2026 — **Monitoraggio GPU** (GPUtil), **Refinement orb animations** (CSS scale), **XSS Security Fixes** (DOM API), **Sync Audio/Orb** (SPEAKING broadcast post-synthesis), **Merge `new_main → main`**, CI GitHub Actions attivo (62 test), lint fixes su `tools/`, **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione automazioni statiche legacy** (`AUTOMATIONS` + `AUTOMATION_ALIASES` + fallback in `_check_automation` rimossi — solo engine OO), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -283,7 +283,7 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità notte"*), pu
 | Notizie | feedparser (RSS ANSA) |
 | Ricerca | DuckDuckGo Search |
 | Traduzione | deep-translator (Google backend) |
-| Monitoraggio | psutil |
+| Monitoraggio | psutil + GPUtil |
 | Media | Spotify API (opzionale) |
 | Interfaccia | Three.js (orb 3D) + Leaflet.js (mappe) + TradingView Widget |
 | Persistenza | ChromaDB (vettoriale) + JSON locale |
@@ -345,7 +345,7 @@ maya/
 │       └── maya_controller.ino  # Firmware: LED, relay, servo, RGB, buzzer, DHT11
 │
 ├── static/
-│   ├── jarvis_dashboard.html  # SPA dashboard HUD — slider, Three.js orb, pannelli live
+│   ├── maya_dashboard.html    # SPA dashboard HUD — slider, Three.js orb, pannelli live
 │   ├── sfondo-maya.png
 │   ├── maya_logo.png
 │   └── maya_logo_no_sfondo.png
@@ -873,6 +873,10 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Proattività contestuale avanzata (`proactive_manager.py`)** — rilevamento attivo e suggerimenti intelligenti (LLM Groq `llama-3.1-8b-instant`) basati su anomalie fisiche dei sensori, promemoria, orario e memoria storica, controllati da filtri di cooldown a 10 minuti.
 - [x] **Apprendimento statistico delle preferenze utente (`preference_learner.py`)** — monitoraggio delle abitudini (frequenza scene, orari di maggiore attività, tool usati) con persistenza in `data/user_preferences.json` e iniezione automatica delle preferenze del profilo utente nel prompt di sistema di MAYA.
 - [x] **Risoluzione blocco asincrono Voice Manager (`voice_manager.py`)** — conversione della lettura vocale delle notizie da `time.sleep` sincrono e bloccante ad `await asyncio.sleep` asincrono non-bloccante, garantendo la fluidità della dashboard HUD.
+- [x] **Monitoraggio GPU (`broadcasters.py`)** — integrazione di `GPUtil` per il tracciamento del carico GPU real-time, visualizzato nelle statistiche della dashboard.
+- [x] **Sicurezza XSS Dashboard** — refactoring dei widget (meteo, news) per utilizzare le API DOM native (`textContent`, `createElement`) invece di `innerHTML`, eliminando vulnerabilità da injection.
+- [x] **Sync Audio/Orb** — ottimizzazione del broadcast dello stato `SPEAKING` post-sintesi Piper per una perfetta sincronia tra animazione dell'orb e output audio.
+- [x] **Refinement UI/UX** — ottimizzazione transizioni orb via CSS scale, eliminazione jitter al cambio tab e integrazione della barra di stato console nel layout HUD.
 
 ### ✅ Recenti
 

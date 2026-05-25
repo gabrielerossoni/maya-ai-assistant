@@ -124,6 +124,14 @@ async def stats_broadcaster(manager, voice_manager):
                 # Allinea widget voce anche se alcuni broadcast si perdono
                 "voice_status": voice_manager.get_dashboard_voice_status(),
             }
+            try:
+                import GPUtil
+
+                gpus = GPUtil.getGPUs()
+                if gpus:
+                    stats["gpu"] = round(gpus[0].load * 100, 1)
+            except Exception:
+                pass
             await manager.broadcast(stats)
         except Exception:
             pass
