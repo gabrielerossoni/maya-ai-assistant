@@ -12,7 +12,10 @@ def test_env_loading():
     print("--- Verifica caricamento .env ---")
     vars_to_check = [
         "OLLAMA_HOST",
-        "MODEL_ULTRA_FAST",
+        "MODEL_ROUTER",
+        "MODEL_DOMOTIC",
+        "MODEL_REASONING",
+        "MODEL_CHITCHAT",
         "ARDUINO_PORT",
         "REMOTE_HOST",
         "DEFAULT_WEATHER_LOCATION",

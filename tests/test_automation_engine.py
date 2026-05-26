@@ -106,6 +106,12 @@ class TestResolve:
         result = engine.resolve("che tempo fa domani?")
         assert result is None
 
+    def test_resolve_modalita_notte_alias(self, engine):
+        engine.register(_simple_automation("buonanotte", aliases=["modalità notte", "modalita notte"]))
+        result = engine.resolve("attiva modalità notte")
+        assert result is not None
+        assert result.name == "buonanotte"
+
     def test_resolve_priority_ordering(self, engine):
         engine.register(_simple_automation("low_scene", aliases=["test"], priority=Priority.LOW))
         engine.register(_simple_automation("high_scene", aliases=["test"], priority=Priority.HIGH))
@@ -321,6 +327,34 @@ class TestEngineEvents:
         assert received[0]["scene"] == "evento_scene"
         assert received[0]["status"] == "ok"
 
+    @pytest.mark.asyncio
+    async def test_event_trigger_executes_automation(self, engine, mock_tool_manager):
+        auto = Automation(
+            scene=Scene(
+                name="wifi_home",
+                actions=[Action(tool="arduino", params={"op": "SET", "target": "light", "value": 1})],
+            ),
+            triggers=[Trigger(type="event", event_name="phone_joined_wifi")],
+        )
+        engine.register(auto)
+
+        await engine.bus.publish("phone_joined_wifi", {"device": "phone"})
+        await asyncio.sleep(0)
+
+        mock_tool_manager.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_conflict_detection_reports_recent_device_change(self, engine, fresh_registry):
+        fresh_registry.update("light", 0, scene="other_scene")
+        auto = _simple_automation("new_scene")
+        engine.register(auto)
+
+        result = await engine.execute(auto)
+
+        assert result["status"] == "ok"
+        assert result["conflicts"][0]["device"] == "light"
+        assert result["conflicts"][0]["previous_scene"] == "other_scene"
+
     def test_event_log_capped(self, engine):
         for i in range(250):
             engine._log_event({"i": i})
@@ -333,11 +367,12 @@ class TestEngineEvents:
 class TestDefaults:
     def test_defaults_build(self, fresh_context, fresh_registry):
         autos = build_default_automations()
-        assert len(autos) >= 12
+        assert len(autos) >= 11
         names = [a.name for a in autos]
         assert "buonanotte" in names
         assert "buongiorno" in names
         assert "allarme" in names
+        assert "modalità notte" not in names
 
     def test_defaults_register_without_error(self, engine, fresh_context, fresh_registry):
         autos = build_default_automations()

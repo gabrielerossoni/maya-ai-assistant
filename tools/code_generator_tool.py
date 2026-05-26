@@ -1,5 +1,9 @@
 import ast
 import os
+import re
+from pathlib import Path
+
+_SAFE_PLUGIN_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.py$")
 
 
 class CodeGeneratorTool:
@@ -19,6 +23,11 @@ class CodeGeneratorTool:
 
         if not filename.endswith(".py"):
             filename += ".py"
+        if Path(filename).name != filename:
+            return {"status": "error", "message": "Percorso plugin non consentito."}
+        filename = os.path.basename(filename)
+        if not _SAFE_PLUGIN_NAME.fullmatch(filename):
+            return {"status": "error", "message": "Nome file plugin non valido."}
 
         # Validazione sintattica base del codice Python
         try:
@@ -26,7 +35,10 @@ class CodeGeneratorTool:
         except SyntaxError as e:
             return {"status": "error", "message": f"Errore di sintassi nel codice generato: {e}"}
 
-        filepath = os.path.join(self.plugins_dir, filename)
+        plugins_root = Path(self.plugins_dir).resolve()
+        filepath = (plugins_root / filename).resolve()
+        if plugins_root not in filepath.parents:
+            return {"status": "error", "message": "Percorso plugin non consentito."}
 
         try:
             with open(filepath, "w", encoding="utf-8") as f:
