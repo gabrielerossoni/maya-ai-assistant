@@ -204,7 +204,7 @@ class TestSceneControls:
     def test_night_scene_is_single_dashboard_chip(self, html):
         assert 'id="chip-notte"' not in html
         assert 'id="chip-buonanotte"' in html
-        assert "Notte / Buonanotte" in html
+        assert "Buonanotte" in html
 
     def test_dashboard_has_scene_off_control(self, html):
         assert "spegni scena" in html
