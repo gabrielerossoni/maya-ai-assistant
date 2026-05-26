@@ -175,3 +175,38 @@ class TestSocketBinding:
             src = f.read()
         assert "0.0.0.0" not in src, "run_server non deve fare binding su 0.0.0.0"
         assert "127.0.0.1" in src
+
+
+class TestDirectToolAllowlist:
+    def test_dashboard_blocks_powerful_tools(self):
+        from core.routes import _validate_direct_tool_action
+
+        allowed, reason = _validate_direct_tool_action({"tool": "system", "command": "shutdown"})
+        assert not allowed
+        assert "non consentito" in reason
+
+    def test_dashboard_allows_known_controls(self):
+        from core.routes import _validate_direct_tool_action
+
+        assert _validate_direct_tool_action({"tool": "calendar", "action": "list"})[0]
+        assert _validate_direct_tool_action({"tool": "spotify", "command": "current"})[0]
+        assert _validate_direct_tool_action({"tool": "arduino", "op": "SET", "target": "light", "value": 1})[0]
+
+    def test_dashboard_blocks_unknown_arduino_target(self):
+        from core.routes import _validate_direct_tool_action
+
+        allowed, reason = _validate_direct_tool_action({"tool": "arduino", "op": "SET", "target": "../bad"})
+        assert not allowed
+        assert "target Arduino" in reason
+
+
+class TestSceneControls:
+    def test_night_scene_is_single_dashboard_chip(self, html):
+        assert 'id="chip-notte"' not in html
+        assert 'id="chip-buonanotte"' in html
+        assert "Notte / Buonanotte" in html
+
+    def test_dashboard_has_scene_off_control(self, html):
+        assert "spegni scena" in html
+        assert "scene_cleared" in html
+        assert "clearScenePill" in html

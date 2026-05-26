@@ -10,7 +10,7 @@ import pytest
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.plugin_loader import PluginLoader
-from core.tool_manager import ToolManager
+from tools.code_generator_tool import CodeGeneratorTool
 
 
 class MockTool:
@@ -21,11 +21,24 @@ class MockTool:
         return {"status": "ok", "message": "hello"}
 
 
+class SimpleToolManager:
+    def __init__(self):
+        self.tools = {}
+
+    def register_tool(self, name, tool_instance):
+        if hasattr(tool_instance, "initialize"):
+            tool_instance.initialize()
+        self.tools[name] = tool_instance
+        return True
+
+    def unregister_tool(self, name):
+        self.tools.pop(name, None)
+        return True
+
+
 @pytest.fixture
 def tool_manager():
-    tm = ToolManager()
-    tm.initialize()
-    return tm
+    return SimpleToolManager()
 
 
 def test_register_unregister_tool(tool_manager):
@@ -61,3 +74,20 @@ class TestTool:
     assert "test" in tool_manager.tools
     result = tool_manager.tools["test"].execute({})
     assert result["message"] == "plugin_works"
+
+
+@pytest.mark.asyncio
+async def test_code_generator_rejects_path_traversal(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tool = CodeGeneratorTool()
+    tool.initialize()
+
+    result = await tool.execute(
+        {
+            "filename": "../escape_tool.py",
+            "code": "class EscapeTool:\n    def execute(self, action):\n        return {'status': 'ok'}\n",
+        }
+    )
+
+    assert result["status"] == "error"
+    assert not (tmp_path / "escape_tool.py").exists()

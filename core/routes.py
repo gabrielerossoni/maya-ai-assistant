@@ -22,6 +22,71 @@ from core.log_utils import setup_dashboard_log_filter
 # Flag globale per applicare il filtro log una sola volta
 _log_filter_applied = False
 
+_DIRECT_TOOL_ALLOWLIST = {
+    "arduino": {
+        "ops": {"SET", "GET"},
+        "targets": {
+            "light",
+            "servo",
+            "servo2",
+            "rgb",
+            "rgb1",
+            "rgb2",
+            "rgb3",
+            "neopixel",
+            "buzzer",
+            "buzzer2",
+            "speaker",
+            "sensor_read",
+            "status",
+        },
+    },
+    "calendar": {"actions": {"list"}},
+    "spotify": {
+        "commands": {
+            "play_pause",
+            "play",
+            "pause",
+            "next",
+            "prev",
+            "current",
+            "volume_up",
+            "volume_down",
+            "volume",
+            "search",
+        }
+    },
+}
+
+
+def _validate_direct_tool_action(action: dict) -> tuple[bool, str]:
+    """Limita i tool eseguibili direttamente dalla dashboard via WebSocket."""
+    if not isinstance(action, dict):
+        return False, "azione non valida"
+
+    tool_name = action.get("tool")
+    rule = _DIRECT_TOOL_ALLOWLIST.get(tool_name)
+    if rule is None:
+        return False, f"tool diretto non consentito: {tool_name}"
+
+    if tool_name == "arduino":
+        op = str(action.get("op", "SET")).upper()
+        target = action.get("target")
+        if op not in rule["ops"]:
+            return False, f"operazione Arduino non consentita: {op}"
+        if target not in rule["targets"]:
+            return False, f"target Arduino non consentito: {target}"
+
+    elif tool_name == "calendar":
+        if action.get("action") not in rule["actions"]:
+            return False, "solo la lettura calendario e' consentita via dashboard"
+
+    elif tool_name == "spotify":
+        if action.get("command") not in rule["commands"]:
+            return False, f"comando Spotify non consentito: {action.get('command')}"
+
+    return True, ""
+
 
 # ---------------------------------------------------------------------------
 # HTTP routes
@@ -85,6 +150,16 @@ async def websocket_endpoint(websocket: WebSocket, agent, manager, voice_manager
                     # Esecuzione diretta tool, bypassa LLM
                     action = data.get("action", {})
                     if action:
+                        allowed, reason = _validate_direct_tool_action(action)
+                        if not allowed:
+                            await manager.broadcast(
+                                {
+                                    "type": "log",
+                                    "text": f"Azione dashboard bloccata: {reason}",
+                                    "level": "error",
+                                }
+                            )
+                            continue
                         result = await agent.tool_manager.execute(action)
                         if action.get("tool") == "calendar" and "events" in result:
                             await manager.broadcast(

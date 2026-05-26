@@ -31,7 +31,7 @@ La differenza rispetto ai sistemi già esistenti:
 - **Gestione multi-scenario** — non un singolo dispositivo acceso/spento, ma un ambiente coordinato
 - **Dashboard HUD dinamica** — pannello "STATO CASA // LIVE" con stato real-time di ogni dispositivo
 - **Linguaggio naturale in italiano** — comandi normali, senza formule rigide
-- **12 scene OO** — modalità notte, film, relax, allarme + scene giornaliere (buongiorno, buonanotte, sveglia, cena, piove, ospiti in arrivo, vado fuori, sono rientrato) con priorità, cooldown e trigger automatici
+- **11 scene OO** — film, relax, allarme + scene giornaliere (buongiorno, buonanotte/notte, sveglia, cena, piove, ospiti in arrivo, vado fuori, sono rientrato) con priorità, cooldown e trigger automatici
 
 ---
 
@@ -60,7 +60,7 @@ flowchart TD
     %% ── AUTOMATION ENGINE ───────────────────────────────────────────────────
     subgraph AUT["🤖 AutomationEngine OO"]
         direction TB
-        AE["Scene + Trigger + Condition\n21 scene predefinite\npriorità · cooldown · retry · timeout"]
+        AE["Scene + Trigger + Condition\n11 scene predefinite\npriorità · cooldown · retry · timeout"]
         BUS["📡 EventBus\npresence_changed · phone_joined_wifi\napp_opened · ..."]
         CTX["🗺️ ContextManager\ntime_slot · presence · weather\nactivity · active_scene · flags"]
         REG["📦 DeviceRegistry\nstato per-device · last_set_by\nconflict detection"]
@@ -226,13 +226,13 @@ Senza Arduino connesso i comandi hardware ritornano errore e la dashboard mostra
 
 ## Scene e Automazioni
 
-Le scene sono attivabili via linguaggio naturale (*"Maya, modalità notte"*), pulsanti dashboard o voce.
+Le scene sono attivabili via linguaggio naturale (*"Maya, buonanotte"*, *"Maya, buongiorno"*), pulsanti dashboard o voce.
 
 **Scene ambiente:**
 
 | Scena | Luci | Relay | Servo | RGB | Buzzer | Altro |
 |---|---|---|---|---|---|---|
-| `modalità notte` | ❌ | ❌ | 0° | `#000022` blu scuro | — | Spotify pause |
+| `buonanotte` / `notte` | ❌ | ❌ | 0° | `#000008` blu notte | — | Spotify pause + calendario |
 | `modalità film` | ❌ | ✅ | — | `#220000` rosso tenue | — | — |
 | `modalità relax` | ❌ | ✅ | — | `#440055` viola | — | — |
 | `allarme` | — | — | — | `#FF0000` rosso | ✅ melody alarm | — |
@@ -255,12 +255,12 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, modalità notte"*), pu
 ## Caratteristiche
 
 - **Agentic ReAct Loop** — ciclo asincrono Ragiona → Agisci → Osserva con routing ibrido dell'intent
-- **Automation Engine OO** — 12 scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno, scheduler asincrono
+- **Automation Engine OO** — 11 scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno, scheduler asincrono
 - **Context Manager** — stato globale casa thread-safe e persistente: time slot, presenza, meteo, attività, scena attiva, flag custom
 - **Device Registry** — memoria persistente dei dispositivi con tracciamento `last_set_by` e conflict detection tra scene
 - **Voice I/O Integrato** — STT via `faster-whisper` (small) e TTS via `Piper` (voce Paola) con VAD adattivo
 - **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window
-- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 12 chip scene con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify
+- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 11 chip scene più controllo OFF con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify
 - **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`
 - **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout
 - **Stato Casa Live** — pannello aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
@@ -843,7 +843,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Firmware Arduino JSON 115200 baud** — controllo completo di LED, relay, servo, RGB, buzzer, DHT11.
 - [x] **Protocollo telemetria automatica da DHT11** — invio automatico dei dati sensore ogni 5 s.
 - [x] **Pannello "STATO CASA // LIVE"** — visualizzazione istantanea del funzionamento di ogni dispositivo.
-- [x] **12 scene OO configurate** — scenari domotici pronti all'uso con priorità, cooldown, condizioni contestuali e trigger automatici.
+- [x] **11 scene OO configurate** — scenari domotici pronti all'uso con priorità, cooldown, condizioni contestuali e trigger automatici.
 - [x] **`sensor_broadcaster`** — aggiornamento automatico temperatura/umidità ogni 30 s.
 - [x] **`SPOTIFY_ENABLED` flag** — abilitazione e disattivazione dinamica del controllo Spotify.
 - [x] **`OLLAMA_ENABLED` flag** — fallback sicuro su Groq o Keyword parser se Ollama locale è offline.
@@ -883,15 +883,15 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Automation Engine OO** — refactoring completo del sistema automazioni: classi `Action`, `Condition`, `Trigger`, `Scene`, `Automation`, `AutomationEngine`, `EventBus`. Supporto priorità, cooldown, conflict detection, retry, timeout, scheduler asincrono, event log strutturato, automazioni temporanee con scadenza.
 - [x] **ContextManager** — singleton thread-safe con persistenza JSON: traccia time slot, presenza, meteo, attività, scena attiva, flag. Metodo `matches()` per condizioni complesse (valore singolo, lista OR, negazione).
 - [x] **DeviceRegistry** — singleton con persistenza JSON: ogni dispositivo ha stato, `last_set_by` e timestamp. Conflict detection tra scene, sync automatico dallo stato Arduino.
-- [x] **Dashboard scene chips** — 12 chip scene con feedback visivo live: il chip attivo si evidenzia verde/arancio al completamento via `scene_executed` WebSocket; pill header mostra la scena corrente.
+- [x] **Dashboard scene chips** — 11 chip scene più OFF con feedback visivo live: il chip attivo si evidenzia verde/arancio al completamento via `scene_executed` WebSocket; pill header mostra la scena corrente.
 - [x] **Velocizzazione risposte IA** — TTS streaming frase-per-frase (parla mentre genera), timeout Groq ridotti (15→8s), early exit più permissivo, cache intent pre-popolata, eliminazione sleep tra token yield, max_tokens CHITCHAT ridotto.
 - [x] **Speaker Gikfun 8Ω 2W** — Sostituisce buzzer2 su pin 3 con speaker di qualità superiore. Nuove melodie: `notify`, `error`, `welcome`. Alias `speaker` nel tool Python e nel prompt LLM.
 - [x] **Refactoring `main.py`** — Riduzione da 894 a ~230 righe. Logica estratta in moduli dedicati: `core/ollama_manager.py`, `core/ngrok_manager.py`, `core/server_utils.py`, `core/broadcasters.py`, `core/routes.py`. Zero cambiamenti di comportamento, smoke test aggiunto.
-- [x] **CI GitHub Actions** — Pipeline `ci.yml` su ogni push: lint `ruff`, test `pytest` (62 test), Python 3.13.
+- [x] **CI GitHub Actions** — Pipeline `ci.yml` su ogni push: lint `ruff`, test `pytest`, Python 3.11.
 - [x] **Lint fix `tools/`** — Risolti import non ordinati (I001), whitespace su righe vuote (W293/W291), variabile inutilizzata F841, newline finale W292 in tutti i tool.
 - [x] **Merge `new_main → main`** — Branch principale aggiornato via PR con fast-forward pulito.
 - [x] **Rimozione automazioni statiche legacy** — Eliminati `AUTOMATIONS`, `AUTOMATION_ALIASES` e il fallback `isinstance` in `_check_automation()` da `agent_core.py`. Il sistema usa esclusivamente l'`AutomationEngine` OO per risoluzione, alias e esecuzione delle scene.
-- [x] **Pulizia scene** — Ridotte da 21 a 12 scene: rimosse modalità lavoro, studio, gaming, pausa caffè, bambini dormono, weekend mattina; `ora di dormire` accorpata in `buonanotte`; `modalità uscita` accorpata in `vado fuori`; `modalità ospite` accorpata in `ospiti in arrivo` (luce, relay, RGB bianco, porta+cancello 90°, melody). Dashboard chip e `SCENE_CHIP_MAP` aggiornati di conseguenza.
+- [x] **Pulizia scene** — Ridotte da 21 a 11 scene: rimosse modalità lavoro, studio, gaming, pausa caffè, bambini dormono, weekend mattina; `ora di dormire`, `notte` e `modalità notte` accorpate in `buonanotte`; `modalità uscita` accorpata in `vado fuori`; `modalità ospite` accorpata in `ospiti in arrivo` (luce, relay, RGB bianco, porta+cancello 90°, melody). Dashboard chip e `SCENE_CHIP_MAP` aggiornati di conseguenza.
 - [x] **Rimozione simulazione Arduino** — `_simulate()` ritorna errore invece di dati fittizi; `broadcast_state` invia `null` per tutti i campi hardware se Arduino non connesso; dashboard mostra `—` sui card invece di valori falsi.
 
 ### 🔲 In corso / Prossimi

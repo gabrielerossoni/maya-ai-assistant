@@ -727,6 +727,16 @@ class AgentCore:
             yield reply
             return
 
+        if _clean in ["spegni scena", "spegni la scena", "disattiva scena", "disattiva la scena", "stop scena"]:
+            previous = self.automation_engine.clear_active_scene()
+            reply = "Scena disattivata." if previous else "Nessuna scena attiva."
+            if self.socket_manager:
+                await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            yield reply
+            return
+
         # 1. Controlla automazioni (fast path)
         auto_result = self._check_automation(user_input)
         if auto_result is not None:

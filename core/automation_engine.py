@@ -277,12 +277,15 @@ class AutomationEngine:
         self._scheduler_task: asyncio.Task | None = None
         self.bus = EventBus()
         self._event_log: list[dict] = []  # ultimi N eventi eseguiti
+        self._event_subscriptions: dict[tuple[str, str], Callable] = {}
 
     # ── Registrazione ─────────────────────────────────────────────────────────
 
     def register(self, automation: Automation):
         """Registra un'automazione nel motore."""
+        self._unwire_event_triggers(automation.name)
         self._automations[automation.name] = automation
+        self._wire_event_triggers(automation)
         logger.debug(f"[ENGINE] Registrata automazione: '{automation.name}'")
 
     def register_all(self, automations: list[Automation]):
@@ -296,7 +299,32 @@ class AutomationEngine:
         logger.info(f"[ENGINE] Automazione temporanea '{automation.name}' scade in {duration_seconds}s")
 
     def remove(self, name: str):
+        self._unwire_event_triggers(name)
         self._automations.pop(name, None)
+
+    def _wire_event_triggers(self, automation: Automation):
+        """Collega i Trigger(type='event') all'EventBus interno."""
+        for trigger in automation.triggers:
+            if trigger.type != "event" or not trigger.event_name:
+                continue
+
+            async def _handler(event: str, data: dict, auto_name: str = automation.name):
+                current = self._automations.get(auto_name)
+                if not current or not current.is_valid():
+                    return
+                logger.info(f"[ENGINE] Trigger evento: '{auto_name}' ({event})")
+                asyncio.create_task(self.execute(current, source=f"event:{event}"))
+
+            self.bus.subscribe(trigger.event_name, _handler)
+            self._event_subscriptions[(automation.name, trigger.event_name)] = _handler
+
+    def _unwire_event_triggers(self, automation_name: str):
+        """Rimuove eventuali handler event registrati per una automazione."""
+        for key, handler in list(self._event_subscriptions.items()):
+            name, event_name = key
+            if name == automation_name:
+                self.bus.unsubscribe(event_name, handler)
+                self._event_subscriptions.pop(key, None)
 
     # ── Risoluzione input → automazione ──────────────────────────────────────
 
@@ -351,11 +379,20 @@ class AutomationEngine:
 
         results = []
         errors = []
+        conflicts = []
         start_ts = time.time()
 
         for action in scene.actions:
             if action.delay > 0:
                 await asyncio.sleep(action.delay)
+
+            conflict = self._detect_action_conflict(action, scene.name)
+            if conflict:
+                conflicts.append(conflict)
+                logger.info(
+                    f"[ENGINE] Possibile conflitto su {conflict['device']}: "
+                    f"{conflict['previous_scene']} -> {scene.name}"
+                )
 
             result = await self._execute_action_with_retry(action, scene.name)
             results.append(result)
@@ -382,6 +419,7 @@ class AutomationEngine:
             "source": source,
             "status": status,
             "errors": errors,
+            "conflicts": conflicts,
             "elapsed": elapsed,
             "ts": start_ts,
         }
@@ -390,7 +428,7 @@ class AutomationEngine:
         await self.bus.publish("scene_executed", event_entry)
 
         logger.info(f"[ENGINE] '{scene.name}' completata in {elapsed}s — status={status}")
-        return {"status": status, "results": results, "errors": errors, "elapsed": elapsed}
+        return {"status": status, "results": results, "errors": errors, "conflicts": conflicts, "elapsed": elapsed}
 
     async def execute_by_name(self, name: str, source: str = "manual") -> dict:
         automation = self._automations.get(name)
@@ -407,6 +445,31 @@ class AutomationEngine:
         return results
 
     # ── Esecuzione singola azione con retry ───────────────────────────────────
+
+    def _detect_action_conflict(self, action: Action, scene_name: str) -> dict | None:
+        """Rileva scritture ravvicinate sullo stesso device da scene diverse."""
+        if action.tool != "arduino":
+            return None
+        target = action.params.get("target")
+        if not target or "value" not in action.params:
+            return None
+        entry = registry.get_entry(target)
+        if not entry:
+            return None
+        previous_scene = entry.get("last_set_by")
+        if previous_scene == scene_name:
+            return None
+        if time.time() - entry.get("ts", 0) > 5:
+            return None
+        new_value = action.params.get("value")
+        if entry.get("value") == new_value:
+            return None
+        return {
+            "device": target,
+            "previous_scene": previous_scene,
+            "previous_value": entry.get("value"),
+            "new_value": new_value,
+        }
 
     async def _execute_action_with_retry(self, action: Action, scene_name: str) -> dict:
         if not self._tool_manager:
@@ -481,6 +544,13 @@ class AutomationEngine:
     def get_last_scene(self) -> str | None:
         return context.get("active_scene")
 
+    def clear_active_scene(self) -> str | None:
+        """Disattiva la scena corrente a livello di contesto/dashboard."""
+        previous = context.get("active_scene")
+        context.set_scene(None)
+        self._log_event({"scene": previous, "source": "manual", "status": "cleared", "errors": [], "ts": time.time()})
+        return previous
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SCENE PREDEFINITE — conversione da AUTOMATIONS statico
@@ -513,6 +583,9 @@ def build_default_automations() -> list[Automation]:
                 "buona notte",
                 "bonne nuit",
                 "notte",
+                "modalità notte",
+                "modalita notte",
+                "modo notte",
                 "vado a dormire",
                 "va a dormire",
                 "dormo",
@@ -521,7 +594,9 @@ def build_default_automations() -> list[Automation]:
                 "ora di dormire",
             ],
             triggers=[
+                Trigger(type="time", time="23:00"),
                 Trigger(type="time", time="23:30"),
+                Trigger(type="context", context={"time_slot": "night", "presence": "home"}),
             ],
         ),
         # ── Buongiorno ────────────────────────────────────────────────────────
@@ -588,26 +663,6 @@ def build_default_automations() -> list[Automation]:
                 ],
             ),
             aliases=["relax"],
-        ),
-        # ── Modalità notte ────────────────────────────────────────────────────
-        Automation(
-            scene=Scene(
-                name="modalità notte",
-                priority=Priority.NORMAL,
-                cooldown=300,
-                conditions=[Condition({"time_slot": ["evening", "night"]})],
-                actions=[
-                    arduino("light", 0),
-                    arduino("relay", 0),
-                    arduino("rgb", 0x000022),
-                    arduino("servo", 0),
-                    spotify("pause"),
-                ],
-            ),
-            triggers=[
-                Trigger(type="time", time="23:00"),
-                Trigger(type="context", context={"time_slot": "night", "presence": "home"}),
-            ],
         ),
         # ── Ospiti in arrivo ──────────────────────────────────────────────────
         Automation(
