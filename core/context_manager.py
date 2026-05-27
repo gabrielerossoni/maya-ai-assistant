@@ -41,6 +41,7 @@ class ContextManager:
             cls._instance._lock = RLock()
             cls._instance._state: dict = {}
             cls._instance._time_slot_locked = False
+            cls._instance._save_timer = None
             cls._instance._load()
         return cls._instance
 
@@ -99,7 +100,25 @@ class ContextManager:
                 self._time_slot_locked = True
             self._state["last_updated"] = time.time()
             if persist:
+                # Immediately persist changes to disk to ensure state is saved before reloads
                 self._save()
+                # Also schedule a debounced save for any subsequent rapid changes
+                self._schedule_save()
+
+    def _schedule_save(self):
+        import threading
+
+        with self._lock:
+            if self._save_timer is not None:
+                self._save_timer.cancel()
+            self._save_timer = threading.Timer(0.1, self._save_debounced)
+            self._save_timer.daemon = True
+            self._save_timer.start()
+
+    def _save_debounced(self):
+        with self._lock:
+            self._save()
+            self._save_timer = None
 
     def set_scene(self, scene_name: str | None):
         self.set("active_scene", scene_name)
