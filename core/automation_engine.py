@@ -270,8 +270,9 @@ class AutomationEngine:
     - Esporre l'event bus per integrazioni esterne
     """
 
-    def __init__(self, tool_manager=None):
+    def __init__(self, tool_manager=None, memory=None):
         self._tool_manager = tool_manager
+        self.memory = memory
         self._automations: dict[str, Automation] = {}
         self._active_tasks: dict[str, asyncio.Task] = {}
         self._scheduler_task: asyncio.Task | None = None
@@ -410,6 +411,12 @@ class AutomationEngine:
         # Aggiorna contesto
         scene.mark_run()
         context.set_scene(scene.name)
+
+        # Sincronizza con la memoria della conversazione (se presente)
+        if self.memory:
+            await self.memory.add_turn(
+                "system", f"[AUTOMATION] Eseguita automazione '{scene.name}' (source={source})", persist_db=False
+            )
 
         elapsed = round(time.time() - start_ts, 3)
         status = "ok" if not errors else "partial"

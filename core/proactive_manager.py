@@ -202,7 +202,7 @@ class ContextPrefetchChecker(BaseChecker):
                     result = weather_tool.execute(action)
                 if result.get("status") == "ok":
                     await self.memory_manager.add_turn(
-                        "system", f"[PREFETCH] Meteo attuale: {result.get('message', '')}"
+                        "system", f"[PREFETCH] Meteo attuale: {result.get('message', '')}", persist_db=False
                     )
             except Exception as e:
                 print(f"[PREFETCH] Errore weather: {e}")
@@ -223,7 +223,9 @@ class ContextPrefetchChecker(BaseChecker):
                     else:
                         titles = result.get("message", "")
                     if titles:
-                        await self.memory_manager.add_turn("system", f"[PREFETCH] Ultime notizie: {titles}")
+                        await self.memory_manager.add_turn(
+                            "system", f"[PREFETCH] Ultime notizie: {titles}", persist_db=False
+                        )
             except Exception as e:
                 print(f"[PREFETCH] Errore news: {e}")
 

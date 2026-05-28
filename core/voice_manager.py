@@ -14,13 +14,25 @@ import numpy as np
 import pyaudio
 from faster_whisper import WhisperModel
 
+# Regex precompilati una tantum per wake phrase strip
+_MAYA = r"(?:maya|maia|maja|máya|màya)"
+_GREET = r"(?:ehi|ehy|hey|ei|hi|eh|ehì|e')"
+
+_PAT_CLEAN_BRACKETS = re.compile(r"(?is)^\[[^\]]*\]\s*")
+_PAT_CLEAN_PARENS = re.compile(r"(?is)^\([^)]{0,48}\)\s*")
+
+_PAT_GREET = re.compile(rf"(?is){_GREET}\s*,?\s*{_MAYA}\b\s*[,:\-]?\s*")
+_PAT_E_MAYA = re.compile(rf"(?is)^e\s*,?\s*{_MAYA}\b\s*[,:\-]?\s*")
+_PAT_EH_MAYA = re.compile(rf"(?is)^eh\s*,?\s*{_MAYA}\b\s*[,:\-]?\s*")
+_PAT_OK_MAYA = re.compile(rf"(?is)^(ok|okay|oké)\s*,?\s*{_MAYA}\b\s*[,:\-]?\s*")
+_PAT_MAYA = re.compile(rf"(?is)^{_MAYA}\b\s*[,:\-]?\s*")
+
 
 class VoiceManager:
     def __init__(self, agent, socket_manager=None):
         self.agent = agent
         self.socket_manager = socket_manager
         self.is_running = False
-        self.is_listening = False
         self.is_speaking = False
 
         # Parametri Audio
@@ -142,34 +154,26 @@ class VoiceManager:
         if not text or not text.strip():
             return None
         t = text.strip()
-        t = re.sub(r"(?is)^\[[^\]]*\]\s*", "", t)
-        t = re.sub(r"(?is)^\([^)]{0,48}\)\s*", "", t)
+        t = _PAT_CLEAN_BRACKETS.sub("", t)
+        t = _PAT_CLEAN_PARENS.sub("", t)
 
-        maya = r"(?:maya|maia|maja|máya|màya)"
-        greet = r"(?:ehi|ehy|hey|ei|hi|eh|ehì|e')"
-        pat_greet = re.compile(rf"(?is){greet}\s*,?\s*{maya}\b\s*[,:\-]?\s*")
-        m = pat_greet.search(t)
+        m = _PAT_GREET.search(t)
         if m:
             return t[m.end() :].strip()
 
-        # Whisper spesso abbrevia «Ehi» → «E» prima di Maya
-        pat_e_maya = re.compile(rf"(?is)^e\s*,?\s*{maya}\b\s*[,:\-]?\s*")
-        m_e = pat_e_maya.match(t)
+        m_e = _PAT_E_MAYA.match(t)
         if m_e:
             return t[m_e.end() :].strip()
 
-        pat_eh_maya = re.compile(rf"(?is)^eh\s*,?\s*{maya}\b\s*[,:\-]?\s*")
-        m_eh = pat_eh_maya.match(t)
+        m_eh = _PAT_EH_MAYA.match(t)
         if m_eh:
             return t[m_eh.end() :].strip()
 
-        pat_ok_maya = re.compile(rf"(?is)^(ok|okay|oké)\s*,?\s*{maya}\b\s*[,:\-]?\s*")
-        m_ok = pat_ok_maya.match(t)
+        m_ok = _PAT_OK_MAYA.match(t)
         if m_ok:
             return t[m_ok.end() :].strip()
 
-        pat_maya = re.compile(rf"(?is)^{maya}\b\s*[,:\-]?\s*")
-        m2 = pat_maya.match(t)
+        m2 = _PAT_MAYA.match(t)
         if m2:
             return t[m2.end() :].strip()
 
@@ -357,12 +361,9 @@ class VoiceManager:
             self.is_running = False
 
     def _handle_voice_command(self, stream):
-        """Dopo solo «Ehi Maya»: attendi che l'utente inizi a parlare, poi registra fino alla pausa."""
-        self.is_listening = True
         w = self.followup_wait_sec
 
         pcm = self._record_utterance_pcm(stream, max_leading_silence_sec=w)
-        self.is_listening = False
 
         if not pcm:
             self._broadcast("IDLE")
@@ -470,7 +471,10 @@ class VoiceManager:
 
             # Recupera dati finali (layout) salvati dall'agente
             layout_data = {"type": "orb", "params": {}}
-            if hasattr(self.agent, "_last_final_data"):
+            task = asyncio.current_task()
+            if task and task in self.agent._current_task_final_data:
+                _, layout_data = self.agent._current_task_final_data.pop(task)
+            elif hasattr(self.agent, "_last_final_data"):
                 _, layout_data = self.agent._last_final_data
 
             if full_reply.strip() and self.socket_manager:
@@ -499,7 +503,10 @@ class VoiceManager:
         if not os.path.exists(self.piper_exe):
             return
         try:
-            output_wav = "voice/response.wav"
+            import uuid
+
+            os.makedirs("voice", exist_ok=True)
+            output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
             command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
             subprocess.run(
                 command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -519,9 +526,11 @@ class VoiceManager:
         self._broadcast("SPEAKING")
 
         try:
-            output_wav = "voice/response.wav"
+            import uuid
+
+            os.makedirs("voice", exist_ok=True)
+            output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
             # Comando per Piper: passa il testo e genera il wav
-            # Fix shell injection: use list of args and pass text via input
             command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
             subprocess.run(
                 command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -557,6 +566,13 @@ class VoiceManager:
             stream.close()
             wf.close()
             p.terminate()
+
+            # Cancella il file WAV temporaneo dopo la riproduzione per evitare accumulo su disco
+            if "voice/response_" in file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
         except Exception as e:
             print(f"[VOICE] Errore riproduzione audio: {e}")
 

@@ -51,7 +51,14 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
         if count >= self.ERROR_THRESHOLD and tool_name not in self._patched:
             self._patched.add(tool_name)
             tb_text = traceback.format_exc()
-            asyncio.create_task(self._attempt_fix(tool_name, error, source_file, tb_text))
+            coro = self._attempt_fix(tool_name, error, source_file, tb_text)
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(coro)
+            except RuntimeError:
+                import threading
+
+                threading.Thread(target=asyncio.run, args=(coro,), daemon=True).start()
 
     async def _attempt_fix(self, tool_name: str, error: Exception, source_file: str, tb_text: str = ""):
         print(f"[SELF_HEALER] Tentativo fix per '{tool_name}' dopo {self.ERROR_THRESHOLD} errori consecutivi")
@@ -115,10 +122,22 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
         except Exception:
             return
 
-        # Scrivi in plugins/<tool_name>_tool.py per hot-reload
+        # Scrittura atomica in plugins/<tool_name>_tool.py per hot-reload sicuro
         os.makedirs("plugins", exist_ok=True)
         final_path = os.path.join("plugins", f"{tool_name}_tool.py")
-        with open(final_path, "w", encoding="utf-8") as f:
-            f.write(patched_code)
-
-        print(f"[SELF_HEALER] Patch salvata in {final_path} — hot-reload in corso")
+        temp_path = os.path.join("plugins", f"{tool_name}_tool.tmp")
+        try:
+            with open(temp_path, "w", encoding="utf-8") as f:
+                f.write(patched_code)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, final_path)
+            print(f"[SELF_HEALER] Patch salvata in {final_path} — hot-reload in corso")
+        except Exception as e:
+            print(f"[SELF_HEALER] Errore scrittura patch: {e}")
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+            return

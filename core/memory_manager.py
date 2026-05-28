@@ -101,7 +101,7 @@ class MemoryManager:
             _ollama_available = False
             return None
 
-    async def add_turn(self, role: str, text: str):
+    async def add_turn(self, role: str, text: str, persist_db: bool = True):
         """Aggiunge un turno alla memoria con embedding semantico."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         turn = {
@@ -118,10 +118,11 @@ class MemoryManager:
 
             # Trigger summary periodico (ogni 50 turni, non-blocking)
             if len(self.turns) % 50 == 0:
-                asyncio.create_task(self.build_topic_summaries())
+                turns_snapshot = list(self.turns)
+                asyncio.create_task(self.build_topic_summaries(turns_snapshot))
 
             # Calcola embedding e aggiungilo a ChromaDB
-            if self.collection:
+            if self.collection and persist_db:
                 import random
 
                 ts_ms = int(datetime.now().timestamp() * 1000)
@@ -186,15 +187,16 @@ class MemoryManager:
             print(f"[MEMORY] Errore summary LLM ({topic}): {e}")
             return ""
 
-    async def build_topic_summaries(self):
+    async def build_topic_summaries(self, turns_snapshot: Optional[list] = None):
         """Ogni 50 turni, crea summary per topic via LLM e li salva in data/memory_summaries.json."""
-        if not self.turns:
+        turns = turns_snapshot if turns_snapshot is not None else list(self.turns)
+        if not turns:
             return
 
         topics = {k: [] for k in _SUMMARY_TOPICS}
         topics["altro"] = []
 
-        for turn in self.turns[-100:]:
+        for turn in turns[-100:]:
             text_lower = turn["text"].lower()
             placed = False
             for topic, keywords in _SUMMARY_TOPICS.items():

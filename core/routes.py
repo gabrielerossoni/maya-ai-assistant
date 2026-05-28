@@ -56,6 +56,12 @@ _DIRECT_TOOL_ALLOWLIST = {
             "search",
         }
     },
+    "trading": {
+        "operations": {
+            "price",
+            "chart",
+        }
+    },
 }
 
 
@@ -84,6 +90,10 @@ def _validate_direct_tool_action(action: dict) -> tuple[bool, str]:
     elif tool_name == "spotify":
         if action.get("command") not in rule["commands"]:
             return False, f"comando Spotify non consentito: {action.get('command')}"
+
+    elif tool_name == "trading":
+        if action.get("operation") not in rule["operations"]:
+            return False, f"operazione trading non consentita: {action.get('operation')}"
 
     return True, ""
 

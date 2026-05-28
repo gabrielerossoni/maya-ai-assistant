@@ -170,6 +170,10 @@ async def spotify_broadcaster(agent, manager):
         return
     while True:
         try:
+            if not manager.active_connections:
+                await asyncio.sleep(2)
+                continue
+
             spotify_tool = agent.tool_manager.tools.get("spotify")
             if spotify_tool and spotify_tool.sp:
                 # Wrap blocking spotipy call in a thread
@@ -219,6 +223,18 @@ async def get_models_status(MODELS):
             print(f"[MONITOR] Errore nel controllo modelli: {e}")
         # Ritorna tutti i modelli come offline se c'è un errore o timeout
         return {k: {"name": v, "online": False, "id": k} for k, v in MODELS.items()}
+
+
+def get_version() -> str:
+    """Legge la versione del progetto da package.json (single source of truth)."""
+    try:
+        import json
+
+        with open("package.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("version", "2.0.1-dev")
+    except Exception:
+        return "2.0.1-dev"
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +296,7 @@ async def broadcast_state(agent, manager, MODELS):
         "system": {
             "model": MODELS.get("router", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),
-            "version": "2.0.1-dev",
+            "version": get_version(),
             "reset_storage": _debug_reset_client,
         },
     }

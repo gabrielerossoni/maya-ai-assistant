@@ -8,6 +8,10 @@ import requests
 
 
 class WeatherTool:
+    def __init__(self):
+        self._cache = {}
+        self.CACHE_EXPIRY = 300  # 5 minuti
+
     def initialize(self):
         pass
 
@@ -26,6 +30,49 @@ class WeatherTool:
     }
 
     def execute(self, action: dict) -> dict:
+        if not hasattr(self, "_cache"):
+            self._cache = {}
+            self.CACHE_EXPIRY = 300
+
+        import time
+
+        # Genera cache key basata sui parametri normalizzati
+        cache_key = tuple(sorted((k, v) for k, v in action.items() if v is not None))
+        now = time.time()
+        if cache_key in self._cache:
+            cached_data, cached_time = self._cache[cache_key]
+            if now - cached_time < self.CACHE_EXPIRY:
+                if cached_data.get("status") == "ok" and "data" in cached_data:
+                    self._update_context_weather(cached_data["data"].get("icon"))
+                return cached_data
+
+        result = self._execute_uncached(action)
+        if result.get("status") == "ok" and "data" in result:
+            self._cache[cache_key] = (result, now)
+            self._update_context_weather(result["data"].get("icon"))
+        return result
+
+    def _update_context_weather(self, icon: str | None):
+        if not icon:
+            return
+        try:
+            from core.context_manager import context
+
+            icon_lower = icon.lower()
+            ctx_weather = "unknown"
+            if "rain" in icon_lower or "drizzle" in icon_lower or "lightning" in icon_lower:
+                ctx_weather = "rain"
+            elif "snow" in icon_lower:
+                ctx_weather = "snow"
+            elif "sun" in icon_lower:
+                ctx_weather = "clear"
+            elif "cloud" in icon_lower or "fog" in icon_lower:
+                ctx_weather = "cloud"
+            context.set_weather(ctx_weather)
+        except Exception as e:
+            print(f"[WEATHER] Errore aggiornamento contesto: {e}")
+
+    def _execute_uncached(self, action: dict) -> dict:
         lat = action.get("lat")
         lon = action.get("lon")
         name = None

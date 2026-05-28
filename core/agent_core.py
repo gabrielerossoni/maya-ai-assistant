@@ -10,6 +10,7 @@ import json
 import os
 import random
 import re
+from collections import OrderedDict
 
 import httpx
 import ollama
@@ -20,6 +21,7 @@ from .automation_engine import engine as automation_engine
 from .context_manager import context as home_context
 from .memory_manager import MemoryManager
 from .preference_learner import PreferenceLearner
+from .token_juice import compress_tool_output
 from .tool_manager import ToolManager
 
 # Carica variabili d'ambiente da .env
@@ -152,11 +154,10 @@ class AgentCore:
         self.memory = MemoryManager()
         self.learner = PreferenceLearner()
         self.automation_engine: AutomationEngine = automation_engine
-        self.conversation_history = []
         self._last_layout = {"type": "orb", "params": {}}
         self._last_final_data = ("", {"type": "orb", "params": {}})
         self.socket_manager = None
-        self._intent_cache: dict[str, str] = {}
+        self._intent_cache: OrderedDict[str, str] = OrderedDict()
         self._current_task_layout: dict = {}
         self._current_task_final_data: dict = {}
 
@@ -196,6 +197,7 @@ class AgentCore:
 
         # Inizializza il nuovo AutomationEngine
         self.automation_engine._tool_manager = self.tool_manager
+        self.automation_engine.memory = self.memory
         self.automation_engine.register_all(build_default_automations())
         asyncio.create_task(self.automation_engine.start_scheduler())
         print("[AGENT] AutomationEngine pronto con", len(self.automation_engine.list_automations()), "automazioni.")
@@ -215,13 +217,15 @@ class AgentCore:
         cache_key = user_input.lower().strip()[:60]
         if cache_key in self._intent_cache:
             print(f"[ROUTER] Intent recuperato da cache: {self._intent_cache[cache_key]}")
+            self._intent_cache.move_to_end(cache_key)
             return self._intent_cache[cache_key]
 
         intent = await self._route_intent_uncached(user_input)
 
         self._intent_cache[cache_key] = intent
+        self._intent_cache.move_to_end(cache_key)
         if len(self._intent_cache) > 500:
-            self._intent_cache.pop(next(iter(self._intent_cache)))
+            self._intent_cache.popitem(last=False)
         return intent
 
     async def _route_intent_uncached(self, user_input: str) -> str:
@@ -657,6 +661,14 @@ class AgentCore:
     # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
     async def process(self, user_input: str, progress_cb=None):
         """Pipeline completa ReAct: Ragiona → Agisci → Osserva."""
+        # Garbage collect completed tasks from caches to prevent memory leaks
+        for t in list(self._current_task_layout.keys()):
+            if t.done():
+                self._current_task_layout.pop(t, None)
+        for t in list(self._current_task_final_data.keys()):
+            if t.done():
+                self._current_task_final_data.pop(t, None)
+
         # Salva input nella memoria
         await self.memory.add_turn("user", user_input)
 
@@ -705,12 +717,8 @@ class AgentCore:
 
         # 0b. Linguaggio naturale: "metti X su spotify", "riproduci X", "play X"
         if not spotify_action:
-            import re as _re
-
             _pfx = r"(?:metti|riproduci|play|fammi sentire|cerca)\s+"
-            m = _re.match(_pfx + r"(.+?)\s+(?:su|on)\s+spotify$", _clean) or _re.match(
-                _pfx + r"([^\n]{1,200})$", _clean
-            )
+            m = re.match(_pfx + r"(.+?)\s+(?:su|on)\s+spotify$", _clean) or re.match(_pfx + r"([^\n]{1,200})$", _clean)
             if m and ("spotify" in _clean or any(w in _clean for w in ["metti", "riproduci", "fammi sentire"])):
                 query = m.group(1).strip()
                 # Rimuovi "di" come separatore artista (es. "ferrari di lilcr")
@@ -762,8 +770,13 @@ class AgentCore:
 
         # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
         if intent == "CHITCHAT":
+            system_prompt = SPECIALIST_PROMPTS["CHITCHAT"]
+            pref_context = self.learner.get_context_injection()
+            if pref_context:
+                system_prompt = system_prompt + f"\n\nPROFILO UTENTE:\n{pref_context}"
+
             messages = [
-                {"role": "system", "content": SPECIALIST_PROMPTS["CHITCHAT"]},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_input},
             ]
 
@@ -893,7 +906,8 @@ class AgentCore:
                         data = res["result"]
                         status = data.get("status", "error")
                         msg = data.get("message", "")
-                        observation += f"Risultato tool '{tool}' ({status}): {msg}\n"
+                        compressed_msg = compress_tool_output(tool, str(msg))
+                        observation += f"Risultato tool '{tool}' ({status}): {compressed_msg}\n"
 
                     # --- EARLY EXIT CHECK ---
                     # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
