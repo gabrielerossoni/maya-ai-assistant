@@ -140,17 +140,17 @@ flowchart TD
 
 ### Schema di collegamento
 
-```powershell
+```
 Arduino Uno / Nano
-├── Pin 13  →  LED             # (luce principale — digitale)
-├── Pin  7  →  Relè            # (attuatore generico — digitale)
-├── Pin  9  →  Servo SG90      # (porta / accesso — PWM)
-├── Pin  5  →  RGB canale R    # (PWM analogWrite)
-├── Pin  6  →  RGB canale G    # (PWM analogWrite)
-├── Pin  3  →  Speaker 8Ω 2W  # (Gikfun — melodie via tone(), ex buzzer2)
-├── Pin  8  →  Buzzer          # (allarme — digitale, auto-off 200 ms)
-├── Pin  4  →  DHT11           # (temperatura e umidità — OneWire)
-└── USB     →  Seriale PC      # (115200 baud)
+├── Pin 13  →  LED             (luce principale — digitale)
+├── Pin  7  →  Relè            (attuatore generico — digitale)
+├── Pin  9  →  Servo SG90      (porta / accesso — PWM)
+├── Pin  5  →  RGB canale R    (PWM analogWrite)
+├── Pin  6  →  RGB canale G    (PWM analogWrite)
+├── Pin  3  →  Speaker 8Ω 2W  (Gikfun — melodie via tone(), ex buzzer2)
+├── Pin  8  →  Buzzer          (allarme — digitale, auto-off 200 ms)
+├── Pin  4  →  DHT11           (temperatura e umidità — OneWire)
+└── USB     →  Seriale PC      (115200 baud)
 ```
 
 ### Tabella componenti
@@ -168,10 +168,10 @@ Arduino Uno / Nano
 
 ### Dipendenze firmware
 
-```powershell
-ArduinoJson  6.x   # (parsing JSON)
-Servo.h             # (libreria built-in)
-DHT.h               # (Adafruit DHT sensor library)
+```
+ArduinoJson  6.x   (parsing JSON)
+Servo.h             (libreria built-in)
+DHT.h               (Adafruit DHT sensor library)
 ```
 
 ---
@@ -296,7 +296,7 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, buonanotte"*, *"Maya, 
 
 ## Struttura Repository
 
-```powershell
+```
 maya/
 ├── main.py                    # Entrypoint: thin wiring, lifespan, avvio uvicorn
 ├── MAYA_DESKTOP.bat           # Launcher rapido Windows (Electron)
@@ -432,14 +432,12 @@ ollama pull nomic-embed-text   # per memoria semantica
 ### 4. Firmware Arduino — Classico o MQTT?
 
 **Versione Classica (Seriale):**
-
 - Un solo Arduino su cavo USB
 - Comunicazione 115200 baud JSON
 - ✅ Semplice, niente dipendenze esterne
 - ❌ Distanza limitata, una sola stanza
 
 **Versione MQTT (WiFi) — CONSIGLIATA:**
-
 - Arduino R4 WiFi con WiFi integrato
 - Comunicazione via MQTT Broker
 - ✅ Multi-room, scalabile, wireless
@@ -448,7 +446,7 @@ ollama pull nomic-embed-text   # per memoria semantica
 
 **Come scegliere?**
 
-```text
+```
 Ho un Arduino Uno classico?        → Usa versione Seriale (original)
 Ho un Arduino Uno R4 WiFi?         → Usa versione MQTT (nuovo firmware)
 Voglio entrambi disponibili?       → Usa MQTT, Seriale rimane fallback
@@ -467,6 +465,8 @@ Se hai già caricato il firmware classico:
 5. **Seriale rimane disponibile** — zero perdita di funzionalità
 
 Niente codice Python da modificare — MAYA rileva automaticamente se Arduino risponde via MQTT o Seriale.
+
+
 
 ### 5. Avvio
 
@@ -521,7 +521,7 @@ A partire dalla versione 2.0, MAYA supporta il **controllo multi-stanza via MQTT
 
 **MQTT** = *Message Queuing Telemetry Transport* — è come una **centralina postale intelligente**:
 
-```text
+```
 Arduino Studio (pubblica):  "Ho acceso la luce" → BROKER (Mosquitto)
                                                         ↓
 Dashboard (legge):  "Mi interessa le notizie dalla stanza studio" ← riceve in real-time
@@ -537,24 +537,27 @@ Dashboard (legge):  "Mi interessa le notizie dalla stanza studio" ← riceve in 
 
 ### Schema di funzionamento
 
-```mermaid
-flowchart LR
-
-A[Arduino R4 WiFi<br/>Studio: luce accesa<br/>MQTT topic<br/>maya/rooms/studio/state<br/>state: light, relay, ...]
-
-B[Broker MQTT<br/>Mosquitto localhost<br/>port 1883]
-
-C[MAYA Core PC<br/>Riceve state<br/>Logica + comandi]
-
-D[WebSocket Server]
-
-E[Dashboard Web<br/>Browser UI]
-
-A -->|WiFi publish| B
-B -->|MQTT| C
-C -->|commands/state| B
-C --> D
-D --> E
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Arduino R4 WiFi                       │
+│  Studio: luce accesa → pubblica su topic               │
+│  "maya/rooms/studio/state"                             │
+│                                                         │
+│  {"state": {"light": true, "relay": false, ...}}       │
+└────────────────────┬────────────────────────────────────┘
+                     │ WiFi
+                     ↓
+        ┌────────────────────────┐
+        │  Broker MQTT           │
+        │  (Mosquitto localhost) │
+        │  localhost:1883        │
+        └────────────┬───────────┘
+                     │
+      ┌──────────────┴──────────────┐
+      ↓                              ↓
+PC (MAYA Core)              WebSocket → Dashboard
+riceve state, applica          (client browser)
+comandi → ripubblica           mostra UI aggiornata
 ```
 
 ### Topic Schema
@@ -572,34 +575,34 @@ maya/rooms/<room>/<message_type>
 | `maya/rooms/studio/telemetry` | Arduino → PC | `{"telemetry":{"temp":22.4,"humidity":58.1}}` | Ogni 5s | Sensori DHT11 periodici |
 
 **Spiegazione:**
-
 - **cmd**: comandi *in ingresso* → Arduino esegue
 - **state**: stato *in uscita* → cosa ha fatto Arduino
 - **telemetry**: misure *in uscita* → sensori DHT11
 
 ### Workflow: "Accendi la luce da dashboard"
 
-```mermaid
-flowchart LR
-
-A[Utente clicca Toggle LED<br/>Dashboard]
-
-B[WebSocket invia comando<br/>al PC MAYA]
-
-C[MAYA pubblica comando MQTT<br/>topic stanza studio]
-
-D[Arduino riceve comando<br/>accende LED]
-
-E[Arduino pubblica stato<br/>topic MQTT stato]
-
-F[PC riceve messaggio MQTT<br/>callback di elaborazione]
-
-G[WebSocket invia aggiornamento<br/>al browser]
-
-H[Dashboard aggiorna LED<br/>stato ON]
-
-A --> B --> C --> D 
-E --> F --> G --> H
+```
+1. User click "Toggle LED" on dashboard
+                    ↓
+2. WebSocket → PC (MAYA):  { "tool": "mqtt", "op": "SET", "target": "light", "value": 1 }
+                    ↓
+3. MAYA mqtt_tool.execute():
+   Pubblica su MQTT:  "maya/rooms/studio/cmd"
+   Payload:          {"cmd":"SET","target":"light","value":1}
+                    ↓
+4. Arduino riceve su topic "maya/rooms/studio/cmd":
+   Parsing JSON → esegue → digitalWrite(LED_PIN, HIGH)
+                    ↓
+5. Arduino pubblica risposta su:  "maya/rooms/studio/state"
+   Payload:  {"state":{"light":true,"relay":false,...}}
+                    ↓
+6. MQTT Broker → PC riceve su topic con `on_message` callback
+   mqtt_tool._on_message() → estrae stato
+                    ↓
+7. Broadcast via WebSocket al client browser:
+   { "type": "arduino_state", "room": "studio", "led": "on", ... }
+                    ↓
+8. Dashboard UI aggiorna il LED indicator in tempo reale ✅
 ```
 
 ### Setup: Installazione Mosquitto (Broker MQTT)
@@ -609,12 +612,10 @@ E --> F --> G --> H
 1. Scarica installer da [mosquitto.org](https://mosquitto.org/download/#windows)
 2. Esegui installer → installa come **Windows Service**
 3. Verifica: apri PowerShell:
-
    ```powershell
    Get-Service mosquitto
    # Dovresti vedere: Status=Running
    ```
-
 4. Default: `localhost:1883`
 
 #### Linux (Ubuntu/Debian)
@@ -651,8 +652,7 @@ mosquitto_pub -h localhost \
 ```
 
 Arduino dovrebbe ricevere e rispondere con:
-
-```powershell
+```
 maya/rooms/studio/state {"state":{"light":true,...}}
 ```
 
@@ -675,12 +675,10 @@ MQTT_DEFAULT_ROOM=studio
 ```
 
 Dopo la configurazione:
-
 1. Salva il file
 2. Carica sketch su Arduino via Arduino IDE
 3. Apri Serial Monitor (115200 baud) → dovresti vedere:
-
-   ```text
+   ```
    [WiFi] Connessione a MioSSID
    [WiFi] Connesso! IP: 192.168.1.X
    [MQTT] Connesso a localhost:1883
@@ -729,11 +727,9 @@ Questo evita deadlock tra il thread MQTT e il loop FastAPI.
 ### Multi-room: Aggiungere una seconda Arduino
 
 1. Crea una copia del firmware con stanza diversa:
-
    ```cpp
    const char* MQTT_ROOM = "cucina";  // Anziché "studio"
    ```
-
 2. Carica su secondo Arduino R4 WiFi
 3. Dashboard riceve automaticamente da entrambe:
    - `maya/rooms/studio/state` → card Studio
@@ -761,13 +757,11 @@ Se Mosquitto non è avviato:
 
 1. Creare `tools/my_tool.py` con classe `MyTool` che implementa `initialize()` e `execute()`
 2. Registrarlo in `core/tool_manager.py`:
-
    ```python
    from tools.my_tool import MyTool
    # in initialize():
    "my_tool": MyTool(),
    ```
-
 3. Aggiungerlo al `SYSTEM_PROMPT` in `core/agent_core.py` nella sezione "Tool disponibili"
 
 ### Interfaccia Tool
@@ -921,17 +915,15 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 
 #### Arduino non viene trovato (Seriale)
 
-```text
+```
 [ARDUINO] Porta non trovata → simulazione
 ```
 
 **Cause:**
-
 - Arduino non connesso USB
 - Porta COM errata in `.env`
 
 **Fix:**
-
 ```env
 ARDUINO_PORT=COM3          # Specifica porta manualmente
 # oppure
@@ -942,17 +934,15 @@ Controlla Device Manager (Windows) o `ls /dev/ttyACM*` (Linux).
 
 #### MQTT: Connection refused
 
-```text
+```
 [MQTT] Broker non raggiungibile
 ```
 
 **Cause:**
-
 - Mosquitto non avviato
 - IP/porta sbagliati
 
 **Fix:**
-
 ```bash
 # Controlla se Mosquitto è in ascolto:
 netstat -ano | findstr :1883      # Windows
@@ -965,17 +955,15 @@ sudo systemctl restart mosquitto              # Linux
 
 #### Voice STT non riconosce
 
-```text
+```
 [VOICE] Whisper timeout
 ```
 
 **Cause:**
-
 - Modello non scaricato
 - Microfono non funziona
 
 **Fix:**
-
 ```bash
 # Testa il microfono con PyAudio:
 python -c "import pyaudio; p=pyaudio.PyAudio(); print([p.get_device_info_by_index(i)['name'] for i in range(p.get_device_count())])"
@@ -988,20 +976,17 @@ Assicurati che `MAYA_WHISPER_MODEL=small` nel `.env`.
 
 #### Dashboard non aggiorna stato Arduino
 
-```text
+```
 Lo stato dei dispositivi non cambia quando accendi/spegni via Arduino
 ```
 
 **Cause:**
-
 - Arduino non invia telemetria
 - WebSocket non connesso
 - MQTT broker non attivo
 
 **Fix:**
-
 1. Controlla che Arduino invia su seriale o MQTT:
-
    ```bash
    # Via seriale:
    python -c "import serial; s=serial.Serial('COM3', 115200); print(s.readline())"
@@ -1009,9 +994,7 @@ Lo stato dei dispositivi non cambia quando accendi/spegni via Arduino
    # Via MQTT:
    mosquitto_sub -h localhost -t "maya/rooms/#" -v
    ```
-
 2. Verifica WebSocket connessione nel browser:
-
    ```javascript
    // Apri DevTools → Console
    WebSocket { url: "ws://127.0.0.1:8000/ws", ... }
@@ -1019,12 +1002,11 @@ Lo stato dei dispositivi non cambia quando accendi/spegni via Arduino
 
 #### Ollama non disponibile all'avvio
 
-```text
+```
 [LLM] Ollama non raggiungibile
 ```
 
 **Fix:**
-
 ```bash
 # Assicurati che Ollama è avviato:
 ollama serve
@@ -1036,18 +1018,16 @@ ollama serve
 
 #### CPU spike all'avvio
 
-```text
+```
 MAYA consuma 100% CPU per 10 secondi dopo lo start
 ```
 
 **Causa:**
-
 - Broadcaster non ha jitter iniziale
 
 **Fix:**
 Verificare che tutti i broadcaster (news, weather, stats) hanno `await asyncio.sleep()` iniziale.
 Controllare che `MAYA_CALIB_CHUNKS` non sia troppo alto:
-
 ```env
 MAYA_CALIB_CHUNKS=36    # default, va bene
 ```
@@ -1056,7 +1036,7 @@ MAYA_CALIB_CHUNKS=36    # default, va bene
 
 ## .gitignore — Cosa viene escluso
 
-```text
+```
 data/          # chroma_db, memory_metadata, calendar, notes
 .env           # credenziali e configurazioni locali
 .venv/         # virtualenv
@@ -1081,7 +1061,9 @@ Progetto sviluppato da studenti dell'**ITIS di Crema** per l'**Arduino Day 2026*
 [![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-gabrielerossoni-181717?style=flat-square&logo=github)](https://github.com/gabrielerossoni)
 [![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-Marcello1408-181717?style=flat-square&logo=github)](https://github.com/Marcello1408)
 
-<div align="center">
-<strong>M.A.Y.A.</strong> — Un cervello per la casa, non l'ennesimo chatbot.<br>
-<em>ITIS di Crema • Arduino Day 2026</em>
-</div>
+---
+
+<p align="center">
+  <strong>M.A.Y.A.</strong> — Un cervello per la casa, non l'ennesimo chatbot.<br>
+  <em>ITIS di Crema • Arduino Day 2026</em>
+</p>
