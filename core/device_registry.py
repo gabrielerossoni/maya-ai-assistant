@@ -2,7 +2,7 @@
 device_registry.py - Registro persistente dello stato dei dispositivi.
 
 Tiene traccia dell'ultimo stato noto di ogni dispositivo fisico (luci,
-servo, RGB, relay, ecc.). Permette conflict detection e rollback.
+servo, RGB, buzzer, ecc.). Permette conflict detection e rollback.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ class DeviceRegistry:
         "light":   { "value": False, "last_set_by": "buonanotte", "ts": 1716000000 },
         "servo":   { "value": 0,     "last_set_by": "modalità uscita", "ts": ... },
         "rgb":     { "value": [0,0,0], ... },
-        "relay":   { "value": False, ... },
+        "buzzer":  { "value": False, ... },
         ...
     }
     """

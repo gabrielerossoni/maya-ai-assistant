@@ -179,6 +179,7 @@ class ArduinoTool:
         target = action.get("target", "")
         value = action.get("value", None)
         op = action.get("op", "SET")
+        extra = {k: action[k] for k in ("effect", "melody") if k in action}
 
         # Alias: speaker → buzzer2 (stesso pin, protocollo invariato)
         if target == "speaker":
@@ -194,10 +195,16 @@ class ArduinoTool:
         if cmd in legacy_map:
             op, target, value = legacy_map[cmd]
 
-        if self.simulated:
-            return self._simulate(op, target, value)
+        op = str(op).upper()
+        if target not in VALID_TARGETS:
+            return {"status": "error", "message": f"target Arduino non supportato: {target}"}
+        if op not in {"SET", "GET"}:
+            return {"status": "error", "message": f"operazione Arduino non supportata: {op}"}
 
-        return self._send_sync(op, target, value)
+        if self.simulated:
+            return self._simulate(op, target, value, **extra)
+
+        return self._send_sync(op, target, value, **extra)
 
     def get_telemetry(self) -> dict:
         return self._telemetry.copy()
@@ -207,11 +214,12 @@ class ArduinoTool:
             self._msg_id += 1
             return self._msg_id
 
-    def _send_sync(self, op: str, target: str, value, timeout=1.0) -> dict:
+    def _send_sync(self, op: str, target: str, value, timeout=1.0, **extra) -> dict:
         msg_id = self._next_id()
         payload = {"id": msg_id, "cmd": op, "target": target}
         if value is not None:
             payload["value"] = value
+        payload.update(extra)
 
         event = threading.Event()
         holder: list = [None]
@@ -221,6 +229,8 @@ class ArduinoTool:
         try:
             with self._serial_lock:
                 if self.connection is None:
+                    with self._lock:
+                        self._sync_pending.pop(msg_id, None)
                     return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
                 self.connection.write((json.dumps(payload) + "\n").encode())
                 self.connection.flush()
@@ -246,13 +256,17 @@ class ArduinoTool:
                         "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
                     }
                 )
-            return {"status": "ok", "state": self.sim_state.copy()}
+            status = data.get("status", "error")
+            result = {"status": status, "state": self.sim_state.copy()}
+            if status == "error":
+                result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
+            return result
         else:
             with self._lock:
                 self._sync_pending.pop(msg_id, None)
             return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
 
-    def _simulate(self, op: str, target: str, value) -> dict:
+    def _simulate(self, op: str, target: str, value, **extra) -> dict:
         return {"status": "error", "message": "arduino non connesso"}
 
     def get_sensor_data(self) -> dict:
@@ -270,6 +284,8 @@ class ArduinoTool:
         try:
             with self._serial_lock:
                 if self.connection is None:
+                    with self._lock:
+                        self._sync_pending.pop(msg_id, None)
                     return None
                 self.connection.write((json.dumps(payload) + "\n").encode())
                 self.connection.flush()

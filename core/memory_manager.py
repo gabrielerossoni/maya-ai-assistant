@@ -22,7 +22,19 @@ EMBEDDING_MODEL = "nomic-embed-text"  # Via Ollama
 _ollama_available = True  # Set to False after first connection failure to suppress repeated errors
 
 _SUMMARY_TOPICS = {
-    "domotica": ["luce", "relay", "servo", "accendi", "spegni", "arduino", "mqtt", "rgb", "buzzer"],
+    "domotica": [
+        "luce",
+        "servo",
+        "cancello",
+        "campanello",
+        "speaker",
+        "accendi",
+        "spegni",
+        "arduino",
+        "mqtt",
+        "rgb",
+        "buzzer",
+    ],
     "meteo": ["meteo", "temperatura", "piogge", "vento", "previsioni", "umidità", "clima"],
     "calendario": ["evento", "riunione", "appuntamento", "calendario", "promemoria", "scadenza"],
 }

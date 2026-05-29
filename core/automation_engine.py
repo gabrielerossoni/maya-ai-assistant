@@ -580,7 +580,6 @@ def build_default_automations() -> list[Automation]:
                 actions=[
                     spotify("pause"),
                     arduino("light", 0),
-                    arduino("relay", 0),
                     arduino("servo", 0),
                     arduino("rgb", 0x000008),
                     calendar_action("list"),
@@ -615,7 +614,6 @@ def build_default_automations() -> list[Automation]:
                 actions=[
                     arduino("light", 1),
                     arduino("rgb", 0xFFD580),
-                    arduino("relay", 1),
                     arduino("servo", 0),
                     spotify("search", query="buongiorno playlist mattina"),
                     weather_action(),
@@ -638,7 +636,6 @@ def build_default_automations() -> list[Automation]:
                     arduino("buzzer", 1),
                     arduino("light", 1),
                     arduino("rgb", 0xFFFFFF),
-                    arduino("relay", 1),
                     spotify("search", query="energetic morning wake up"),
                 ],
             ),
@@ -652,7 +649,6 @@ def build_default_automations() -> list[Automation]:
                 exclusive=True,
                 actions=[
                     arduino("light", 0),
-                    arduino("relay", 1),
                     arduino("rgb", 0x220000),
                 ],
             ),
@@ -665,7 +661,6 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.LOW,
                 actions=[
                     arduino("light", 0),
-                    arduino("relay", 1),
                     arduino("rgb", 0x440055),
                 ],
             ),
@@ -679,7 +674,6 @@ def build_default_automations() -> list[Automation]:
                 cooldown=120,
                 actions=[
                     arduino("light", 1),
-                    arduino("relay", 1),
                     arduino("rgb", 0xFFFFFF),
                     arduino("servo", 90),
                     arduino("servo2", 90),
@@ -696,7 +690,6 @@ def build_default_automations() -> list[Automation]:
                 cooldown=30,
                 actions=[
                     arduino("light", 0),
-                    arduino("relay", 0),
                     arduino("rgb", 0),
                     arduino("servo", 0),
                     arduino("servo2", 0),
@@ -717,7 +710,6 @@ def build_default_automations() -> list[Automation]:
                     arduino("light", 1),
                     arduino("servo", 90),
                     arduino("rgb", 0xFF8C42),
-                    arduino("relay", 1),
                     spotify("search", query="relax after work playlist"),
                     timer_action(5, "Ricordati di chiudere la porta!"),
                     news_action(limit=3),
@@ -751,7 +743,6 @@ def build_default_automations() -> list[Automation]:
                     arduino("servo", 0),
                     arduino("light", 1),
                     arduino("rgb", 0x4488FF),
-                    arduino("relay", 1),
                     spotify("search", query="rain lofi study"),
                     weather_action(),
                 ],
@@ -770,7 +761,6 @@ def build_default_automations() -> list[Automation]:
                 actions=[
                     arduino("light", 0),
                     arduino("rgb", 0xFF4400),
-                    arduino("relay", 0),
                     arduino("servo", 0),
                     spotify("search", query="cena romantica musica italiana"),
                 ],

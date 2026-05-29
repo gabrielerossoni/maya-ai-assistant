@@ -444,7 +444,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
     }
     sendResponse(id, true);
 
-  } else if (strcmp(target, "buzzer2") == 0) {
+  } else if (strcmp(target, "buzzer2") == 0 || strcmp(target, "speaker") == 0) {
     if (isSET) {
       const char *melodyName = doc["melody"] | "beep";
       startMelody(melodyName);

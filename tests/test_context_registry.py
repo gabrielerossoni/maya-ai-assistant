@@ -95,10 +95,10 @@ class TestDeviceRegistry:
 
     def test_snapshot(self, fresh_registry):
         fresh_registry.update("light", False)
-        fresh_registry.update("relay", True)
+        fresh_registry.update("servo2", 90)
         snap = fresh_registry.snapshot()
         assert "light" in snap
-        assert "relay" in snap
+        assert "servo2" in snap
 
     def test_get_current_values(self, fresh_registry):
         fresh_registry.update("light", True)
@@ -108,11 +108,11 @@ class TestDeviceRegistry:
         assert vals["rgb"] == [255, 0, 0]
 
     def test_update_from_arduino_state(self, fresh_registry):
-        state = {"light": False, "servo": 45, "relay": True}
+        state = {"light": False, "servo": 45, "servo2": 90}
         fresh_registry.update_from_arduino_state(state, scene="hardware")
         assert fresh_registry.get_value("light") is False
         assert fresh_registry.get_value("servo") == 45
-        entry = fresh_registry.get_entry("relay")
+        entry = fresh_registry.get_entry("servo2")
         assert entry["last_set_by"] == "hardware"
 
     def test_conflict_detection(self, fresh_registry):
@@ -127,9 +127,9 @@ class TestDeviceRegistry:
         assert fresh_registry.check_conflict("light", False, min_age_seconds=5.0) is False
 
     def test_persistence(self, fresh_registry, tmp_data_dir):
-        fresh_registry.update("relay", True, scene="test_persist")
+        fresh_registry.update("servo2", 90, scene="test_persist")
         from core.device_registry import DeviceRegistry
 
         DeviceRegistry._instance = None
         reg2 = DeviceRegistry()
-        assert reg2.get_value("relay") is True
+        assert reg2.get_value("servo2") == 90

@@ -210,3 +210,28 @@ class TestSceneControls:
         assert "spegni scena" in html
         assert "scene_cleared" in html
         assert "clearScenePill" in html
+
+    def test_dashboard_uses_device_cards_without_relay(self, html):
+        assert "dom-cards-grid" in html
+        assert "dom-floorplan" not in html
+        assert "dev-relay" not in html
+        assert "target: 'relay'" not in html
+        for label in [
+            "Luce",
+            "Cancello",
+            "Porta",
+            "Buzzer",
+            "Audio",
+            "Soggiorno",
+            "Camera",
+            "Studio",
+        ]:
+            assert label in html
+
+    def test_rgb_cards_cycle_multiple_colors(self, html):
+        assert "const RGB_CYCLE" in html
+        assert "function nextRgbAction" in html
+        assert "setRgbCardState(dev, action._rgbIndex)" in html
+        for label in ["ROSSO", "VERDE", "BLU", "VIOLA", "CALDO", "BIANCO"]:
+            assert label in html
+
