@@ -682,7 +682,7 @@ class AgentCore:
                 await self.socket_manager.broadcast({"type": "toggle_console", "action": "open"})
             reply = "Console neurale aperta, signore."
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -698,7 +698,7 @@ class AgentCore:
                 await self.socket_manager.broadcast({"type": "toggle_console", "action": "close"})
             reply = "Console minimizzata."
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -731,7 +731,7 @@ class AgentCore:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "spotify", "data": result})
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -741,7 +741,7 @@ class AgentCore:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -757,7 +757,7 @@ class AgentCore:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
