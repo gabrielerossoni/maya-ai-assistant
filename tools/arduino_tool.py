@@ -220,6 +220,8 @@ class ArduinoTool:
 
         try:
             with self._serial_lock:
+                if self.connection is None:
+                    return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
                 self.connection.write((json.dumps(payload) + "\n").encode())
                 self.connection.flush()
         except serial.SerialException as e:
@@ -267,6 +269,8 @@ class ArduinoTool:
 
         try:
             with self._serial_lock:
+                if self.connection is None:
+                    return None
                 self.connection.write((json.dumps(payload) + "\n").encode())
                 self.connection.flush()
         except Exception:

@@ -46,6 +46,9 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
 
     def record_error(self, tool_name: str, error: Exception, source_file: str):
         """Incrementa il contatore; dopo ERROR_THRESHOLD tenta il fix."""
+        if os.getenv("DISABLE_SELF_HEALER", "false").lower() == "true":
+            return
+
         count = self._error_counts.get(tool_name, 0) + 1
         self._error_counts[tool_name] = count
         if count >= self.ERROR_THRESHOLD and tool_name not in self._patched:
@@ -94,7 +97,7 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
                             {"role": "user", "content": user_msg},
                         ],
                         "temperature": 0.05,
-                        "max_tokens": 2000,
+                        "max_tokens": 8000,
                     },
                 )
                 patched_code = resp.json()["choices"][0]["message"]["content"]
