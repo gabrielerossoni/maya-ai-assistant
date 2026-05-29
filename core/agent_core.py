@@ -81,7 +81,7 @@ NON aggiungere testo fuori dal JSON.
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
-- arduino: (op: SET/GET, target: light/relay/servo/servo2/rgb/neopixel/buzzer/buzzer2/speaker/accel; servo=porta 0-180, servo2=cancello 0-180; neopixel: value=0xRRGGBB effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/startup/ok/notify/error/welcome)
+- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; neopixel: value=0xRRGGBB effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/startup/ok/notify/error/welcome)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: invia comandi al secondo PC (qualsiasi stringa)
 - system: comandi OS (shutdown, open_browser, screenshot)
@@ -250,7 +250,7 @@ class AgentCore:
         # --- 1. HARD ROUTING: DOMOTIC ---
         # Azione hardware esplicita: VERBO + OGGETTO
         domotic_verbs = ["accendi", "spegni", "apri", "chiudi"]
-        domotic_objects = ["luce", "led", "relè", "servo", "tapparella"]
+        domotic_objects = ["luce", "led", "servo", "tapparella", "cancello", "campanello", "rgb", "speaker"]
         if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
             return "DOMOTIC"
 
@@ -631,9 +631,11 @@ class AgentCore:
                             {
                                 "type": "state",
                                 "led": "on" if st.get("light") else "off",
-                                "relay": "on" if st.get("relay") else "off",
                                 "servo": "open" if (st.get("servo") or 0) > 0 else "0",
-                                "rgb": st.get("rgb", [0, 0, 0]),
+                                "servo2": st.get("servo2", 0),
+                                "rgb1": st.get("rgb1", [0, 0, 0]),
+                                "rgb2": st.get("rgb2", [0, 0, 0]),
+                                "rgb3": st.get("rgb3", [0, 0, 0]),
                                 "buzzer": st.get("buzzer", False),
                             }
                         )
@@ -682,7 +684,7 @@ class AgentCore:
                 await self.socket_manager.broadcast({"type": "toggle_console", "action": "open"})
             reply = "Console neurale aperta, signore."
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -698,7 +700,7 @@ class AgentCore:
                 await self.socket_manager.broadcast({"type": "toggle_console", "action": "close"})
             reply = "Console minimizzata."
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -731,7 +733,7 @@ class AgentCore:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "spotify", "data": result})
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -741,7 +743,7 @@ class AgentCore:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 
@@ -757,7 +759,7 @@ class AgentCore:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
             await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "orb", "params": {}})
+            self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
 

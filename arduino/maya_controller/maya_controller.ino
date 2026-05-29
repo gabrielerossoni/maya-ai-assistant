@@ -46,13 +46,13 @@ const int SERVO2_PIN = 10;
 const int LED_PIN = 13;
 
 #define DHT_TYPE DHT11
-#define NEOPIXEL_COUNT 8 // Freenove 8-LED module
+#define NEOPIXEL_COUNT 24 // 3 modules of 8 LEDs each
 
-// ── NeoPixel State (3 zone indipendenti) ──────
-// Pixel 0 = Soggiorno (rgb1), Pixel 1 = Camera (rgb2), Pixel 2 = Studio (rgb3)
-uint8_t zone1R = 0, zone1G = 0, zone1B = 0;
-uint8_t zone2R = 0, zone2G = 0, zone2B = 0;
-uint8_t zone3R = 0, zone3G = 0, zone3B = 0;
+// ── NeoPixel State (24 LEDs, 3 logical zones of 8 LEDs each) ──────
+// Zone 1: LEDs 0-7, Zone 2: LEDs 8-15, Zone 3: LEDs 16-23
+uint8_t ledsR[NEOPIXEL_COUNT] = {0};
+uint8_t ledsG[NEOPIXEL_COUNT] = {0};
+uint8_t ledsB[NEOPIXEL_COUNT] = {0};
 int neoEffect = 0; // 0=solid, 1=pulse, 2=rainbow, 3=alert
 
 // ── State ─────────────────────────────────────
@@ -71,10 +71,13 @@ int noteDuration = 0;
 unsigned long buzzStartMs = 0;
 unsigned long lastTelemetryMs = 0;
 unsigned long lastMqttConnectAttempt = 0;
+unsigned long lastServo1AttachMs = 0;
+unsigned long lastServo2AttachMs = 0;
 
 const unsigned long BUZZ_DURATION_MS = 200;
 const unsigned long TELEMETRY_INTERVAL = 5000;
 const unsigned long MQTT_CONNECT_INTERVAL = 10000;
+const unsigned long SERVO_DETACH_DELAY = 1000;
 
 // ── MQTT & WiFi ───────────────────────────────
 WiFiClient espClient;
@@ -83,6 +86,8 @@ PubSubClient mqttClient(espClient);
 // ── Objects ────────────────────────────────────
 Servo myServo;
 Servo myServo2;
+bool servo1Attached = false;
+bool servo2Attached = false;
 DHT dht(DHT_PIN, DHT_TYPE);
 Adafruit_NeoPixel strip(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -114,11 +119,14 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   digitalWrite(BUZZ_PIN, LOW);
 
+  // Initial servo position and detach
   myServo.attach(SERVO_PIN);
   myServo.write(0);
-
   myServo2.attach(SERVO2_PIN);
   myServo2.write(0);
+  delay(500);
+  myServo.detach();
+  myServo2.detach();
 
   dht.begin();
 
@@ -191,6 +199,16 @@ void loop() {
     if (WiFi.status() == WL_CONNECTED && mqttClient.connected()) {
       publishTelemetry();
     }
+  }
+
+  // 6. Servo auto-detach logic
+  if (servo1Attached && (millis() - lastServo1AttachMs >= SERVO_DETACH_DELAY)) {
+    myServo.detach();
+    servo1Attached = false;
+  }
+  if (servo2Attached && (millis() - lastServo2AttachMs >= SERVO_DETACH_DELAY)) {
+    myServo2.detach();
+    servo2Attached = false;
   }
 }
 
@@ -314,68 +332,102 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
   } else if (strcmp(target, "servo") == 0) {
     if (isSET) {
       servoPos = constrain(doc["value"].as<int>(), 0, 180);
+      myServo.attach(SERVO_PIN);
       myServo.write(servoPos);
+      lastServo1AttachMs = millis();
+      servo1Attached = true;
     }
     sendResponse(id, true);
 
   } else if (strcmp(target, "servo2") == 0) {
     if (isSET) {
       servo2Pos = constrain(doc["value"].as<int>(), 0, 180);
+      myServo2.attach(SERVO2_PIN);
       myServo2.write(servo2Pos);
+      lastServo2AttachMs = millis();
+      servo2Attached = true;
     }
     sendResponse(id, true);
 
   } else if (strcmp(target, "rgb1") == 0) {
     if (isSET) {
+      uint8_t r, g, b;
       JsonVariant val = doc["value"];
       if (val.is<JsonObject>()) {
-        zone1R = val["r"] | 0; zone1G = val["g"] | 0; zone1B = val["b"] | 0;
+        r = val["r"] | 0; g = val["g"] | 0; b = val["b"] | 0;
       } else {
-        applyRGBInt(zone1R, zone1G, zone1B, val.as<long>());
+        applyRGBInt(r, g, b, val.as<long>());
       }
+      for (int i = 0; i < 8; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
     }
     sendResponse(id, true);
 
   } else if (strcmp(target, "rgb2") == 0) {
     if (isSET) {
+      uint8_t r, g, b;
       JsonVariant val = doc["value"];
       if (val.is<JsonObject>()) {
-        zone2R = val["r"] | 0; zone2G = val["g"] | 0; zone2B = val["b"] | 0;
+        r = val["r"] | 0; g = val["g"] | 0; b = val["b"] | 0;
       } else {
-        applyRGBInt(zone2R, zone2G, zone2B, val.as<long>());
+        applyRGBInt(r, g, b, val.as<long>());
       }
+      for (int i = 8; i < 16; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
     }
     sendResponse(id, true);
 
   } else if (strcmp(target, "rgb3") == 0) {
     if (isSET) {
+      uint8_t r, g, b;
       JsonVariant val = doc["value"];
       if (val.is<JsonObject>()) {
-        zone3R = val["r"] | 0; zone3G = val["g"] | 0; zone3B = val["b"] | 0;
+        r = val["r"] | 0; g = val["g"] | 0; b = val["b"] | 0;
       } else {
-        applyRGBInt(zone3R, zone3G, zone3B, val.as<long>());
+        applyRGBInt(r, g, b, val.as<long>());
       }
+      for (int i = 16; i < 24; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
+    }
+    sendResponse(id, true);
+
+  } else if (strncmp(target, "rgb", 3) == 0 && strlen(target) > 3) {
+    // Individual LED control (up to 24)
+    int idx = atoi(target + 3) - 1;
+    if (idx >= 0 && idx < NEOPIXEL_COUNT) {
+      if (isSET) {
+        uint8_t r, g, b;
+        JsonVariant val = doc["value"];
+        if (val.is<JsonObject>()) {
+          r = val["r"] | 0; g = val["g"] | 0; b = val["b"] | 0;
+        } else {
+          applyRGBInt(r, g, b, val.as<long>());
+        }
+        ledsR[idx] = r; ledsG[idx] = g; ledsB[idx] = b;
+        neoEffect = doc["effect"] | 0;
+        updateNeoPixels(); // Force immediate update
+      }
     }
     sendResponse(id, true);
 
   } else if (strcmp(target, "rgb") == 0 || strcmp(target, "neopixel") == 0) {
-    // Shortcut: imposta tutte e 3 le zone allo stesso colore
+    // Shortcut: set all 24 LEDs to same color
     if (isSET) {
       JsonVariant val = doc["value"];
       uint8_t r, g, b;
       if (val.is<JsonObject>()) {
         r = val["r"] | 0; g = val["g"] | 0; b = val["b"] | 0;
       } else {
-        long c = val.as<long>();
-        r = (c >> 16) & 0xFF; g = (c >> 8) & 0xFF; b = c & 0xFF;
+        applyRGBInt(r, g, b, val.as<long>());
       }
-      zone1R = zone2R = zone3R = r;
-      zone1G = zone2G = zone3G = g;
-      zone1B = zone2B = zone3B = b;
+      for (int i = 0; i < NEOPIXEL_COUNT; i++) {
+        ledsR[i] = r; ledsG[i] = g; ledsB[i] = b;
+      }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
     }
     sendResponse(id, true);
 
@@ -392,7 +444,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
     }
     sendResponse(id, true);
 
-  } else if (strcmp(target, "buzzer2") == 0) {
+  } else if (strcmp(target, "buzzer2") == 0 || strcmp(target, "speaker") == 0) {
     if (isSET) {
       const char *melodyName = doc["melody"] | "beep";
       startMelody(melodyName);
@@ -431,11 +483,11 @@ void buildState(JsonObject state) {
   state["servo"] = servoPos;
   state["servo2"] = servo2Pos;
   JsonArray r1 = state.createNestedArray("rgb1");
-  r1.add(zone1R); r1.add(zone1G); r1.add(zone1B);
+  r1.add(ledsR[0]); r1.add(ledsG[0]); r1.add(ledsB[0]);
   JsonArray r2 = state.createNestedArray("rgb2");
-  r2.add(zone2R); r2.add(zone2G); r2.add(zone2B);
+  r2.add(ledsR[8]); r2.add(ledsG[8]); r2.add(ledsB[8]);
   JsonArray r3 = state.createNestedArray("rgb3");
-  r3.add(zone3R); r3.add(zone3G); r3.add(zone3B);
+  r3.add(ledsR[16]); r3.add(ledsG[16]); r3.add(ledsB[16]);
   state["neo_effect"] = neoEffect;
   state["buzzer"] = buzzerOn;
   state["buzz2_playing"] = (melodyNoteIndex >= 0);
@@ -636,8 +688,6 @@ void updateMelody() {
 }
 
 // ── Non-blocking NeoPixel Effects ─────────────
-// Pixel 0 = Soggiorno (zone1), Pixel 1 = Camera (zone2), Pixel 2 = Studio (zone3)
-// Pixels 3-7 restano spenti (riserva futura)
 void updateNeoPixels() {
   static unsigned long lastUpdate = 0;
   static int pulseDir = 1;
@@ -650,42 +700,37 @@ void updateNeoPixels() {
     return; // ~33 FPS
   lastUpdate = now;
 
-  // Spegni pixel non usati (3-7)
-  for (int i = 3; i < NEOPIXEL_COUNT; i++) {
-    strip.setPixelColor(i, 0);
-  }
-
-  if (neoEffect == 0) { // solid — colori indipendenti per zona
-    strip.setPixelColor(0, strip.Color(zone1R, zone1G, zone1B));
-    strip.setPixelColor(1, strip.Color(zone2R, zone2G, zone2B));
-    strip.setPixelColor(2, strip.Color(zone3R, zone3G, zone3B));
+  if (neoEffect == 0) { // solid — use individual LED colors
+    for (int i = 0; i < NEOPIXEL_COUNT; i++) {
+      strip.setPixelColor(i, strip.Color(ledsR[i], ledsG[i], ledsB[i]));
+    }
     strip.show();
   } else if (neoEffect == 1) { // pulse
     pulseVal += pulseDir * 5;
     if (pulseVal >= 255) { pulseVal = 255; pulseDir = -1; }
     if (pulseVal <= 30)  { pulseVal = 30;  pulseDir = 1;  }
 
-    strip.setPixelColor(0, strip.Color((zone1R * pulseVal) / 255, (zone1G * pulseVal) / 255, (zone1B * pulseVal) / 255));
-    strip.setPixelColor(1, strip.Color((zone2R * pulseVal) / 255, (zone2G * pulseVal) / 255, (zone2B * pulseVal) / 255));
-    strip.setPixelColor(2, strip.Color((zone3R * pulseVal) / 255, (zone3G * pulseVal) / 255, (zone3B * pulseVal) / 255));
+    for (int i = 0; i < NEOPIXEL_COUNT; i++) {
+      strip.setPixelColor(i, strip.Color((ledsR[i] * pulseVal) / 255, (ledsG[i] * pulseVal) / 255, (ledsB[i] * pulseVal) / 255));
+    }
     strip.show();
-  } else if (neoEffect == 2) { // rainbow — tutte le zone
+  } else if (neoEffect == 2) { // rainbow — all LEDs
     rainbowHue += 1;
-    for (int i = 0; i < 3; i++) {
-      uint8_t pixelHue = rainbowHue + (i * 256 / 3);
+    for (int i = 0; i < NEOPIXEL_COUNT; i++) {
+      uint8_t pixelHue = rainbowHue + (i * 256 / NEOPIXEL_COUNT);
       strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue * 256)));
     }
     strip.show();
-  } else if (neoEffect == 3) { // alert — flash rosso su tutte le zone
+  } else if (neoEffect == 3) { // alert — flash red on all LEDs
     static unsigned long lastFlash = 0;
     if (now - lastFlash >= 250) {
       lastFlash = now;
       alertOn = !alertOn;
     }
     uint32_t c = alertOn ? strip.Color(255, 0, 0) : 0;
-    strip.setPixelColor(0, c);
-    strip.setPixelColor(1, c);
-    strip.setPixelColor(2, c);
+    for (int i = 0; i < NEOPIXEL_COUNT; i++) {
+      strip.setPixelColor(i, c);
+    }
     strip.show();
   }
 }

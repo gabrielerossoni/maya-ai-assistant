@@ -22,7 +22,6 @@ class DisplayTool:
         self._thread = None
         self.status = {
             "light": "OFF",
-            "relay": "OFF",
             "servo": "CLOSED",
             "last_cmd": "—",
             "last_reply": "Sistema pronto",
@@ -76,7 +75,6 @@ class DisplayTool:
         panel = f"""
 {BOLD}{CYAN}┌─── JARVIS STATUS ─── {now} ───────────────┐{RESET}
 │  💡 Luce  : {color_state(s["light"]):<20}              │
-│  🔌 Relè  : {color_state(s["relay"]):<20}              │
 │  ⚙  Servo : {color_state(s["servo"]):<20}              │
 │                                              │
 │  Ultimo cmd : {s["last_cmd"][:35]:<35} │

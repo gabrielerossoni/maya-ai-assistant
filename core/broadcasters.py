@@ -394,14 +394,15 @@ async def execute_and_broadcast(cmd: str, agent, manager):
     except Exception as e:
         print(f"[PROCESS] Errore: {e}")
 
-    # Invia il layout finale alla dashboard
-    await manager.broadcast(
-        {
-            "type": "layout",
-            "layout": layout_data.get("type", "orb"),
-            "params": layout_data.get("params", {}),
-        }
-    )
+    # Invia il layout finale alla dashboard solo se non è 'current'
+    if layout_data.get("type") != "current":
+        await manager.broadcast(
+            {
+                "type": "layout",
+                "layout": layout_data.get("type", "orb"),
+                "params": layout_data.get("params", {}),
+            }
+        )
 
     print(f"MAYA > {full_reply}")
 

@@ -2915,18 +2915,17 @@
                     <!-- Scene chips -->
                     <div class="dom-scene-strip">
                         <span class="dom-scene-strip-label">SCENE</span>
-                        <div class="dom-scene-chip" id="chip-buongiorno" onclick="sendCmdToWS('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
-                        <div class="dom-scene-chip" id="chip-sveglia" onclick="sendCmdToWS('sveglia')"><span class="dom-chip-icon">⏰</span>Sveglia</div>
-                        <div class="dom-scene-chip" id="chip-film" onclick="sendCmdToWS('modalità film')"><span class="dom-chip-icon">🎦</span>Film</div>
-                        <div class="dom-scene-chip" id="chip-relax" onclick="sendCmdToWS('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
-                        <div class="dom-scene-chip" id="chip-buonanotte" onclick="sendCmdToWS('buonanotte')"><span class="dom-chip-icon">🌙</span>Buonanotte</div>
-                        <div class="dom-scene-chip" id="chip-cena" onclick="sendCmdToWS('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
-                        <div class="dom-scene-chip" id="chip-ospiti-arrivo" onclick="sendCmdToWS('ospiti in arrivo')"><span class="dom-chip-icon">👥</span>Ospiti</div>
-                        <div class="dom-scene-chip" id="chip-rientro" onclick="sendCmdToWS('sono rientrato')"><span class="dom-chip-icon">🏠</span>Rientro</div>
-                        <div class="dom-scene-chip" id="chip-uscita" onclick="sendCmdToWS('vado fuori')"><span class="dom-chip-icon">🚶</span>Uscita</div>
-                        <div class="dom-scene-chip" id="chip-piove" onclick="sendCmdToWS('piove')"><span class="dom-chip-icon">🌧️</span>Piove</div>
-                        <div class="dom-scene-chip" id="chip-allarme" onclick="sendCmdToWS('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
-                        <div class="dom-scene-chip off" id="chip-scene-off" onclick="sendCmdToWS('spegni scena')"><span class="dom-chip-icon">OFF</span>Scene</div>
+                        <div class="dom-scene-chip" id="chip-buongiorno" onclick="toggleScene('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
+                        <div class="dom-scene-chip" id="chip-sveglia" onclick="toggleScene('sveglia')"><span class="dom-chip-icon">⏰</span>Sveglia</div>
+                        <div class="dom-scene-chip" id="chip-film" onclick="toggleScene('modalità film')"><span class="dom-chip-icon">🎦</span>Film</div>
+                        <div class="dom-scene-chip" id="chip-relax" onclick="toggleScene('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
+                        <div class="dom-scene-chip" id="chip-buonanotte" onclick="toggleScene('buonanotte')"><span class="dom-chip-icon">🌙</span>Buonanotte</div>
+                        <div class="dom-scene-chip" id="chip-cena" onclick="toggleScene('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
+                        <div class="dom-scene-chip" id="chip-ospiti-arrivo" onclick="toggleScene('ospiti in arrivo')"><span class="dom-chip-icon">👥</span>Ospiti</div>
+                        <div class="dom-scene-chip" id="chip-rientro" onclick="toggleScene('sono rientrato')"><span class="dom-chip-icon">🏠</span>Rientro</div>
+                        <div class="dom-scene-chip" id="chip-uscita" onclick="toggleScene('vado fuori')"><span class="dom-chip-icon">🚶</span>Uscita</div>
+                        <div class="dom-scene-chip" id="chip-piove" onclick="toggleScene('piove')"><span class="dom-chip-icon">🌧️</span>Piove</div>
+                        <div class="dom-scene-chip" id="chip-allarme" onclick="toggleScene('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
                     </div>
                     <!-- Main content -->
                     <div class="dom-content">
@@ -3209,6 +3208,16 @@
         let scene, camera, renderer, mainOrb, orbUniforms, orbMotionState;
         let consoleStreamEl = null;
         let consoleOpen = false;
+        let _currentScene = null;
+        function toggleScene(sceneName) {
+            if (_currentScene === sceneName) {
+                sendCmdToWS('spegni scena');
+                _currentScene = null;
+            } else {
+                sendCmdToWS(sceneName);
+                _currentScene = sceneName;
+            }
+        }
         // =============================================
         // SCREEN STATE MACHINE
         // Screen 1: idle  → sfondo nero, orb centrato, clock
@@ -4354,13 +4363,40 @@
             }
             setStatus('[SCENA] OFF');
         }
-        // Stato locale dispositivi per la mappa casa
+        // Stato locale dispositivi della domotica
         const domState = {
             light: false,
             servo: false, servo2: false,
             alarm: false, buzz2: false,
             rgb1: false, rgb2: false, rgb3: false
         };
+        const RGB_CYCLE = [
+            { label: 'OFF', value: 0, hex: '#14171c' },
+            { label: 'ROSSO', value: 16711680, hex: '#ff3030' },
+            { label: 'VERDE', value: 65280, hex: '#4caf50' },
+            { label: 'BLU', value: 255, hex: '#4488ff' },
+            { label: 'VIOLA', value: 10494192, hex: '#a020f0' },
+            { label: 'CALDO', value: 16755200, hex: '#ffaa00' },
+            { label: 'BIANCO', value: 16777215, hex: '#ffffff' },
+        ];
+        const domRgbIndex = { rgb1: 0, rgb2: 0, rgb3: 0 };
+        const domRgbSwatches = {
+            rgb1: 'casa-rgb1-swatch',
+            rgb2: 'casa-rgb2-swatch',
+            rgb3: 'casa-rgb3-swatch',
+        };
+        function setRgbCardState(dev, index) {
+            const rgb = RGB_CYCLE[index] || RGB_CYCLE[0];
+            domRgbIndex[dev] = index;
+            domState[dev] = rgb.value !== 0;
+            const sw = document.getElementById(domRgbSwatches[dev]);
+            if (sw) sw.style.background = rgb.hex;
+        }
+        function nextRgbAction(dev) {
+            const current = domState[dev] ? domRgbIndex[dev] : 0;
+            const next = (current + 1) % RGB_CYCLE.length;
+            return { op: 'SET', target: dev, value: RGB_CYCLE[next].value, _rgbIndex: next };
+        }
         function toggleDevice(dev) {
             const actionMap = {
                 light: () => ({ op: 'SET', target: 'light', value: domState.light ? 0 : 1 }),
@@ -4368,17 +4404,22 @@
                 servo2: () => ({ op: 'SET', target: 'servo2', value: domState.servo2 ? 0 : 90 }),
                 buzz2:  () => ({ op: 'SET', target: 'buzzer2', melody: 'beep' }),
                 alarm: () => ({ op: 'SET', target: 'buzzer', value: 1 }),
-                rgb1: () => ({ op: 'SET', target: 'rgb1', value: domState.rgb1 ? 0 : 16711680 }),
-                rgb2: () => ({ op: 'SET', target: 'rgb2', value: domState.rgb2 ? 0 : 65280 }),
-                rgb3: () => ({ op: 'SET', target: 'rgb3', value: domState.rgb3 ? 0 : 255 }),
+                rgb1: () => nextRgbAction('rgb1'),
+                rgb2: () => nextRgbAction('rgb2'),
+                rgb3: () => nextRgbAction('rgb3'),
             };
             const action = actionMap[dev]?.();
             if (!action) return;
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', ...action } }));
+                const { _rgbIndex, ...arduinoAction } = action;
+                ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', ...arduinoAction } }));
             }
             if (dev !== 'alarm') {
-                domState[dev] = !domState[dev];
+                if (dev in domRgbIndex) {
+                    setRgbCardState(dev, action._rgbIndex);
+                } else {
+                    domState[dev] = !domState[dev];
+                }
                 refreshDomUI();
             }
         }
@@ -4402,7 +4443,7 @@
                     if (stateEl) stateEl.textContent = '—';
                 } else if (domState[dev]) {
                     el.classList.add('active');
-                    if (stateEl) stateEl.textContent = labels.onLabel;
+                    if (stateEl) stateEl.textContent = (dev in domRgbIndex) ? RGB_CYCLE[domRgbIndex[dev]].label : labels.onLabel;
                 } else {
                     el.classList.remove('active');
                     if (stateEl) stateEl.textContent = labels.offLabel;
@@ -4414,10 +4455,15 @@
             return function(d) {
                 if (d[key] !== undefined) {
                     const rgb = Array.isArray(d[key]) ? d[key] : [0, 0, 0];
-                    domState[key] = rgb.some(v => v > 0);
                     const hex = '#' + rgb.map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
-                    const sw = document.getElementById(swatchId);
-                    if (sw) sw.style.background = hex;
+                    const knownIndex = RGB_CYCLE.findIndex(color => color.hex.toLowerCase() === hex.toLowerCase());
+                    if (knownIndex >= 0) {
+                        setRgbCardState(key, knownIndex);
+                    } else {
+                        domState[key] = rgb.some(v => v > 0);
+                        const sw = document.getElementById(swatchId);
+                        if (sw) sw.style.background = hex;
+                    }
                 }
             };
         }
