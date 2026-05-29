@@ -2915,18 +2915,17 @@
                     <!-- Scene chips -->
                     <div class="dom-scene-strip">
                         <span class="dom-scene-strip-label">SCENE</span>
-                        <div class="dom-scene-chip" id="chip-buongiorno" onclick="sendCmdToWS('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
-                        <div class="dom-scene-chip" id="chip-sveglia" onclick="sendCmdToWS('sveglia')"><span class="dom-chip-icon">⏰</span>Sveglia</div>
-                        <div class="dom-scene-chip" id="chip-film" onclick="sendCmdToWS('modalità film')"><span class="dom-chip-icon">🎦</span>Film</div>
-                        <div class="dom-scene-chip" id="chip-relax" onclick="sendCmdToWS('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
-                        <div class="dom-scene-chip" id="chip-buonanotte" onclick="sendCmdToWS('buonanotte')"><span class="dom-chip-icon">🌙</span>Buonanotte</div>
-                        <div class="dom-scene-chip" id="chip-cena" onclick="sendCmdToWS('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
-                        <div class="dom-scene-chip" id="chip-ospiti-arrivo" onclick="sendCmdToWS('ospiti in arrivo')"><span class="dom-chip-icon">👥</span>Ospiti</div>
-                        <div class="dom-scene-chip" id="chip-rientro" onclick="sendCmdToWS('sono rientrato')"><span class="dom-chip-icon">🏠</span>Rientro</div>
-                        <div class="dom-scene-chip" id="chip-uscita" onclick="sendCmdToWS('vado fuori')"><span class="dom-chip-icon">🚶</span>Uscita</div>
-                        <div class="dom-scene-chip" id="chip-piove" onclick="sendCmdToWS('piove')"><span class="dom-chip-icon">🌧️</span>Piove</div>
-                        <div class="dom-scene-chip" id="chip-allarme" onclick="sendCmdToWS('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
-                        <div class="dom-scene-chip off" id="chip-scene-off" onclick="sendCmdToWS('spegni scena')"><span class="dom-chip-icon">OFF</span>Scene</div>
+                        <div class="dom-scene-chip" id="chip-buongiorno" onclick="toggleScene('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
+                        <div class="dom-scene-chip" id="chip-sveglia" onclick="toggleScene('sveglia')"><span class="dom-chip-icon">⏰</span>Sveglia</div>
+                        <div class="dom-scene-chip" id="chip-film" onclick="toggleScene('modalità film')"><span class="dom-chip-icon">🎦</span>Film</div>
+                        <div class="dom-scene-chip" id="chip-relax" onclick="toggleScene('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
+                        <div class="dom-scene-chip" id="chip-buonanotte" onclick="toggleScene('buonanotte')"><span class="dom-chip-icon">🌙</span>Buonanotte</div>
+                        <div class="dom-scene-chip" id="chip-cena" onclick="toggleScene('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
+                        <div class="dom-scene-chip" id="chip-ospiti-arrivo" onclick="toggleScene('ospiti in arrivo')"><span class="dom-chip-icon">👥</span>Ospiti</div>
+                        <div class="dom-scene-chip" id="chip-rientro" onclick="toggleScene('sono rientrato')"><span class="dom-chip-icon">🏠</span>Rientro</div>
+                        <div class="dom-scene-chip" id="chip-uscita" onclick="toggleScene('vado fuori')"><span class="dom-chip-icon">🚶</span>Uscita</div>
+                        <div class="dom-scene-chip" id="chip-piove" onclick="toggleScene('piove')"><span class="dom-chip-icon">🌧️</span>Piove</div>
+                        <div class="dom-scene-chip" id="chip-allarme" onclick="toggleScene('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
                     </div>
                     <!-- Main content -->
                     <div class="dom-content">
@@ -3209,6 +3208,16 @@
         let scene, camera, renderer, mainOrb, orbUniforms, orbMotionState;
         let consoleStreamEl = null;
         let consoleOpen = false;
+        let _currentScene = null;
+        function toggleScene(sceneName) {
+            if (_currentScene === sceneName) {
+                sendCmdToWS('spegni scena');
+                _currentScene = null;
+            } else {
+                sendCmdToWS(sceneName);
+                _currentScene = sceneName;
+            }
+        }
         // =============================================
         // SCREEN STATE MACHINE
         // Screen 1: idle  → sfondo nero, orb centrato, clock

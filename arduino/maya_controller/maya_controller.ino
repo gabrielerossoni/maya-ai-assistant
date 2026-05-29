@@ -360,6 +360,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       }
       for (int i = 0; i < 8; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
     }
     sendResponse(id, true);
 
@@ -374,6 +375,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       }
       for (int i = 8; i < 16; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
     }
     sendResponse(id, true);
 
@@ -388,6 +390,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       }
       for (int i = 16; i < 24; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
     }
     sendResponse(id, true);
 
@@ -405,6 +408,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
         }
         ledsR[idx] = r; ledsG[idx] = g; ledsB[idx] = b;
         neoEffect = doc["effect"] | 0;
+        updateNeoPixels(); // Force immediate update
       }
     }
     sendResponse(id, true);
@@ -417,13 +421,13 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       if (val.is<JsonObject>()) {
         r = val["r"] | 0; g = val["g"] | 0; b = val["b"] | 0;
       } else {
-        long c = val.as<long>();
-        r = (c >> 16) & 0xFF; g = (c >> 8) & 0xFF; b = c & 0xFF;
+        applyRGBInt(r, g, b, val.as<long>());
       }
       for (int i = 0; i < NEOPIXEL_COUNT; i++) {
         ledsR[i] = r; ledsG[i] = g; ledsB[i] = b;
       }
       neoEffect = doc["effect"] | 0;
+      updateNeoPixels(); // Force immediate update
     }
     sendResponse(id, true);
 
