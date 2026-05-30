@@ -239,6 +239,86 @@ def test_send_sync_timeout_and_missing_connection_cleanup(real_tool):
     assert real_tool._sync_pending == {}
 
 
+def test_batch_continues_after_timeout(real_tool, monkeypatch):
+    sent = []
+
+    def fake_send(op, target, value, **extra):
+        sent.append(target)
+        if target == "light":
+            return {"status": "error", "message": "timeout", "state": {}}
+        return {"status": "ok", "state": {}}
+
+    monkeypatch.setattr(real_tool, "_send_batch_sync", lambda actions, timeout=3.0: {"status": "error", "message": "timeout", "state": {}})
+    monkeypatch.setattr(real_tool, "_send_sync", fake_send)
+
+    result = real_tool.execute(
+        {
+            "op": "BATCH",
+            "actions": [
+                {"op": "SET", "target": "light", "value": 1},
+                {"op": "SET", "target": "rgb", "value": 0xFFD580},
+                {"op": "SET", "target": "servo", "value": 0},
+            ],
+        }
+    )
+
+    assert result["status"] == "partial"
+    assert sent == ["light", "rgb", "servo"]
+
+
+def test_batch_treats_all_timeouts_as_partial(real_tool, monkeypatch):
+    monkeypatch.setattr(real_tool, "_send_batch_sync", lambda actions, timeout=3.0: {"status": "error", "message": "timeout", "state": {}})
+    monkeypatch.setattr(
+        real_tool,
+        "_send_sync",
+        lambda op, target, value, **extra: {"status": "error", "message": "timeout", "state": {}},
+    )
+
+    result = real_tool.execute(
+        {
+            "op": "BATCH",
+            "actions": [
+                {"op": "SET", "target": "light", "value": 1},
+                {"op": "SET", "target": "rgb", "value": 0xFFD580},
+            ],
+        }
+    )
+
+    assert result["status"] == "partial"
+
+
+def test_batch_prefers_single_serial_command(real_tool):
+    real_tool.connection = ReplyingConnection(
+        real_tool,
+        {
+            "status": "ok",
+            "state": {
+                "light": True,
+                "servo": 0,
+                "rgb1": [255, 213, 128],
+            },
+        },
+    )
+
+    result = real_tool.execute(
+        {
+            "op": "BATCH",
+            "actions": [
+                {"op": "SET", "target": "light", "value": 1},
+                {"op": "SET", "target": "rgb", "value": 0xFFD580},
+                {"op": "SET", "target": "servo", "value": 0},
+            ],
+        }
+    )
+
+    sent = json.loads(real_tool.connection.writes[0].decode().strip())
+    assert sent["cmd"] == "BATCH"
+    assert [a["target"] for a in sent["actions"]] == ["light", "rgb", "servo"]
+    assert len(real_tool.connection.writes) == 1
+    assert result["status"] == "ok"
+    assert result["state"]["light"] is True
+
+
 def test_get_sensor_data_sends_get_and_converts_numbers(real_tool):
     real_tool.connection = ReplyingConnection(real_tool, {"status": "ok", "temp": "22.5", "humidity": "61"})
 

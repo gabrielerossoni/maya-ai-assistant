@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -56,6 +57,7 @@ class Action:
     delay: float = 0.0  # secondi di attesa prima dell'esecuzione
     retry: int = 1  # tentativi in caso di errore
     timeout: float = 5.0  # timeout per tool lenti (es. Arduino seriale)
+    background: bool = False  # se True parte dopo il foreground senza bloccare la scena
 
     def to_tool_action(self) -> dict:
         """Converte in formato atteso da ToolManager.execute()."""
@@ -96,6 +98,11 @@ def arduino_all_off() -> Action:
 
 def spotify(command: str, **kwargs) -> Action:
     return Action(tool="spotify", params={"command": command, **kwargs})
+
+
+def background(action: Action) -> Action:
+    action.background = True
+    return action
 
 
 def timer_action(minutes: int, message: str) -> Action:
@@ -299,6 +306,8 @@ class AutomationEngine:
         self.bus = EventBus()
         self._event_log: list[dict] = []  # ultimi N eventi eseguiti
         self._event_subscriptions: dict[tuple[str, str], Callable] = {}
+        self.scheduler_interval = float(os.getenv("AUTOMATION_SCHEDULER_INTERVAL", "5"))
+        self._scene_lock = asyncio.Lock()
 
     # ── Registrazione ─────────────────────────────────────────────────────────
 
@@ -398,12 +407,22 @@ class AutomationEngine:
 
         logger.info(f"[ENGINE] Esecuzione '{scene.name}' (priorità={scene.priority}, source={source})")
 
+        await self._scene_lock.acquire()
+        if not scene.can_run():
+            self._scene_lock.release()
+            reason = "cooldown" if time.time() - scene._last_run < scene.cooldown else "condizioni non soddisfatte"
+            logger.info(f"[ENGINE] '{scene.name}' bloccata: {reason}")
+            return {"status": "skipped", "reason": reason}
+
         results = []
         errors = []
         conflicts = []
         start_ts = time.time()
 
-        for action in self._compact_arduino_actions(scene.actions):
+        foreground_actions = self._hardware_first([action for action in scene.actions if not action.background])
+        background_actions = [action for action in scene.actions if action.background]
+
+        for action in self._compact_arduino_actions(foreground_actions):
             if action.delay > 0:
                 await asyncio.sleep(action.delay)
 
@@ -424,10 +443,13 @@ class AutomationEngine:
                 logger.warning(f"[ENGINE] '{scene.name}' — errore in {action}: {result.get('message')}")
 
             # Aggiorna registry dopo azioni Arduino
-            if action.tool == "arduino" and result.get("status") == "ok":
+            if action.tool == "arduino" and result.get("status") in {"ok", "partial"}:
                 state = result.get("state", {})
                 if state:
                     registry.update_from_arduino_state(state, scene=scene.name)
+
+        if background_actions:
+            asyncio.create_task(self._execute_background_actions(scene.name, background_actions))
 
         # Aggiorna contesto
         scene.mark_run()
@@ -456,6 +478,7 @@ class AutomationEngine:
         await self.bus.publish("scene_executed", event_entry)
 
         logger.info(f"[ENGINE] '{scene.name}' completata in {elapsed}s — status={status}")
+        self._scene_lock.release()
         return {"status": status, "results": results, "errors": errors, "conflicts": conflicts, "elapsed": elapsed}
 
     async def execute_by_name(self, name: str, source: str = "manual") -> dict:
@@ -473,6 +496,20 @@ class AutomationEngine:
         return results
 
     # ── Esecuzione singola azione con retry ───────────────────────────────────
+
+    async def _execute_background_actions(self, scene_name: str, actions: list[Action]):
+        for action in self._compact_arduino_actions(actions):
+            if action.delay > 0:
+                await asyncio.sleep(action.delay)
+            result = await self._execute_action_with_retry(action, f"{scene_name}:background")
+            if result.get("status") == "error":
+                logger.warning(f"[ENGINE] '{scene_name}' background — errore in {action}: {result.get('message')}")
+
+    def _hardware_first(self, actions: list[Action]) -> list[Action]:
+        immediate_arduino = [action for action in actions if action.tool == "arduino" and action.delay <= 0]
+        arduino_ids = {id(action) for action in immediate_arduino}
+        remaining = [action for action in actions if id(action) not in arduino_ids]
+        return immediate_arduino + remaining
 
     def _compact_arduino_actions(self, actions: list[Action]) -> list[Action]:
         compacted: list[Action] = []
@@ -595,7 +632,7 @@ class AutomationEngine:
             except Exception as e:
                 logger.error(f"[SCHEDULER] Errore: {e}")
 
-            await asyncio.sleep(60)  # controlla ogni minuto
+            await asyncio.sleep(self.scheduler_interval)
 
     # ── Event log ─────────────────────────────────────────────────────────────
 
@@ -623,7 +660,9 @@ class AutomationEngine:
             registry.update_from_arduino_state(result["state"], scene="scene_off")
         context.set_scene(None)
         status = "ok" if not errors else "partial"
-        self._log_event({"scene": previous, "source": "manual", "status": "cleared", "errors": errors, "ts": time.time()})
+        self._log_event(
+            {"scene": previous, "source": "manual", "status": "cleared", "errors": errors, "ts": time.time()}
+        )
         return {"status": status, "previous": previous, "results": results, "errors": errors}
 
 
@@ -683,16 +722,15 @@ def build_default_automations() -> list[Automation]:
                     arduino("light", 1),
                     arduino("rgb", 0xFFD580),
                     arduino("servo", 0),
-                    spotify("search", query="buongiorno playlist mattina"),
-                    weather_action(),
-                    news_action(limit=5),
-                    calendar_action("list"),
+                    background(spotify("search", query="buongiorno playlist mattina")),
+                    background(weather_action()),
+                    background(news_action(limit=5)),
+                    background(calendar_action("list")),
                 ],
             ),
             aliases=["buon giorno", "morning"],
             triggers=[
                 Trigger(type="time", time="07:00"),
-                Trigger(type="context", context={"time_slot": "morning", "presence": "home"}),
             ],
         ),
         # ── Sveglia ───────────────────────────────────────────────────────────

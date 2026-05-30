@@ -19,7 +19,7 @@ except ImportError:
 BAUD_RATE = 115200
 TIMEOUT_SEC = 3
 SERIAL_PORT = os.getenv("ARDUINO_PORT", "AUTO")
-ARDUINO_BATCH_STEP_TIMEOUT = float(os.getenv("ARDUINO_BATCH_STEP_TIMEOUT", "0.6"))
+ARDUINO_BATCH_STEP_TIMEOUT = float(os.getenv("ARDUINO_BATCH_STEP_TIMEOUT", "1.0"))
 
 VALID_TARGETS = {
     "light",
@@ -215,8 +215,22 @@ class ArduinoTool:
     def _execute_batch(self, actions: list) -> dict:
         if not isinstance(actions, list) or not actions:
             return {"status": "error", "message": "batch Arduino vuoto"}
+        invalid = self._validate_batch_actions(actions)
+        if invalid:
+            return {"status": "error", "message": invalid}
+
+        if self.simulated:
+            return self._simulate("BATCH", "batch", actions)
+
+        batch_result = self._send_batch_sync(actions, timeout=max(1.5, ARDUINO_BATCH_STEP_TIMEOUT * len(actions)))
+        if batch_result.get("status") == "ok":
+            return batch_result
+
+        if batch_result.get("message") not in {"bad_cmd", "timeout"}:
+            return batch_result
 
         results = []
+        errors = []
         for item in actions:
             if not isinstance(item, dict):
                 return {"status": "error", "message": "azione batch Arduino non valida", "results": results}
@@ -225,14 +239,33 @@ class ArduinoTool:
             result = self.execute(sub_action)
             results.append(result)
             if result.get("status") == "error":
-                return {
-                    "status": "error",
-                    "message": result.get("message", "errore batch Arduino"),
-                    "results": results,
-                    "state": self.sim_state.copy(),
-                }
+                errors.append({"action": item, "message": result.get("message", "errore Arduino")})
 
+        if errors and len(errors) == len(actions) and not all(e["message"] == "timeout" for e in errors):
+            return {
+                "status": "error",
+                "message": errors[0]["message"],
+                "errors": errors,
+                "results": results,
+                "state": self.sim_state.copy(),
+            }
+        if errors:
+            return {"status": "partial", "errors": errors, "results": results, "state": self.sim_state.copy()}
         return {"status": "ok", "results": results, "state": self.sim_state.copy()}
+
+    def _validate_batch_actions(self, actions: list) -> str:
+        for item in actions:
+            if not isinstance(item, dict):
+                return "azione batch Arduino non valida"
+            target = item.get("target", "")
+            op = str(item.get("op", "SET")).upper()
+            if target == "speaker":
+                target = "buzzer2"
+            if target not in VALID_TARGETS:
+                return f"target Arduino non supportato: {target}"
+            if op not in {"SET", "GET"}:
+                return f"operazione Arduino non supportata: {op}"
+        return ""
 
     def get_telemetry(self) -> dict:
         return self._telemetry.copy()
@@ -293,6 +326,66 @@ class ArduinoTool:
             with self._lock:
                 self._sync_pending.pop(msg_id, None)
             return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
+
+    def _send_batch_sync(self, actions: list, timeout=3.0) -> dict:
+        msg_id = self._next_id()
+        payload_actions = []
+        for item in actions:
+            cmd = str(item.get("op", "SET")).upper()
+            payload = {"cmd": cmd, "target": item["target"]}
+            if "value" in item:
+                payload["value"] = item["value"]
+            for key in ("effect", "melody"):
+                if key in item:
+                    payload[key] = item[key]
+            payload_actions.append(payload)
+
+        payload = {"id": msg_id, "cmd": "BATCH", "actions": payload_actions}
+
+        event = threading.Event()
+        holder: list = [None]
+        with self._lock:
+            self._sync_pending[msg_id] = (event, holder)
+
+        try:
+            with self._serial_lock:
+                if self.connection is None:
+                    with self._lock:
+                        self._sync_pending.pop(msg_id, None)
+                    return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
+                self.connection.write((json.dumps(payload) + "\n").encode())
+                self.connection.flush()
+        except serial.SerialException as e:
+            with self._lock:
+                self._sync_pending.pop(msg_id, None)
+            return {"status": "error", "message": str(e), "state": self.sim_state.copy()}
+
+        if event.wait(timeout=timeout):
+            data = holder[0] or {}
+            state = data.get("state", {})
+            if state:
+                self.sim_state.update(
+                    {
+                        "light": state.get("light", self.sim_state["light"]),
+                        "servo": state.get("servo", self.sim_state["servo"]),
+                        "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
+                        "rgb1": state.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
+                        "rgb2": state.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
+                        "rgb3": state.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
+                        "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                        "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
+                        "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
+                    }
+                )
+            status = data.get("status", "error")
+            result = {"status": status, "state": self.sim_state.copy()}
+            if status == "error":
+                result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
+            return result
+
+        with self._lock:
+            self._sync_pending.pop(msg_id, None)
+        return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
 
     def _simulate(self, op: str, target: str, value, **extra) -> dict:
         return {"status": "error", "message": "arduino non connesso"}

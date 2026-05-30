@@ -195,6 +195,31 @@ class TestExecute:
         assert result["status"] == "ok"
         assert mock_tool_manager.execute.call_count == 3
 
+    @pytest.mark.asyncio
+    async def test_execute_prioritizes_hardware_first(self, engine, mock_tool_manager):
+        seen = []
+
+        async def record(action):
+            seen.append(action["tool"])
+            return {"status": "ok", "state": {}}
+
+        mock_tool_manager.execute = record
+        auto = Automation(
+            scene=Scene(
+                name="hardware_first",
+                actions=[
+                    Action(tool="spotify", params={"command": "pause"}),
+                    Action(tool="arduino", params={"op": "SET", "target": "light", "value": 1}),
+                    Action(tool="weather", params={"location": "Milano"}),
+                ],
+            )
+        )
+
+        result = await engine.execute(auto)
+
+        assert result["status"] == "ok"
+        assert seen == ["arduino", "spotify", "weather"]
+
 
 # ── Test condizioni ───────────────────────────────────────────────────────────
 
@@ -378,3 +403,18 @@ class TestDefaults:
         autos = build_default_automations()
         engine.register_all(autos)
         assert len(engine.list_automations()) == len(autos)
+
+    def test_buongiorno_is_time_trigger_only(self, fresh_context, fresh_registry):
+        auto = next(a for a in build_default_automations() if a.name == "buongiorno")
+
+        assert any(t.type == "time" and t.time == "07:00" for t in auto.triggers)
+        assert not any(t.type == "context" for t in auto.triggers)
+
+    def test_buongiorno_runs_visual_actions_before_background(self, fresh_context, fresh_registry):
+        auto = next(a for a in build_default_automations() if a.name == "buongiorno")
+
+        foreground = [a for a in auto.scene.actions if not a.background]
+        background_actions = [a for a in auto.scene.actions if a.background]
+
+        assert [a.tool for a in foreground] == ["arduino", "arduino", "arduino"]
+        assert [a.tool for a in background_actions] == ["spotify", "weather", "news", "calendar"]
