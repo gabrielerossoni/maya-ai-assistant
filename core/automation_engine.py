@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -56,6 +57,7 @@ class Action:
     delay: float = 0.0  # secondi di attesa prima dell'esecuzione
     retry: int = 1  # tentativi in caso di errore
     timeout: float = 5.0  # timeout per tool lenti (es. Arduino seriale)
+    background: bool = False  # se True parte dopo il foreground senza bloccare la scena
 
     def to_tool_action(self) -> dict:
         """Converte in formato atteso da ToolManager.execute()."""
@@ -74,8 +76,45 @@ def arduino(target: str, value: Any = None, **kwargs) -> Action:
     return Action(tool="arduino", params={"op": "SET", **params})
 
 
+def arduino_batch(actions: list[Action], timeout: float = 3.0) -> Action:
+    commands = [a.params.copy() for a in actions if a.tool == "arduino"]
+    return Action(tool="arduino", params={"op": "BATCH", "actions": commands}, timeout=timeout)
+
+
+def arduino_all_off() -> Action:
+    return arduino_batch(
+        [
+            arduino("light", 0),
+            arduino("servo", 0),
+            arduino("servo2", 0),
+            arduino("rgb", 0, effect=0),
+            arduino("neopixel", 0, effect=0),
+            arduino("buzzer", 0),
+            Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "off"}),
+        ],
+        timeout=4.0,
+    )
+
+
 def spotify(command: str, **kwargs) -> Action:
     return Action(tool="spotify", params={"command": command, **kwargs})
+
+
+def background(action: Action) -> Action:
+    action.background = True
+    return action
+
+
+def delayed_background(action: Action, delay: float) -> Action:
+    action.delay = delay
+    action.background = True
+    return action
+
+
+def arduino_melody(melody: str, delay: float = 0.0, background_action: bool = False) -> Action:
+    action = Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": melody}, delay=delay)
+    action.background = background_action
+    return action
 
 
 def timer_action(minutes: int, message: str) -> Action:
@@ -92,6 +131,30 @@ def news_action(limit: int = 3) -> Action:
 
 def calendar_action(act: str = "list") -> Action:
     return Action(tool="calendar", params={"action": act})
+
+
+def display_action(layout: str, delay: float = 0.0, **params) -> Action:
+    return Action(tool="display", params={"layout": layout, **params}, delay=delay)
+
+
+def _background_buzzer_pulse(duration: float = 30.0, interval: float = 0.5) -> list[Action]:
+    actions: list[Action] = []
+    steps = int(duration / interval)
+    for i in range(steps):
+        value = 1 if i % 2 == 0 else 0
+        actions.append(delayed_background(arduino("buzzer", value), interval))
+    actions.append(delayed_background(arduino("buzzer", 0), 0.0))
+    return actions
+
+
+def _background_melody_loop(melody: str, duration: float = 30.0, repeat_every: float = 4.0) -> list[Action]:
+    actions: list[Action] = []
+    elapsed = repeat_every
+    while elapsed < duration:
+        actions.append(delayed_background(arduino_melody(melody), repeat_every))
+        elapsed += repeat_every
+    actions.append(delayed_background(arduino_melody("off"), max(0.0, duration - (elapsed - repeat_every))))
+    return actions
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,9 +228,9 @@ class Scene:
     cooldown: float = 0.0  # secondi minimi tra due esecuzioni
     _last_run: float = field(default=0.0, init=False, repr=False)
 
-    def can_run(self) -> bool:
+    def can_run(self, ignore_cooldown: bool = False) -> bool:
         """Verifica condizioni e cooldown."""
-        if time.time() - self._last_run < self.cooldown:
+        if not ignore_cooldown and time.time() - self._last_run < self.cooldown:
             return False
         return all(c.evaluate() for c in self.conditions)
 
@@ -270,15 +333,19 @@ class AutomationEngine:
     - Esporre l'event bus per integrazioni esterne
     """
 
-    def __init__(self, tool_manager=None, memory=None):
+    def __init__(self, tool_manager=None, memory=None, socket_manager=None):
         self._tool_manager = tool_manager
         self.memory = memory
+        self.socket_manager = socket_manager
         self._automations: dict[str, Automation] = {}
         self._active_tasks: dict[str, asyncio.Task] = {}
+        self._background_tasks: dict[str, set[asyncio.Task]] = {}
         self._scheduler_task: asyncio.Task | None = None
         self.bus = EventBus()
         self._event_log: list[dict] = []  # ultimi N eventi eseguiti
         self._event_subscriptions: dict[tuple[str, str], Callable] = {}
+        self.scheduler_interval = float(os.getenv("AUTOMATION_SCHEDULER_INTERVAL", "5"))
+        self._scene_lock = asyncio.Lock()
 
     # ── Registrazione ─────────────────────────────────────────────────────────
 
@@ -350,6 +417,17 @@ class AutomationEngine:
     def list_automations(self) -> list[str]:
         return [name for name, a in self._automations.items() if a.is_valid()]
 
+    def _is_manual_source(self, source: str) -> bool:
+        return (source or "manual").strip().lower() in {"manual", "voice", "dashboard", "test"}
+
+    def _blocked_reason(self, scene: Scene, ignore_cooldown: bool = False) -> str:
+        if not ignore_cooldown and time.time() - scene._last_run < scene.cooldown:
+            return "cooldown"
+        return "condizioni non soddisfatte"
+
+    def _is_critical_action_error(self, action: Action) -> bool:
+        return action.tool in {"arduino", "timer"}
+
     # ── Esecuzione ────────────────────────────────────────────────────────────
 
     async def execute(self, automation: Automation, source: str = "manual") -> dict:
@@ -363,9 +441,10 @@ class AutomationEngine:
         - event bus publish
         """
         scene = automation.scene
+        ignore_cooldown = self._is_manual_source(source)
 
-        if not scene.can_run():
-            reason = "cooldown" if time.time() - scene._last_run < scene.cooldown else "condizioni non soddisfatte"
+        if not scene.can_run(ignore_cooldown=ignore_cooldown):
+            reason = self._blocked_reason(scene, ignore_cooldown=ignore_cooldown)
             logger.info(f"[ENGINE] '{scene.name}' bloccata: {reason}")
             return {"status": "skipped", "reason": reason}
 
@@ -378,18 +457,30 @@ class AutomationEngine:
 
         logger.info(f"[ENGINE] Esecuzione '{scene.name}' (priorità={scene.priority}, source={source})")
 
+        await self._scene_lock.acquire()
+        if not scene.can_run(ignore_cooldown=ignore_cooldown):
+            self._scene_lock.release()
+            reason = self._blocked_reason(scene, ignore_cooldown=ignore_cooldown)
+            logger.info(f"[ENGINE] '{scene.name}' bloccata: {reason}")
+            return {"status": "skipped", "reason": reason}
+
         results = []
         errors = []
+        warnings = []
         conflicts = []
         start_ts = time.time()
 
-        for action in scene.actions:
+        foreground_actions = self._hardware_first([action for action in scene.actions if not action.background])
+        background_actions = [action for action in scene.actions if action.background]
+
+        for action in self._compact_arduino_actions(foreground_actions):
             if action.delay > 0:
                 await asyncio.sleep(action.delay)
 
-            conflict = self._detect_action_conflict(action, scene.name)
-            if conflict:
-                conflicts.append(conflict)
+            action_conflicts = self._detect_action_conflicts(action, scene.name)
+            if action_conflicts:
+                conflicts.extend(action_conflicts)
+                conflict = action_conflicts[0]
                 logger.info(
                     f"[ENGINE] Possibile conflitto su {conflict['device']}: "
                     f"{conflict['previous_scene']} -> {scene.name}"
@@ -399,14 +490,25 @@ class AutomationEngine:
             results.append(result)
 
             if result.get("status") == "error":
-                errors.append({"action": str(action), "error": result.get("message")})
+                entry = {"action": str(action), "error": result.get("message")}
+                if self._is_critical_action_error(action):
+                    errors.append(entry)
+                else:
+                    warnings.append(entry)
                 logger.warning(f"[ENGINE] '{scene.name}' — errore in {action}: {result.get('message')}")
 
             # Aggiorna registry dopo azioni Arduino
-            if action.tool == "arduino" and result.get("status") == "ok":
+            if action.tool == "arduino" and result.get("status") in {"ok", "partial"}:
                 state = result.get("state", {})
                 if state:
                     registry.update_from_arduino_state(state, scene=scene.name)
+
+        if background_actions:
+            task = asyncio.create_task(self._execute_background_actions(scene.name, background_actions))
+            self._background_tasks.setdefault(scene.name, set()).add(task)
+            task.add_done_callback(
+                lambda done_task, name=scene.name: self._background_tasks.get(name, set()).discard(done_task)
+            )
 
         # Aggiorna contesto
         scene.mark_run()
@@ -426,6 +528,7 @@ class AutomationEngine:
             "source": source,
             "status": status,
             "errors": errors,
+            "warnings": warnings,
             "conflicts": conflicts,
             "elapsed": elapsed,
             "ts": start_ts,
@@ -435,7 +538,15 @@ class AutomationEngine:
         await self.bus.publish("scene_executed", event_entry)
 
         logger.info(f"[ENGINE] '{scene.name}' completata in {elapsed}s — status={status}")
-        return {"status": status, "results": results, "errors": errors, "conflicts": conflicts, "elapsed": elapsed}
+        self._scene_lock.release()
+        return {
+            "status": status,
+            "results": results,
+            "errors": errors,
+            "warnings": warnings,
+            "conflicts": conflicts,
+            "elapsed": elapsed,
+        }
 
     async def execute_by_name(self, name: str, source: str = "manual") -> dict:
         automation = self._automations.get(name)
@@ -446,12 +557,76 @@ class AutomationEngine:
     async def execute_actions(self, actions: list[Action], source: str = "manual") -> list[dict]:
         """Esegui una lista di azioni raw (compatibilità con il vecchio sistema)."""
         results = []
-        for action in actions:
+        for action in self._compact_arduino_actions(actions):
             result = await self._execute_action_with_retry(action, source)
             results.append({"tool": action.tool, "result": result})
         return results
 
     # ── Esecuzione singola azione con retry ───────────────────────────────────
+
+    async def _execute_background_actions(self, scene_name: str, actions: list[Action]):
+        try:
+            for action in self._compact_arduino_actions(actions):
+                if action.delay > 0:
+                    await asyncio.sleep(action.delay)
+                result = await self._execute_action_with_retry(action, f"{scene_name}:background")
+                if result.get("status") == "error":
+                    logger.warning(f"[ENGINE] '{scene_name}' background — errore in {action}: {result.get('message')}")
+        except asyncio.CancelledError:
+            logger.info(f"[ENGINE] '{scene_name}' background cancellato")
+            raise
+
+    def _cancel_background_tasks(self, scene_name: str | None = None):
+        names = [scene_name] if scene_name else list(self._background_tasks)
+        for name in names:
+            for task in list(self._background_tasks.get(name, set())):
+                if not task.done():
+                    task.cancel()
+            self._background_tasks.pop(name, None)
+
+    def _hardware_first(self, actions: list[Action]) -> list[Action]:
+        immediate_arduino = [action for action in actions if action.tool == "arduino" and action.delay <= 0]
+        arduino_ids = {id(action) for action in immediate_arduino}
+        remaining = [action for action in actions if id(action) not in arduino_ids]
+        return immediate_arduino + remaining
+
+    def _compact_arduino_actions(self, actions: list[Action]) -> list[Action]:
+        compacted: list[Action] = []
+        pending: list[Action] = []
+
+        def flush_pending():
+            if not pending:
+                return
+            if len(pending) == 1:
+                compacted.append(pending[0])
+            else:
+                compacted.append(arduino_batch(pending, timeout=max(3.0, sum(a.timeout for a in pending))))
+            pending.clear()
+
+        for action in actions:
+            if action.tool == "arduino" and action.delay <= 0:
+                pending.append(action)
+                continue
+            flush_pending()
+            compacted.append(action)
+
+        flush_pending()
+        return compacted
+
+    def _iter_arduino_params(self, action: Action) -> list[dict]:
+        if action.tool != "arduino":
+            return []
+        if action.params.get("op") == "BATCH":
+            return [item for item in action.params.get("actions", []) if isinstance(item, dict)]
+        return [action.params]
+
+    def _detect_action_conflicts(self, action: Action, scene_name: str) -> list[dict]:
+        conflicts = []
+        for params in self._iter_arduino_params(action):
+            conflict = self._detect_action_conflict(Action(tool="arduino", params=params), scene_name)
+            if conflict:
+                conflicts.append(conflict)
+        return conflicts
 
     def _detect_action_conflict(self, action: Action, scene_name: str) -> dict | None:
         """Rileva scritture ravvicinate sullo stesso device da scene diverse."""
@@ -482,6 +657,18 @@ class AutomationEngine:
         if not self._tool_manager:
             return {"status": "error", "message": "ToolManager non configurato"}
 
+        # 0. Check preventivo Spotify: se disabilitato o non connesso, skip immediato
+        if action.tool == "spotify":
+            enabled = os.environ.get("SPOTIFY_ENABLED", "true").strip().lower() not in ("0", "false", "no")
+            if not enabled:
+                logger.info(f"[ENGINE] '{scene_name}' — skip Spotify: disabilitato via ENV")
+                return {"status": "skipped", "message": "Spotify disabilitato."}
+
+            spotify_tool = self._tool_manager.tools.get("spotify")
+            if spotify_tool and not spotify_tool.sp:
+                logger.info(f"[ENGINE] '{scene_name}' — skip Spotify: non connesso")
+                return {"status": "skipped", "message": "Spotify non connesso."}
+
         last_result = {}
         for attempt in range(max(1, action.retry)):
             try:
@@ -490,8 +677,51 @@ class AutomationEngine:
                     self._tool_manager.execute(tool_action),
                     timeout=action.timeout,
                 )
+
+                # --- BROADCAST PER DASHBOARD ---
+                if self.socket_manager and result.get("status") == "ok":
+                    ws_map = {
+                        "weather": "weather",
+                        "spotify": "spotify",
+                        "calendar": "calendar",
+                        "news": "news",
+                        "sys_monitor": "stats",
+                        "display": "layout",
+                    }
+                    if action.tool in ws_map:
+                        msg_type = ws_map[action.tool]
+                        payload = {"type": msg_type}
+                        if "data" in result:
+                            if isinstance(result["data"], dict):
+                                payload.update(result["data"])
+                            else:
+                                payload["data"] = result["data"]
+                        else:
+                            payload.update(result)
+                        payload.pop("status", None)
+                        payload.pop("message", None)
+                        await self.socket_manager.broadcast(payload)
+
+                    # Caso speciale Arduino: broadcast stato compatto
+                    if action.tool == "arduino":
+                        st = result.get("state", {})
+                        if st:
+                            await self.socket_manager.broadcast(
+                                {
+                                    "type": "state",
+                                    "led": "on" if st.get("light") else "off",
+                                    "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                                    "servo2": st.get("servo2", 0),
+                                    "rgb1": st.get("rgb1", [0, 0, 0]),
+                                    "rgb2": st.get("rgb2", [0, 0, 0]),
+                                    "rgb3": st.get("rgb3", [0, 0, 0]),
+                                    "buzzer": st.get("buzzer", False),
+                                }
+                            )
+
                 if result.get("status") != "error":
                     return result
+
                 last_result = result
                 if attempt < action.retry - 1:
                     logger.debug(f"[ENGINE] Retry {attempt + 1}/{action.retry} per {action}")
@@ -536,7 +766,7 @@ class AutomationEngine:
             except Exception as e:
                 logger.error(f"[SCHEDULER] Errore: {e}")
 
-            await asyncio.sleep(60)  # controlla ogni minuto
+            await asyncio.sleep(self.scheduler_interval)
 
     # ── Event log ─────────────────────────────────────────────────────────────
 
@@ -551,12 +781,24 @@ class AutomationEngine:
     def get_last_scene(self) -> str | None:
         return context.get("active_scene")
 
-    def clear_active_scene(self) -> str | None:
-        """Disattiva la scena corrente a livello di contesto/dashboard."""
+    async def clear_active_scene(self) -> dict:
+        """Disattiva la scena corrente e porta tutti gli attuatori in OFF."""
         previous = context.get("active_scene")
+        self._cancel_background_tasks(previous)
+        results = []
+        errors = []
+        result = await self._execute_action_with_retry(arduino_all_off(), "scene_off")
+        results.append(result)
+        if result.get("status") == "error":
+            errors.append({"action": "arduino_all_off", "error": result.get("message")})
+        elif result.get("state"):
+            registry.update_from_arduino_state(result["state"], scene="scene_off")
         context.set_scene(None)
-        self._log_event({"scene": previous, "source": "manual", "status": "cleared", "errors": [], "ts": time.time()})
-        return previous
+        status = "ok" if not errors else "partial"
+        self._log_event(
+            {"scene": previous, "source": "manual", "status": "cleared", "errors": errors, "ts": time.time()}
+        )
+        return {"status": status, "previous": previous, "results": results, "errors": errors}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -581,7 +823,7 @@ def build_default_automations() -> list[Automation]:
                     spotify("pause"),
                     arduino("light", 0),
                     arduino("servo", 0),
-                    arduino("rgb", 0x000008),
+                    arduino("rgb", {"r": 0, "g": 0, "b": 8}),
                     calendar_action("list"),
                 ],
             ),
@@ -610,21 +852,22 @@ def build_default_automations() -> list[Automation]:
             scene=Scene(
                 name="buongiorno",
                 priority=Priority.HIGH,
-                cooldown=3600,
+                cooldown=60,
                 actions=[
                     arduino("light", 1),
-                    arduino("rgb", 0xFFD580),
+                    arduino("rgb", {"r": 255, "g": 213, "b": 128}),
                     arduino("servo", 0),
-                    spotify("search", query="buongiorno playlist mattina"),
-                    weather_action(),
-                    news_action(limit=5),
-                    calendar_action("list"),
+                    display_action("news"),
+                    display_action("weather", delay=10),
+                    background(spotify("search", query="buongiorno playlist mattina")),
+                    background(weather_action()),
+                    background(news_action(limit=5)),
+                    background(calendar_action("list")),
                 ],
             ),
             aliases=["buon giorno", "morning"],
             triggers=[
                 Trigger(type="time", time="07:00"),
-                Trigger(type="context", context={"time_slot": "morning", "presence": "home"}),
             ],
         ),
         # ── Sveglia ───────────────────────────────────────────────────────────
@@ -633,9 +876,13 @@ def build_default_automations() -> list[Automation]:
                 name="sveglia",
                 priority=Priority.CRITICAL,
                 actions=[
-                    arduino("buzzer", 1),
                     arduino("light", 1),
-                    arduino("rgb", 0xFFFFFF),
+                    arduino("rgb", {"r": 255, "g": 213, "b": 128}, effect=1),
+                    arduino("buzzer", 1),
+                    arduino_melody("wake_radar"),
+                    *_background_melody_loop("wake_radar", duration=30.0, repeat_every=4.0),
+                    delayed_background(arduino("rgb", 0, effect=0), 0.0),
+                    delayed_background(arduino("buzzer", 0), 0.0),
                     spotify("search", query="energetic morning wake up"),
                 ],
             ),
@@ -649,7 +896,7 @@ def build_default_automations() -> list[Automation]:
                 exclusive=True,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", 0x220000),
+                    arduino("rgb", {"r": 34, "g": 0, "b": 0}),
                 ],
             ),
             aliases=["film", "cinema", "guardo un film"],
@@ -661,7 +908,7 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.LOW,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", 0x440055),
+                    arduino("rgb", {"r": 68, "g": 0, "b": 85}),
                 ],
             ),
             aliases=["relax"],
@@ -674,10 +921,10 @@ def build_default_automations() -> list[Automation]:
                 cooldown=120,
                 actions=[
                     arduino("light", 1),
-                    arduino("rgb", 0xFFFFFF),
+                    arduino("rgb", {"r": 255, "g": 255, "b": 255}),
                     arduino("servo", 90),
                     arduino("servo2", 90),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "startup"}),
+                    arduino_melody("startup"),
                 ],
             ),
             aliases=["ospite", "modalità ospite", "arrivano ospiti", "stanno arrivando"],
@@ -693,7 +940,7 @@ def build_default_automations() -> list[Automation]:
                     arduino("rgb", 0),
                     arduino("servo", 0),
                     arduino("servo2", 0),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "ok"}),
+                    arduino_melody("ok"),
                     spotify("pause"),
                     weather_action(),
                 ],
@@ -709,7 +956,7 @@ def build_default_automations() -> list[Automation]:
                 actions=[
                     arduino("light", 1),
                     arduino("servo", 90),
-                    arduino("rgb", 0xFF8C42),
+                    arduino("rgb", {"r": 255, "g": 140, "b": 66}),
                     spotify("search", query="relax after work playlist"),
                     timer_action(5, "Ricordati di chiudere la porta!"),
                     news_action(limit=3),
@@ -727,9 +974,12 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.CRITICAL,
                 exclusive=True,
                 actions=[
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer", "value": 1}),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "alarm"}),
-                    Action(tool="arduino", params={"op": "SET", "target": "neopixel", "value": 0xFF0000, "effect": 3}),
+                    arduino("neopixel", {"r": 255, "g": 0, "b": 0}, effect=3),
+                    arduino("buzzer", 1),
+                    arduino_melody("alarm"),
+                    *_background_buzzer_pulse(duration=30.0, interval=0.5),
+                    delayed_background(arduino_melody("off"), 0.0),
+                    delayed_background(arduino("neopixel", 0, effect=0), 0.0),
                 ],
             ),
         ),
@@ -742,7 +992,7 @@ def build_default_automations() -> list[Automation]:
                 actions=[
                     arduino("servo", 0),
                     arduino("light", 1),
-                    arduino("rgb", 0x4488FF),
+                    arduino("rgb", {"r": 68, "g": 136, "b": 255}),
                     spotify("search", query="rain lofi study"),
                     weather_action(),
                 ],
@@ -760,7 +1010,7 @@ def build_default_automations() -> list[Automation]:
                 cooldown=3600,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", 0xFF4400),
+                    arduino("rgb", {"r": 255, "g": 68, "b": 0}),
                     arduino("servo", 0),
                     spotify("search", query="cena romantica musica italiana"),
                 ],

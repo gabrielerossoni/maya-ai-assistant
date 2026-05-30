@@ -106,6 +106,8 @@ async def news_broadcaster(agent, manager):
 async def stats_broadcaster(manager, voice_manager):
     import psutil
 
+    from core.gpu_stats import get_gpu_stats
+
     # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
     psutil.cpu_percent(interval=None)
     await asyncio.sleep(2)
@@ -124,14 +126,7 @@ async def stats_broadcaster(manager, voice_manager):
                 # Allinea widget voce anche se alcuni broadcast si perdono
                 "voice_status": voice_manager.get_dashboard_voice_status(),
             }
-            try:
-                import GPUtil
-
-                gpus = GPUtil.getGPUs()
-                if gpus:
-                    stats["gpu"] = round(gpus[0].load * 100, 1)
-            except Exception:
-                pass
+            stats.update(get_gpu_stats())
             await manager.broadcast(stats)
         except Exception:
             pass

@@ -9,6 +9,7 @@ import inspect
 from tools.arduino_tool import ArduinoTool
 from tools.calendar_tool import CalendarTool
 from tools.code_generator_tool import CodeGeneratorTool
+from tools.display_tool import DisplayTool
 from tools.mqtt_tool import MqttTool
 from tools.network_tool import NetworkTool
 from tools.news_tool import NewsTool
@@ -71,6 +72,7 @@ class ToolManager:
             "translate": TranslateTool(),
             "search": SearchTool(),
             "spotify": SpotifyTool(),
+            "display": DisplayTool(),
             "sys_monitor": SysMonitorTool(),
             "code_generator": CodeGeneratorTool(),
             "mqtt": MqttTool(),

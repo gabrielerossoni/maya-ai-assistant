@@ -88,7 +88,9 @@ async def lifespan(app: FastAPI):
     plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
     plugin_loader.start()
 
-    proactive_manager = ProactiveManager(agent.tool_manager, manager, memory_manager=agent.memory)
+    proactive_manager = ProactiveManager(
+        agent.tool_manager, manager, memory_manager=agent.memory, voice_manager=voice_manager
+    )
     asyncio.create_task(proactive_manager.start_loop())
 
     # Inietta WebSocketManager nel mqtt_tool per broadcast bidirezionale

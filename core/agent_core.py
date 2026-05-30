@@ -81,7 +81,7 @@ NON aggiungere testo fuori dal JSON.
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
-- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; neopixel: value=0xRRGGBB effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/startup/ok/notify/error/welcome)
+- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: invia comandi al secondo PC (qualsiasi stringa)
 - system: comandi OS (shutdown, open_browser, screenshot)
@@ -198,6 +198,7 @@ class AgentCore:
         # Inizializza il nuovo AutomationEngine
         self.automation_engine._tool_manager = self.tool_manager
         self.automation_engine.memory = self.memory
+        self.automation_engine.socket_manager = self.socket_manager
         self.automation_engine.register_all(build_default_automations())
         asyncio.create_task(self.automation_engine.start_scheduler())
         print("[AGENT] AutomationEngine pronto con", len(self.automation_engine.list_automations()), "automazioni.")
@@ -738,8 +739,12 @@ class AgentCore:
             return
 
         if _clean in ["spegni scena", "spegni la scena", "disattiva scena", "disattiva la scena", "stop scena"]:
-            previous = self.automation_engine.clear_active_scene()
-            reply = "Scena disattivata." if previous else "Nessuna scena attiva."
+            clear_result = await self.automation_engine.clear_active_scene()
+            previous = clear_result.get("previous")
+            status = clear_result.get("status")
+            reply = "Scena disattivata." if previous and status == "ok" else "Scena disattivata con avvisi."
+            if not previous:
+                reply = "Nessuna scena attiva. Dispositivi spenti."
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
             await self.memory.add_turn("jarvis", reply)
@@ -753,9 +758,20 @@ class AgentCore:
             exec_result = await self.automation_engine.execute(auto_result, source="voice")
             scene_name = auto_result.name
             status = exec_result.get("status", "ok")
-            reply = (
-                f"Scena '{scene_name}' eseguita." if status == "ok" else f"Scena '{scene_name}' completata con avvisi."
-            )
+
+            if status == "ok":
+                reply = f"Scena '{scene_name}' eseguita."
+            elif status == "skipped":
+                reason = exec_result.get("reason", "")
+                if reason == "cooldown":
+                    reply = (
+                        f"La scena '{scene_name}' è stata già eseguita di recente. Attendi un po' prima di riprovare."
+                    )
+                else:
+                    reply = f"La scena '{scene_name}' non può essere eseguita al momento (condizioni non soddisfatte)."
+            else:
+                reply = f"Scena '{scene_name}' completata con alcuni avvisi."
+
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
             await self.memory.add_turn("jarvis", reply)

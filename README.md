@@ -14,7 +14,7 @@
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** 25 Maggio 2026 — **Monitoraggio GPU** (GPUtil), **Refinement orb animations** (CSS scale), **XSS Security Fixes** (DOM API), **Sync Audio/Orb** (SPEAKING broadcast post-synthesis), **Merge `new_main → main`**, CI GitHub Actions attivo (62 test), lint fixes su `tools/`, **Refactoring `main.py`** (da 894 a ~230 righe, logica in moduli dedicati), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione automazioni statiche legacy** (`AUTOMATIONS` + `AUTOMATION_ALIASES` + fallback in `_check_automation` rimossi — solo engine OO), velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
+> **Ultimo aggiornamento:** 30 Maggio 2026 — **PR Ready (EventiArduino)**, completamento **ArduinoTool** (auto-discovery, sync physical states, batch operations) e suite di test completa (132/132 passati), linting `ruff` fixato, **Monitoraggio GPU** (GPUtil), **Refinement orb animations**, **XSS Security Fixes**, **Sync Audio/Orb**, **Refactoring `main.py`**, **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione automazioni statiche legacy**, velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -880,6 +880,8 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 
 ### ✅ Recenti
 
+- [x] **Completamento ArduinoTool (Branch EventiArduino)** — implementazione finale del tool Arduino con gestione sincrona degli stati, operazioni batch ottimizzate e auto-discovery della porta seriale.
+- [x] **Suite di Test Completa** — 132 test unitari e di integrazione passati (verificati via `pytest`), inclusa la copertura per il nuovo engine di automazione e i tool hardware.
 - [x] **Automation Engine OO** — refactoring completo del sistema automazioni: classi `Action`, `Condition`, `Trigger`, `Scene`, `Automation`, `AutomationEngine`, `EventBus`. Supporto priorità, cooldown, conflict detection, retry, timeout, scheduler asincrono, event log strutturato, automazioni temporanee con scadenza.
 - [x] **ContextManager** — singleton thread-safe con persistenza JSON: traccia time slot, presenza, meteo, attività, scena attiva, flag. Metodo `matches()` per condizioni complesse (valore singolo, lista OR, negazione).
 - [x] **DeviceRegistry** — singleton con persistenza JSON: ogni dispositivo ha stato, `last_set_by` e timestamp. Conflict detection tra scene, sync automatico dallo stato Arduino.
@@ -892,7 +894,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Merge `new_main → main`** — Branch principale aggiornato via PR con fast-forward pulito.
 - [x] **Rimozione automazioni statiche legacy** — Eliminati `AUTOMATIONS`, `AUTOMATION_ALIASES` e il fallback `isinstance` in `_check_automation()` da `agent_core.py`. Il sistema usa esclusivamente l'`AutomationEngine` OO per risoluzione, alias e esecuzione delle scene.
 - [x] **Pulizia scene** — Ridotte da 21 a 11 scene: rimosse modalità lavoro, studio, gaming, pausa caffè, bambini dormono, weekend mattina; `ora di dormire`, `notte` e `modalità notte` accorpate in `buonanotte`; `modalità uscita` accorpata in `vado fuori`; `modalità ospite` accorpata in `ospiti in arrivo` (luce, relay, RGB bianco, porta+cancello 90°, melody). Dashboard chip e `SCENE_CHIP_MAP` aggiornati di conseguenza.
-- [x] **Rimozione simulazione Arduino** — `_simulate()` ritorna errore invece di dati fittizi; `broadcast_state` invia `null` per tutti i campi hardware se Arduino non connesso; dashboard mostra `—` sui card invece di valori falsi.
+- [x] **Rimozione simulazione Arduino** — `_simulate()` ritorna errore invece di dati fittizi; `broadcast_state` invia `null` per tutti i campi hardware se Arduino non connesso; dashboard mostra `—` sui card instead of valori falsi.
 
 ### 🔲 In corso / Prossimi
 

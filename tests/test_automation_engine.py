@@ -155,11 +155,131 @@ class TestExecute:
     async def test_execute_respects_cooldown(self, engine, mock_tool_manager):
         auto = _simple_automation("scena_cooldown", cooldown=9999)
         engine.register(auto)
-        r1 = await engine.execute(auto)
+        r1 = await engine.execute(auto, source="scheduler:12:00")
         assert r1["status"] == "ok"
-        r2 = await engine.execute(auto)
+        r2 = await engine.execute(auto, source="scheduler:12:00")
         assert r2["status"] == "skipped"
         assert r2["reason"] == "cooldown"
+
+    @pytest.mark.asyncio
+    async def test_manual_execution_bypasses_cooldown(self, engine, mock_tool_manager):
+        auto = _simple_automation("scena_manuale", cooldown=9999)
+        engine.register(auto)
+
+        r1 = await engine.execute(auto, source="scheduler:12:00")
+        r2 = await engine.execute(auto, source="voice")
+
+        assert r1["status"] == "ok"
+        assert r2["status"] == "ok"
+        assert mock_tool_manager.execute.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_scheduler_execution_respects_cooldown(self, engine, mock_tool_manager):
+        auto = _simple_automation("scena_scheduler", cooldown=9999)
+        engine.register(auto)
+
+        r1 = await engine.execute(auto, source="scheduler:12:00")
+        r2 = await engine.execute(auto, source="scheduler:12:00")
+
+        assert r1["status"] == "ok"
+        assert r2["status"] == "skipped"
+        assert r2["reason"] == "cooldown"
+
+    @pytest.mark.asyncio
+    async def test_manual_execution_allows_time_triggered_scene(self, engine, mock_tool_manager):
+        auto = _simple_automation("solo_orario")
+        auto.triggers = [Trigger(type="time", time="07:00")]
+        engine.register(auto)
+
+        result = await engine.execute(auto, source="voice")
+
+        assert result["status"] == "ok"
+        mock_tool_manager.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_noncritical_action_errors_do_not_make_scene_partial(self, engine, mock_tool_manager):
+        async def execute(action):
+            if action["tool"] == "spotify":
+                return {"status": "error", "message": "spotify offline"}
+            return {"status": "ok", "state": {}}
+
+        mock_tool_manager.execute = execute
+        auto = Automation(
+            scene=Scene(
+                name="warning_only",
+                actions=[
+                    Action(tool="arduino", params={"op": "SET", "target": "light", "value": 1}),
+                    Action(tool="spotify", params={"command": "play"}),
+                ],
+            )
+        )
+
+        result = await engine.execute(auto)
+
+        assert result["status"] == "ok"
+        assert result["errors"] == []
+        assert result["warnings"][0]["error"] == "spotify offline"
+
+    @pytest.mark.asyncio
+    async def test_clear_active_scene_cancels_background_buzzer_actions(self, engine, mock_tool_manager):
+        seen = []
+
+        async def execute(action):
+            seen.append(action)
+            return {"status": "ok", "state": {"buzzer": bool(action.get("value", 0))}}
+
+        mock_tool_manager.execute = execute
+        auto = Automation(
+            scene=Scene(
+                name="alarm_loop",
+                actions=[
+                    Action(tool="arduino", params={"op": "SET", "target": "buzzer", "value": 1}),
+                    Action(
+                        tool="arduino",
+                        params={"op": "SET", "target": "buzzer", "value": 1},
+                        delay=0.2,
+                        background=True,
+                    ),
+                ],
+            )
+        )
+
+        result = await engine.execute(auto)
+        clear_result = await engine.clear_active_scene()
+        await asyncio.sleep(0.25)
+
+        assert result["status"] == "ok"
+        assert clear_result["status"] == "ok"
+        assert all(not task or task.done() for tasks in engine._background_tasks.values() for task in tasks)
+        background_restarts = [
+            action
+            for action in seen
+            if action.get("target") == "buzzer" and action.get("value") == 1 and action.get("tool") == "arduino"
+        ]
+        assert len(background_restarts) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("scene_name", ["cena", "buonanotte"])
+    async def test_manual_default_scenes_bypass_cooldown(self, engine, mock_tool_manager, scene_name):
+        auto = next(a for a in build_default_automations() if a.name == scene_name)
+        auto.scene._last_run = time.time()
+        engine.register(auto)
+
+        result = await engine.execute(auto, source="voice")
+
+        assert result["status"] == "ok"
+        assert mock_tool_manager.execute.called
+
+    @pytest.mark.asyncio
+    async def test_scheduler_execution_allows_time_triggered_scene(self, engine, mock_tool_manager):
+        auto = _simple_automation("solo_orario")
+        auto.triggers = [Trigger(type="time", time="07:00")]
+        engine.register(auto)
+
+        result = await engine.execute(auto, source="scheduler:07:00")
+
+        assert result["status"] == "ok"
+        mock_tool_manager.execute.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_execute_action_timeout(self, engine, mock_tool_manager):
@@ -194,6 +314,31 @@ class TestExecute:
         result = await engine.execute(auto)
         assert result["status"] == "ok"
         assert mock_tool_manager.execute.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_execute_prioritizes_hardware_first(self, engine, mock_tool_manager):
+        seen = []
+
+        async def record(action):
+            seen.append(action["tool"])
+            return {"status": "ok", "state": {}}
+
+        mock_tool_manager.execute = record
+        auto = Automation(
+            scene=Scene(
+                name="hardware_first",
+                actions=[
+                    Action(tool="spotify", params={"command": "pause"}),
+                    Action(tool="arduino", params={"op": "SET", "target": "light", "value": 1}),
+                    Action(tool="weather", params={"location": "Milano"}),
+                ],
+            )
+        )
+
+        result = await engine.execute(auto)
+
+        assert result["status"] == "ok"
+        assert seen == ["arduino", "spotify", "weather"]
 
 
 # ── Test condizioni ───────────────────────────────────────────────────────────
@@ -378,3 +523,34 @@ class TestDefaults:
         autos = build_default_automations()
         engine.register_all(autos)
         assert len(engine.list_automations()) == len(autos)
+
+    def test_buongiorno_is_time_trigger_only(self, fresh_context, fresh_registry):
+        auto = next(a for a in build_default_automations() if a.name == "buongiorno")
+
+        assert any(t.type == "time" and t.time == "07:00" for t in auto.triggers)
+        assert not any(t.type == "context" for t in auto.triggers)
+
+    def test_buongiorno_runs_visual_actions_before_background(self, fresh_context, fresh_registry):
+        auto = next(a for a in build_default_automations() if a.name == "buongiorno")
+
+        foreground = [a for a in auto.scene.actions if not a.background]
+        background_actions = [a for a in auto.scene.actions if a.background]
+
+        assert [a.tool for a in foreground] == ["arduino", "arduino", "arduino", "display", "display"]
+        assert [a.tool for a in background_actions] == ["spotify", "weather", "news", "calendar"]
+
+    def test_alarm_has_30_second_rhythmic_sequence(self, fresh_context, fresh_registry):
+        auto = next(a for a in build_default_automations() if a.name == "allarme")
+        background_actions = [a for a in auto.scene.actions if a.background]
+
+        assert any(a.params.get("target") == "buzzer" and a.params.get("value") == 0 for a in background_actions)
+        assert any(a.params.get("target") == "neopixel" and a.params.get("value") == 0 for a in background_actions)
+        assert round(sum(a.delay for a in background_actions), 1) == 30.0
+
+    def test_wake_scene_uses_radar_melody_for_30_seconds(self, fresh_context, fresh_registry):
+        auto = next(a for a in build_default_automations() if a.name == "sveglia")
+        background_actions = [a for a in auto.scene.actions if a.background]
+
+        assert any(a.params.get("melody") == "wake_radar" for a in auto.scene.actions)
+        assert any(a.params.get("melody") == "off" for a in background_actions)
+        assert round(sum(a.delay for a in background_actions), 1) == 30.0

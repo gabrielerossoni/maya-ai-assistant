@@ -102,7 +102,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length);
 void publishState();
 void handleMqttCommand(JsonDocument &cmd);
 void handleSerialCommand(JsonDocument &doc);
-void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc);
+void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool quiet = false);
 void applyRGBInt(uint8_t &r, uint8_t &g, uint8_t &b, long color);
 void startMelody(const char *name);
 void updateMelody();
@@ -171,7 +171,7 @@ void loop() {
     line.trim();
 
     if (line.length() > 0) {
-      StaticJsonDocument<256> doc;
+      StaticJsonDocument<768> doc;
       DeserializationError err = deserializeJson(doc, line);
 
       if (err) {
@@ -273,7 +273,7 @@ void connectMQTT() {
 
 // ── MQTT Callback ─────────────────────────────
 void mqttCallback(char *topic, byte *payload, unsigned int length) {
-  StaticJsonDocument<256> cmd;
+  StaticJsonDocument<768> cmd;
   DeserializationError err = deserializeJson(cmd, payload, length);
 
   if (err) {
@@ -299,7 +299,7 @@ void handleMqttCommand(JsonDocument &cmd) {
     return;
   }
 
-  applyCommand(id, isSET, target, cmd);
+  applyCommand(id, isSET, target, cmd.as<JsonObject>());
   publishState();
 }
 
@@ -311,23 +311,49 @@ void handleSerialCommand(JsonDocument &doc) {
 
   bool isSET = (strcmp(cmd, "SET") == 0);
   bool isGET = (strcmp(cmd, "GET") == 0);
+  bool isBATCH = (strcmp(cmd, "BATCH") == 0);
+
+  if (isBATCH) {
+    JsonArray actions = doc["actions"].as<JsonArray>();
+    if (actions.isNull()) {
+      sendError(id, "bad_batch");
+      return;
+    }
+
+    for (JsonObject item : actions) {
+      const char *itemCmd = item["cmd"] | "";
+      if (strlen(itemCmd) == 0) {
+        itemCmd = item["op"] | "";
+      }
+      const char *itemTarget = item["target"] | "";
+      bool itemSET = (strcmp(itemCmd, "SET") == 0);
+      bool itemGET = (strcmp(itemCmd, "GET") == 0);
+      if (!itemSET && !itemGET) {
+        sendError(id, "bad_batch_cmd");
+        return;
+      }
+      applyCommand(id, itemSET, itemTarget, item, true);
+    }
+    sendResponse(id, true);
+    return;
+  }
 
   if (!isSET && !isGET) {
     sendError(id, "bad_cmd");
     return;
   }
 
-  applyCommand(id, isSET, target, doc);
+  applyCommand(id, isSET, target, doc.as<JsonObject>());
 }
 
 // ── Apply Command (shared logic) ───────────────
-void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
+void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool quiet) {
   if (strcmp(target, "light") == 0) {
     if (isSET) {
       lightOn = doc["value"].as<int>() != 0;
       digitalWrite(LED_PIN, lightOn ? HIGH : LOW);
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "servo") == 0) {
     if (isSET) {
@@ -337,7 +363,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       lastServo1AttachMs = millis();
       servo1Attached = true;
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "servo2") == 0) {
     if (isSET) {
@@ -347,7 +373,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       lastServo2AttachMs = millis();
       servo2Attached = true;
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "rgb1") == 0) {
     if (isSET) {
@@ -362,7 +388,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       neoEffect = doc["effect"] | 0;
       updateNeoPixels(); // Force immediate update
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "rgb2") == 0) {
     if (isSET) {
@@ -377,7 +403,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       neoEffect = doc["effect"] | 0;
       updateNeoPixels(); // Force immediate update
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "rgb3") == 0) {
     if (isSET) {
@@ -392,7 +418,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       neoEffect = doc["effect"] | 0;
       updateNeoPixels(); // Force immediate update
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strncmp(target, "rgb", 3) == 0 && strlen(target) > 3) {
     // Individual LED control (up to 24)
@@ -411,7 +437,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
         updateNeoPixels(); // Force immediate update
       }
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "rgb") == 0 || strcmp(target, "neopixel") == 0) {
     // Shortcut: set all 24 LEDs to same color
@@ -429,7 +455,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
       neoEffect = doc["effect"] | 0;
       updateNeoPixels(); // Force immediate update
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "buzzer") == 0) {
     if (isSET) {
@@ -442,14 +468,14 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
         digitalWrite(BUZZ_PIN, LOW);
       }
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "buzzer2") == 0 || strcmp(target, "speaker") == 0) {
     if (isSET) {
       const char *melodyName = doc["melody"] | "beep";
       startMelody(melodyName);
     }
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "sensor_read") == 0) {
     float temp = dht.readTemperature();
@@ -469,10 +495,10 @@ void applyCommand(int id, bool isSET, const char *target, JsonDocument &doc) {
     Serial.print('\n');
 
   } else if (strcmp(target, "status") == 0) {
-    sendResponse(id, true);
+    if (!quiet) sendResponse(id, true);
 
   } else {
-    sendError(id, "unknown_target");
+    if (!quiet) sendError(id, "unknown_target");
   }
 }
 
@@ -577,6 +603,14 @@ void publishTelemetry() {
 
 // ── Melody functions ───────────────────────────
 void startMelody(const char *name) {
+  if (strcmp(name, "off") == 0 || strcmp(name, "stop") == 0) {
+    noTone(SPEAKER_PIN);
+    currentMelody = "";
+    melodyNoteIndex = -1;
+    noteStartMs = 0;
+    noteDuration = 0;
+    return;
+  }
   currentMelody = name;
   melodyNoteIndex = 0;
   noteStartMs = 0;
@@ -611,6 +645,18 @@ void updateMelody() {
     int freqs[] = {800, 1200, 800, 1200, 800, 1200};
     int durs[] = {200, 200, 200, 200, 200, 200};
     int size = 6;
+    if (melodyNoteIndex < size) {
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
+      noteDuration = durs[melodyNoteIndex];
+      noteStartMs = now;
+      melodyNoteIndex++;
+    } else {
+      melodyNoteIndex = -1;
+    }
+  } else if (strcmp(currentMelody, "wake_radar") == 0) {
+    int freqs[] = {880, 1175, 1760, 1175, 988, 1319, 1976, 1319, 1047, 1397, 2093, 1397};
+    int durs[] = {120, 120, 180, 180, 120, 120, 180, 180, 120, 120, 220, 300};
+    int size = 12;
     if (melodyNoteIndex < size) {
       tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
       noteDuration = durs[melodyNoteIndex];

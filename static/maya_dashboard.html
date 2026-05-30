@@ -3775,6 +3775,10 @@
                         document.getElementById('dash-gpu').innerText = `${Math.round(d.gpu)}%`;
                         const f = document.getElementById('dom-gpu-fill');
                         if (f) f.style.width = Math.min(100, d.gpu) + '%';
+                    } else if (d.gpu_available === false) {
+                        document.getElementById('dash-gpu').innerText = '--%';
+                        const f = document.getElementById('dom-gpu-fill');
+                        if (f) f.style.width = '0%';
                     }
                 }
                 if (d.type === 'spotify') updateSpotify(d);
@@ -3785,6 +3789,11 @@
                 if (d.type === 'log') {
                     appendConsoleLog(d.text || '', d.level || 'system');
                     setStatus(d.text || 'MAYA LOG');
+                    finalizeConsoleStream();
+                }
+                if (d.type === 'proactive_suggestion') {
+                    appendConsoleLog(d.text || '', d.level || 'suggestion');
+                    setStatus(d.text || 'SUGGERIMENTO MAYA');
                     finalizeConsoleStream();
                 }
                 if (d.type === 'scene_cleared') clearScenePill();
@@ -4371,13 +4380,13 @@
             rgb1: false, rgb2: false, rgb3: false
         };
         const RGB_CYCLE = [
-            { label: 'OFF', value: 0, hex: '#14171c' },
-            { label: 'ROSSO', value: 16711680, hex: '#ff3030' },
-            { label: 'VERDE', value: 65280, hex: '#4caf50' },
-            { label: 'BLU', value: 255, hex: '#4488ff' },
-            { label: 'VIOLA', value: 10494192, hex: '#a020f0' },
-            { label: 'CALDO', value: 16755200, hex: '#ffaa00' },
-            { label: 'BIANCO', value: 16777215, hex: '#ffffff' },
+            { label: 'OFF', rgb: { r: 0, g: 0, b: 0 }, hex: '#14171c' },
+            { label: 'ROSSO', rgb: { r: 255, g: 48, b: 48 }, hex: '#ff3030' },
+            { label: 'VERDE', rgb: { r: 76, g: 175, b: 80 }, hex: '#4caf50' },
+            { label: 'BLU', rgb: { r: 68, g: 136, b: 255 }, hex: '#4488ff' },
+            { label: 'VIOLA', rgb: { r: 160, g: 32, b: 240 }, hex: '#a020f0' },
+            { label: 'CALDO', rgb: { r: 255, g: 170, b: 0 }, hex: '#ffaa00' },
+            { label: 'BIANCO', rgb: { r: 255, g: 255, b: 255 }, hex: '#ffffff' },
         ];
         const domRgbIndex = { rgb1: 0, rgb2: 0, rgb3: 0 };
         const domRgbSwatches = {
@@ -4388,16 +4397,53 @@
         function setRgbCardState(dev, index) {
             const rgb = RGB_CYCLE[index] || RGB_CYCLE[0];
             domRgbIndex[dev] = index;
-            domState[dev] = rgb.value !== 0;
+            domState[dev] = rgb.rgb.r !== 0 || rgb.rgb.g !== 0 || rgb.rgb.b !== 0;
             const sw = document.getElementById(domRgbSwatches[dev]);
             if (sw) sw.style.background = rgb.hex;
         }
         function nextRgbAction(dev) {
             const current = domState[dev] ? domRgbIndex[dev] : 0;
             const next = (current + 1) % RGB_CYCLE.length;
-            return { op: 'SET', target: dev, value: RGB_CYCLE[next].value, _rgbIndex: next };
+            return { op: 'SET', target: dev, value: RGB_CYCLE[next].rgb, _rgbIndex: next };
+        }
+        function sendArduinoAction(action) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', ...action } }));
+            }
+        }
+        const rgbHoldState = { rgb1: null, rgb2: null, rgb3: null };
+        const rgbSuppressClick = { rgb1: false, rgb2: false, rgb3: false };
+        function turnRgbOff(dev) {
+            sendArduinoAction({ op: 'SET', target: dev, value: 0 });
+            setRgbCardState(dev, 0);
+            refreshDomUI();
+            setStatus(`[RGB] ${dev.toUpperCase()} OFF`);
+        }
+        function setupRgbHoldControls() {
+            ['rgb1', 'rgb2', 'rgb3'].forEach(dev => {
+                const el = document.getElementById(`dev-${dev}`);
+                if (!el) return;
+                el.addEventListener('pointerdown', () => {
+                    clearTimeout(rgbHoldState[dev]);
+                    rgbSuppressClick[dev] = false;
+                    rgbHoldState[dev] = setTimeout(() => {
+                        rgbSuppressClick[dev] = true;
+                        turnRgbOff(dev);
+                    }, 550);
+                });
+                ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt => {
+                    el.addEventListener(evt, () => {
+                        clearTimeout(rgbHoldState[dev]);
+                        rgbHoldState[dev] = null;
+                    });
+                });
+            });
         }
         function toggleDevice(dev) {
+            if ((dev in rgbSuppressClick) && rgbSuppressClick[dev]) {
+                rgbSuppressClick[dev] = false;
+                return;
+            }
             const actionMap = {
                 light: () => ({ op: 'SET', target: 'light', value: domState.light ? 0 : 1 }),
                 servo: () => ({ op: 'SET', target: 'servo', value: domState.servo ? 0 : 90 }),
@@ -4410,10 +4456,8 @@
             };
             const action = actionMap[dev]?.();
             if (!action) return;
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                const { _rgbIndex, ...arduinoAction } = action;
-                ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', ...arduinoAction } }));
-            }
+            const { _rgbIndex, ...arduinoAction } = action;
+            sendArduinoAction(arduinoAction);
             if (dev !== 'alarm') {
                 if (dev in domRgbIndex) {
                     setRgbCardState(dev, action._rgbIndex);
@@ -4455,8 +4499,11 @@
             return function(d) {
                 if (d[key] !== undefined) {
                     const rgb = Array.isArray(d[key]) ? d[key] : [0, 0, 0];
-                    const hex = '#' + rgb.map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
-                    const knownIndex = RGB_CYCLE.findIndex(color => color.hex.toLowerCase() === hex.toLowerCase());
+                    const normalized = rgb.map(v => Math.min(255, Math.max(0, Number(v) || 0)));
+                    const hex = '#' + normalized.map(v => v.toString(16).padStart(2, '0')).join('');
+                    const knownIndex = RGB_CYCLE.findIndex(color =>
+                        color.rgb.r === normalized[0] && color.rgb.g === normalized[1] && color.rgb.b === normalized[2]
+                    );
                     if (knownIndex >= 0) {
                         setRgbCardState(key, knownIndex);
                     } else {
@@ -4470,6 +4517,7 @@
         const _rgb1Update = _updateRgbSwatch('rgb1', 'casa-rgb1-swatch');
         const _rgb2Update = _updateRgbSwatch('rgb2', 'casa-rgb2-swatch');
         const _rgb3Update = _updateRgbSwatch('rgb3', 'casa-rgb3-swatch');
+        setupRgbHoldControls();
         function updateArduino(d) {
             if (d.system && d.system.reset_storage) {
                 document.getElementById('debug-controls').style.display = 'flex';

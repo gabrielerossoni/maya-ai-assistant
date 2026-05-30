@@ -43,6 +43,18 @@ class DisplayTool:
         """Aggiorna un campo dello stato."""
         self.status[key] = value
 
+    def execute(self, action: dict) -> dict:
+        layout = action.get("layout")
+        params = action.get("params", {})
+        if not layout:
+            return {"status": "error", "message": "Layout non specificato."}
+
+        # In una configurazione reale, questo potrebbe aggiornare uno stato locale
+        # ma qui serve principalmente a far sì che l'AutomationEngine veda l'azione
+        # e faccia il broadcast verso la dashboard.
+        self.status["last_cmd"] = f"Layout: {layout}"
+        return {"status": "ok", "message": f"Layout impostato a {layout}", "layout": layout, "params": params}
+
     # ── Display ASCII ─────────────────────────
 
     def _run_display(self):

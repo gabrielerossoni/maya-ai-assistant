@@ -233,11 +233,21 @@ class ContextPrefetchChecker(BaseChecker):
 
 
 class ProactiveManager:
-    def __init__(self, tool_manager, websocket_manager=None, interval=60, memory_manager=None):
+    def __init__(
+        self,
+        tool_manager,
+        websocket_manager=None,
+        interval=60,
+        memory_manager=None,
+        voice_manager=None,
+        initial_delay=60,
+    ):
         self.tool_manager = tool_manager
         self.websocket_manager = websocket_manager
         self.memory_manager = memory_manager
+        self.voice_manager = voice_manager
         self.interval = interval
+        self.initial_delay = initial_delay
         self.checkers = []
         self._initialize_checkers()
 
@@ -256,30 +266,43 @@ class ProactiveManager:
             self.checkers.append(ContextPrefetchChecker(self.tool_manager, self.memory_manager))
             self.checkers.append(ContextualSensorChecker(self.tool_manager, self.memory_manager))
 
+    async def _broadcast_alert(self, checker: BaseChecker, alert: str):
+        if not self.websocket_manager:
+            return
+        if isinstance(checker, ContextualSensorChecker):
+            await self.websocket_manager.broadcast(
+                {
+                    "type": "proactive_suggestion",
+                    "text": alert,
+                    "level": "suggestion",
+                }
+            )
+        else:
+            await self.websocket_manager.broadcast(
+                {
+                    "type": "log",
+                    "text": f"[AVVISO] {alert}",
+                    "level": "warning",
+                }
+            )
+
+    async def _speak_alert(self, alert: str):
+        if self.memory_manager:
+            await self.memory_manager.add_turn("jarvis", alert, persist_db=False)
+        if self.voice_manager:
+            await asyncio.to_thread(self.voice_manager.speak, alert)
+
     async def start_loop(self):
+        if self.initial_delay > 0:
+            await asyncio.sleep(self.initial_delay)
         while True:
             try:
                 for checker in self.checkers:
                     alert = await checker.check()
                     if alert:
                         print(f"[PROACTIVE] Trigger attivato ({checker.name}): {alert}")
-                        if self.websocket_manager:
-                            if isinstance(checker, ContextualSensorChecker):
-                                await self.websocket_manager.broadcast(
-                                    {
-                                        "type": "proactive_suggestion",
-                                        "text": alert,
-                                        "level": "suggestion",
-                                    }
-                                )
-                            else:
-                                await self.websocket_manager.broadcast(
-                                    {
-                                        "type": "log",
-                                        "text": f"🔔 {alert}",
-                                        "level": "warning",
-                                    }
-                                )
+                        await self._broadcast_alert(checker, alert)
+                        await self._speak_alert(alert)
                 await asyncio.sleep(self.interval)
             except Exception as e:
                 print(f"[PROACTIVE] Errore nel loop: {e}")
