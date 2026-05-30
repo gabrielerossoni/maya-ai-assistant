@@ -224,7 +224,8 @@ def test_send_sync_preserves_arduino_error_status(real_tool):
     assert result["message"] == "unknown_target"
 
 
-def test_send_sync_timeout_and_missing_connection_cleanup(real_tool):
+def test_send_sync_timeout_and_missing_connection_cleanup(real_tool, monkeypatch):
+    monkeypatch.setattr(real_tool, "_find_port", lambda: None)
     real_tool.connection = ReplyingConnection(real_tool, None)
 
     timeout = real_tool._send_sync("SET", "light", 1, timeout=0)

@@ -73,23 +73,24 @@ class ArduinoTool:
             print("[ARDUINO] pyserial assente → simulazione")
             return
 
-        port = self._find_port() if SERIAL_PORT == "AUTO" else SERIAL_PORT
-        if not port:
-            self.simulated = True
-            print("[ARDUINO] Porta non trovata → simulazione")
-            return
+        self._running = True
+        self.simulated = True  # Inizia in modalità simulata finché non si connette
 
-        try:
-            self.connection = serial.Serial(port, BAUD_RATE, timeout=0.1)
-            time.sleep(2)
-            self.simulated = False
-            self._running = True
-            self._reader = threading.Thread(target=self._read_loop, daemon=True)
-            self._reader.start()
-            print(f"[ARDUINO] Connesso su {port} @ {BAUD_RATE}")
-        except SERIAL_EXCEPTION as e:
-            self.simulated = True
-            print(f"[ARDUINO] Errore porta: {e} → simulazione")
+        # Prova una connessione iniziale veloce
+        port = self._find_port() if SERIAL_PORT == "AUTO" else SERIAL_PORT
+        if port:
+            try:
+                self.connection = serial.Serial(port, BAUD_RATE, timeout=0.1)
+                time.sleep(2)
+                self.simulated = False
+                print(f"[ARDUINO] Connesso su {port} @ {BAUD_RATE}")
+            except SERIAL_EXCEPTION as e:
+                print(f"[ARDUINO] Connessione iniziale fallita su {port}: {e}")
+        else:
+            print("[ARDUINO] Porta non trovata all'avvio, monitoraggio in background attivo.")
+
+        self._reader = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader.start()
 
     def register_event_hook(self, cb: Callable):
         self._event_hooks.append(cb)
