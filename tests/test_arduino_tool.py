@@ -3,7 +3,7 @@ import json
 import pytest
 
 from core.automation_engine import build_default_automations
-from tools.arduino_tool import ArduinoTool, VALID_TARGETS
+from tools.arduino_tool import VALID_TARGETS, ArduinoTool
 
 
 class ReplyingConnection:

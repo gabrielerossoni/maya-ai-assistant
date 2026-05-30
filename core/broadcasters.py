@@ -105,6 +105,7 @@ async def news_broadcaster(agent, manager):
 # ---------------------------------------------------------------------------
 async def stats_broadcaster(manager, voice_manager):
     import psutil
+
     from core.gpu_stats import get_gpu_stats
 
     # Warm-up: la prima chiamata con interval=None restituisce sempre 0.0
