@@ -105,6 +105,18 @@ def background(action: Action) -> Action:
     return action
 
 
+def delayed_background(action: Action, delay: float) -> Action:
+    action.delay = delay
+    action.background = True
+    return action
+
+
+def arduino_melody(melody: str, delay: float = 0.0, background_action: bool = False) -> Action:
+    action = Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": melody}, delay=delay)
+    action.background = background_action
+    return action
+
+
 def timer_action(minutes: int, message: str) -> Action:
     return Action(tool="timer", params={"minutes": minutes, "message": message})
 
@@ -123,6 +135,26 @@ def calendar_action(act: str = "list") -> Action:
 
 def display_action(layout: str, delay: float = 0.0, **params) -> Action:
     return Action(tool="display", params={"layout": layout, **params}, delay=delay)
+
+
+def _background_buzzer_pulse(duration: float = 30.0, interval: float = 0.5) -> list[Action]:
+    actions: list[Action] = []
+    steps = int(duration / interval)
+    for i in range(steps):
+        value = 1 if i % 2 == 0 else 0
+        actions.append(delayed_background(arduino("buzzer", value), interval))
+    actions.append(delayed_background(arduino("buzzer", 0), 0.0))
+    return actions
+
+
+def _background_melody_loop(melody: str, duration: float = 30.0, repeat_every: float = 4.0) -> list[Action]:
+    actions: list[Action] = []
+    elapsed = repeat_every
+    while elapsed < duration:
+        actions.append(delayed_background(arduino_melody(melody), repeat_every))
+        elapsed += repeat_every
+    actions.append(delayed_background(arduino_melody("off"), max(0.0, duration - (elapsed - repeat_every))))
+    return actions
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -196,9 +228,9 @@ class Scene:
     cooldown: float = 0.0  # secondi minimi tra due esecuzioni
     _last_run: float = field(default=0.0, init=False, repr=False)
 
-    def can_run(self) -> bool:
+    def can_run(self, ignore_cooldown: bool = False) -> bool:
         """Verifica condizioni e cooldown."""
-        if time.time() - self._last_run < self.cooldown:
+        if not ignore_cooldown and time.time() - self._last_run < self.cooldown:
             return False
         return all(c.evaluate() for c in self.conditions)
 
@@ -384,6 +416,17 @@ class AutomationEngine:
     def list_automations(self) -> list[str]:
         return [name for name, a in self._automations.items() if a.is_valid()]
 
+    def _is_manual_source(self, source: str) -> bool:
+        return (source or "manual").strip().lower() in {"manual", "voice", "dashboard", "test"}
+
+    def _blocked_reason(self, scene: Scene, ignore_cooldown: bool = False) -> str:
+        if not ignore_cooldown and time.time() - scene._last_run < scene.cooldown:
+            return "cooldown"
+        return "condizioni non soddisfatte"
+
+    def _is_critical_action_error(self, action: Action) -> bool:
+        return action.tool in {"arduino", "timer"}
+
     # ── Esecuzione ────────────────────────────────────────────────────────────
 
     async def execute(self, automation: Automation, source: str = "manual") -> dict:
@@ -397,9 +440,10 @@ class AutomationEngine:
         - event bus publish
         """
         scene = automation.scene
+        ignore_cooldown = self._is_manual_source(source)
 
-        if not scene.can_run():
-            reason = "cooldown" if time.time() - scene._last_run < scene.cooldown else "condizioni non soddisfatte"
+        if not scene.can_run(ignore_cooldown=ignore_cooldown):
+            reason = self._blocked_reason(scene, ignore_cooldown=ignore_cooldown)
             logger.info(f"[ENGINE] '{scene.name}' bloccata: {reason}")
             return {"status": "skipped", "reason": reason}
 
@@ -413,14 +457,15 @@ class AutomationEngine:
         logger.info(f"[ENGINE] Esecuzione '{scene.name}' (priorità={scene.priority}, source={source})")
 
         await self._scene_lock.acquire()
-        if not scene.can_run():
+        if not scene.can_run(ignore_cooldown=ignore_cooldown):
             self._scene_lock.release()
-            reason = "cooldown" if time.time() - scene._last_run < scene.cooldown else "condizioni non soddisfatte"
+            reason = self._blocked_reason(scene, ignore_cooldown=ignore_cooldown)
             logger.info(f"[ENGINE] '{scene.name}' bloccata: {reason}")
             return {"status": "skipped", "reason": reason}
 
         results = []
         errors = []
+        warnings = []
         conflicts = []
         start_ts = time.time()
 
@@ -444,7 +489,11 @@ class AutomationEngine:
             results.append(result)
 
             if result.get("status") == "error":
-                errors.append({"action": str(action), "error": result.get("message")})
+                entry = {"action": str(action), "error": result.get("message")}
+                if self._is_critical_action_error(action):
+                    errors.append(entry)
+                else:
+                    warnings.append(entry)
                 logger.warning(f"[ENGINE] '{scene.name}' — errore in {action}: {result.get('message')}")
 
             # Aggiorna registry dopo azioni Arduino
@@ -474,6 +523,7 @@ class AutomationEngine:
             "source": source,
             "status": status,
             "errors": errors,
+            "warnings": warnings,
             "conflicts": conflicts,
             "elapsed": elapsed,
             "ts": start_ts,
@@ -484,7 +534,14 @@ class AutomationEngine:
 
         logger.info(f"[ENGINE] '{scene.name}' completata in {elapsed}s — status={status}")
         self._scene_lock.release()
-        return {"status": status, "results": results, "errors": errors, "conflicts": conflicts, "elapsed": elapsed}
+        return {
+            "status": status,
+            "results": results,
+            "errors": errors,
+            "warnings": warnings,
+            "conflicts": conflicts,
+            "elapsed": elapsed,
+        }
 
     async def execute_by_name(self, name: str, source: str = "manual") -> dict:
         automation = self._automations.get(name)
@@ -589,7 +646,7 @@ class AutomationEngine:
             if not enabled:
                 logger.info(f"[ENGINE] '{scene_name}' — skip Spotify: disabilitato via ENV")
                 return {"status": "skipped", "message": "Spotify disabilitato."}
-            
+
             spotify_tool = self._tool_manager.tools.get("spotify")
             if spotify_tool and not spotify_tool.sp:
                 logger.info(f"[ENGINE] '{scene_name}' — skip Spotify: non connesso")
@@ -603,7 +660,7 @@ class AutomationEngine:
                     self._tool_manager.execute(tool_action),
                     timeout=action.timeout,
                 )
-                
+
                 # --- BROADCAST PER DASHBOARD ---
                 if self.socket_manager and result.get("status") == "ok":
                     ws_map = {
@@ -618,32 +675,36 @@ class AutomationEngine:
                         msg_type = ws_map[action.tool]
                         payload = {"type": msg_type}
                         if "data" in result:
-                            if isinstance(result["data"], dict): payload.update(result["data"])
-                            else: payload["data"] = result["data"]
+                            if isinstance(result["data"], dict):
+                                payload.update(result["data"])
+                            else:
+                                payload["data"] = result["data"]
                         else:
                             payload.update(result)
                         payload.pop("status", None)
                         payload.pop("message", None)
                         await self.socket_manager.broadcast(payload)
-                    
+
                     # Caso speciale Arduino: broadcast stato compatto
                     if action.tool == "arduino":
                         st = result.get("state", {})
                         if st:
-                            await self.socket_manager.broadcast({
-                                "type": "state",
-                                "led": "on" if st.get("light") else "off",
-                                "servo": "open" if (st.get("servo") or 0) > 0 else "0",
-                                "servo2": st.get("servo2", 0),
-                                "rgb1": st.get("rgb1", [0, 0, 0]),
-                                "rgb2": st.get("rgb2", [0, 0, 0]),
-                                "rgb3": st.get("rgb3", [0, 0, 0]),
-                                "buzzer": st.get("buzzer", False),
-                            })
+                            await self.socket_manager.broadcast(
+                                {
+                                    "type": "state",
+                                    "led": "on" if st.get("light") else "off",
+                                    "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                                    "servo2": st.get("servo2", 0),
+                                    "rgb1": st.get("rgb1", [0, 0, 0]),
+                                    "rgb2": st.get("rgb2", [0, 0, 0]),
+                                    "rgb3": st.get("rgb3", [0, 0, 0]),
+                                    "buzzer": st.get("buzzer", False),
+                                }
+                            )
 
                 if result.get("status") != "error":
                     return result
-                
+
                 last_result = result
                 if attempt < action.retry - 1:
                     logger.debug(f"[ENGINE] Retry {attempt + 1}/{action.retry} per {action}")
@@ -744,7 +805,7 @@ def build_default_automations() -> list[Automation]:
                     spotify("pause"),
                     arduino("light", 0),
                     arduino("servo", 0),
-                    arduino("rgb", 0x000008),
+                    arduino("rgb", {"r": 0, "g": 0, "b": 8}),
                     calendar_action("list"),
                 ],
             ),
@@ -776,7 +837,7 @@ def build_default_automations() -> list[Automation]:
                 cooldown=60,
                 actions=[
                     arduino("light", 1),
-                    arduino("rgb", 0xFFD580),
+                    arduino("rgb", {"r": 255, "g": 213, "b": 128}),
                     arduino("servo", 0),
                     display_action("news"),
                     display_action("weather", delay=10),
@@ -797,9 +858,13 @@ def build_default_automations() -> list[Automation]:
                 name="sveglia",
                 priority=Priority.CRITICAL,
                 actions=[
-                    arduino("buzzer", 1),
                     arduino("light", 1),
-                    arduino("rgb", 0xFFFFFF),
+                    arduino("rgb", {"r": 255, "g": 213, "b": 128}, effect=1),
+                    arduino("buzzer", 1),
+                    arduino_melody("wake_radar"),
+                    *_background_melody_loop("wake_radar", duration=30.0, repeat_every=4.0),
+                    delayed_background(arduino("rgb", 0, effect=0), 0.0),
+                    delayed_background(arduino("buzzer", 0), 0.0),
                     spotify("search", query="energetic morning wake up"),
                 ],
             ),
@@ -813,7 +878,7 @@ def build_default_automations() -> list[Automation]:
                 exclusive=True,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", 0x220000),
+                    arduino("rgb", {"r": 34, "g": 0, "b": 0}),
                 ],
             ),
             aliases=["film", "cinema", "guardo un film"],
@@ -825,7 +890,7 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.LOW,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", 0x440055),
+                    arduino("rgb", {"r": 68, "g": 0, "b": 85}),
                 ],
             ),
             aliases=["relax"],
@@ -838,10 +903,10 @@ def build_default_automations() -> list[Automation]:
                 cooldown=120,
                 actions=[
                     arduino("light", 1),
-                    arduino("rgb", 0xFFFFFF),
+                    arduino("rgb", {"r": 255, "g": 255, "b": 255}),
                     arduino("servo", 90),
                     arduino("servo2", 90),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "startup"}),
+                    arduino_melody("startup"),
                 ],
             ),
             aliases=["ospite", "modalità ospite", "arrivano ospiti", "stanno arrivando"],
@@ -857,7 +922,7 @@ def build_default_automations() -> list[Automation]:
                     arduino("rgb", 0),
                     arduino("servo", 0),
                     arduino("servo2", 0),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "ok"}),
+                    arduino_melody("ok"),
                     spotify("pause"),
                     weather_action(),
                 ],
@@ -873,7 +938,7 @@ def build_default_automations() -> list[Automation]:
                 actions=[
                     arduino("light", 1),
                     arduino("servo", 90),
-                    arduino("rgb", 0xFF8C42),
+                    arduino("rgb", {"r": 255, "g": 140, "b": 66}),
                     spotify("search", query="relax after work playlist"),
                     timer_action(5, "Ricordati di chiudere la porta!"),
                     news_action(limit=3),
@@ -891,9 +956,12 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.CRITICAL,
                 exclusive=True,
                 actions=[
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer", "value": 1}),
-                    Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "alarm"}),
-                    Action(tool="arduino", params={"op": "SET", "target": "neopixel", "value": 0xFF0000, "effect": 3}),
+                    arduino("neopixel", {"r": 255, "g": 0, "b": 0}, effect=3),
+                    arduino("buzzer", 1),
+                    arduino_melody("alarm"),
+                    *_background_buzzer_pulse(duration=30.0, interval=0.5),
+                    delayed_background(arduino_melody("off"), 0.0),
+                    delayed_background(arduino("neopixel", 0, effect=0), 0.0),
                 ],
             ),
         ),
@@ -906,7 +974,7 @@ def build_default_automations() -> list[Automation]:
                 actions=[
                     arduino("servo", 0),
                     arduino("light", 1),
-                    arduino("rgb", 0x4488FF),
+                    arduino("rgb", {"r": 68, "g": 136, "b": 255}),
                     spotify("search", query="rain lofi study"),
                     weather_action(),
                 ],
@@ -924,7 +992,7 @@ def build_default_automations() -> list[Automation]:
                 cooldown=3600,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", 0xFF4400),
+                    arduino("rgb", {"r": 255, "g": 68, "b": 0}),
                     arduino("servo", 0),
                     spotify("search", query="cena romantica musica italiana"),
                 ],

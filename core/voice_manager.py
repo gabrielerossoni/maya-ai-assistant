@@ -515,6 +515,9 @@ class VoiceManager:
             self._play_wav(output_wav)
         except Exception as e:
             print(f"[VOICE] Errore TTS raw: {e}")
+        finally:
+            if not self.is_speaking:
+                self._broadcast("IDLE")
 
     def speak(self, text):
         if not os.path.exists(self.piper_exe):
@@ -541,8 +544,9 @@ class VoiceManager:
 
         except Exception as e:
             print(f"[VOICE] Errore TTS: {e}")
-
-        self.is_speaking = False
+        finally:
+            self.is_speaking = False
+            self._broadcast("IDLE")
 
     def _play_wav(self, file_path):
         """Riproduce un file WAV usando PyAudio in modo sincrono e controllato."""

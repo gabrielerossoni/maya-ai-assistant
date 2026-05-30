@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>M.A.Y.A.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@200;300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #06080a;
+      --text: #e6edf3;
+      --muted: rgba(200,215,230,0.5);
+      --faint: rgba(200,215,230,0.22);
+      --red: #e8253a;
+      --red-dim: rgba(232,37,58,0.35);
+      --line: rgba(255,255,255,0.07);
+      --mono: 'DM Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+      --display: 'Bebas Neue', sans-serif;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* subtle noise grain */
+    body::before {
+      content: "";
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+    }
+
+    /* ===== TOPLINE ===== */
+    .topline {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 10;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .topline-id { color: rgba(200,215,230,0.55); }
+    #clock { font-variant-numeric: tabular-nums; }
+
+    /* ===== PROGRESS ===== */
+    .progress {
+      position: fixed; top: 40px; left: 0; right: 0;
+      z-index: 10;
+      height: 1px;
+      background: var(--line);
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      background: var(--red);
+      transition: width 800ms cubic-bezier(.19,1,.22,1);
+    }
+
+    /* ===== DECK ===== */
+    #deck { position: fixed; inset: 0; z-index: 2; overflow: hidden; }
+    #track {
+      height: 100%;
+      display: flex;
+      will-change: transform;
+      transition: transform 800ms cubic-bezier(.19,1,.22,1);
+    }
+
+    /* ===== SLIDE ===== */
+    .slide {
+      flex: 0 0 100vw;
+      height: 100vh;
+      padding: 40px 0 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* centered content area */
+    .slide-inner {
+      max-width: 1080px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 clamp(28px, 6vw, 96px);
+    }
+
+    /* two-col slides */
+    .slide-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(40px, 6vw, 100px);
+      align-items: center;
+    }
+
+    /* ===== REVEAL ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      filter: blur(4px);
+      transition:
+        opacity 600ms ease,
+        transform 800ms cubic-bezier(.19,1,.22,1),
+        filter 600ms ease;
+      transition-delay: calc(var(--d,0) * 80ms);
+    }
+    .slide.active .reveal {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+
+    /* ===== SLIDE NUMBER ===== */
+    .slide-num {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--red);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    .title-hero {
+      font-family: var(--display);
+      font-size: clamp(100px, 16vw, 210px);
+      line-height: 0.9;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+    .title-hero .accent { color: var(--red); }
+
+    h2 {
+      font-family: var(--display);
+      font-size: clamp(40px, 6vw, 88px);
+      line-height: 0.96;
+      letter-spacing: 0.02em;
+      font-weight: 400;
+      color: var(--text);
+    }
+    h2 .accent { color: var(--red); }
+
+    .lede {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: clamp(15px, 1.6vw, 20px);
+      line-height: 1.5;
+      font-weight: 300;
+      max-width: 520px;
+    }
+
+    .sublede {
+      margin-top: 12px;
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ===== ACTIONS ===== */
+    .actions { display: flex; gap: 10px; margin-top: 32px; }
+    .btn {
+      padding: 9px 20px;
+      border: 1px solid var(--line);
+      background: transparent;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 180ms ease, color 180ms ease;
+    }
+    .btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .btn.primary {
+      border-color: var(--red-dim);
+      color: rgba(232,37,58,0.8);
+    }
+    .btn.primary:hover { border-color: var(--red); color: var(--red); }
+
+    /* ===== ORB ===== */
+    .orb-wrap {
+      position: relative;
+      width: min(38vw, 380px);
+      aspect-ratio: 1;
+      min-width: 240px;
+      justify-self: center;
+    }
+    .orb-body {
+      position: absolute;
+      inset: 18%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 32%,
+        rgba(255,255,255,0.14),
+        rgba(232,37,58,0.3) 35%,
+        rgba(180,10,25,0.12) 65%,
+        transparent);
+      animation: breathe 5s ease-in-out infinite;
+    }
+    .orb-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid;
+      animation: spin linear infinite;
+    }
+    .orb-ring:nth-child(1) { inset:3%;  border-color: rgba(232,37,58,0.25); animation-duration: 22s; }
+    .orb-ring:nth-child(2) { inset:10%; border-color: rgba(255,255,255,0.08); animation-duration: 16s; animation-direction: reverse; }
+    .orb-ring:nth-child(3) { inset:0%;  border-color: rgba(255,255,255,0.04); animation-duration: 38s; }
+    .orb-glow {
+      position: absolute; inset: 8%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(232,37,58,0.12), transparent 70%);
+      filter: blur(18px);
+      animation: breathe 5s ease-in-out infinite;
+    }
+    .orb-dot {
+      position: absolute;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 16px var(--red);
+      top: 50%; left: 50%;
+      animation: orbit-dot 9s linear infinite;
+      transform-origin: -118px 0;
+    }
+    @keyframes breathe { 0%,100%{transform:scale(1);} 50%{transform:scale(1.05);} }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes orbit-dot {
+      from { transform: rotate(0deg) translateX(-118px) rotate(0deg); }
+      to   { transform: rotate(360deg) translateX(-118px) rotate(-360deg); }
+    }
+
+    /* ===== CARD LIST (right col) ===== */
+    .card-list { display: flex; flex-direction: column; gap: 1px; }
+    .card-item {
+      padding: 18px 20px;
+      border-left: 2px solid var(--line);
+      transition: border-color 200ms ease;
+      cursor: default;
+    }
+    .card-item:hover { border-color: var(--red-dim); }
+    .card-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--faint);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+    .card-body {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-weight: 300;
+    }
+
+    /* ===== FLOW ===== */
+    .flow { display: flex; flex-direction: column; gap: 0; }
+    .flow-node {
+      padding: 16px 20px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+    }
+    .flow-node strong { font-size: 15px; font-weight: 500; display: block; margin-bottom: 3px; }
+    .flow-node small {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 20px;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--faint);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .flow-arrow::before {
+      content: "";
+      flex: 1; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--line));
+    }
+
+    /* ===== PIN GRID ===== */
+    .pin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); }
+    .pin-item { background: var(--bg); padding: 16px 18px; }
+    .pin-code {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: rgba(232,37,58,0.7);
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+    .pin-desc { font-size: 12.5px; color: var(--muted); line-height: 1.4; font-weight: 300; }
+
+    /* ===== STEPS ===== */
+    .steps { display: flex; flex-direction: column; gap: 2px; }
+    .step-item {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+      align-items: start;
+    }
+    .step-num {
+      font-family: var(--display);
+      font-size: 38px;
+      color: var(--red);
+      line-height: 1;
+      opacity: 0.7;
+    }
+    .step-title { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+    .step-desc { font-size: 13px; color: var(--muted); line-height: 1.45; font-weight: 300; }
+
+    /* ===== KPI ROW ===== */
+    .kpi-row { display: flex; gap: 1px; background: var(--line); margin-bottom: 20px; }
+    .kpi-item {
+      flex: 1; padding: 18px;
+      background: var(--bg);
+      text-align: center;
+    }
+    .kpi-val {
+      font-family: var(--display);
+      font-size: clamp(34px, 4vw, 52px);
+      color: var(--text);
+      display: block;
+      line-height: 1;
+    }
+    .kpi-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--faint);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      display: block;
+      margin-top: 6px;
+    }
+
+    /* ===== DASHBOARD MOCK ===== */
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+    .dash-panel { background: var(--bg); padding: 16px; }
+    .dash-orb-wrap { display: flex; align-items: center; justify-content: center; min-height: 120px; }
+    .dash-orb {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      border: 1px solid var(--red-dim);
+      background: radial-gradient(circle, rgba(232,37,58,0.3), transparent 70%);
+      animation: breathe 3s ease-in-out infinite;
+    }
+    .switch-list { display: flex; flex-direction: column; gap: 1px; background: var(--line); }
+    .switch-row {
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 12px;
+      font-size: 12px; font-weight: 300;
+    }
+    .switch-row small { font-family: var(--mono); font-size: 9px; color: var(--faint); }
+    .toggle {
+      width: 34px; height: 18px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      padding: 3px;
+    }
+    .toggle::before {
+      content: "";
+      display: block;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--faint);
+      transition: transform 250ms ease, background 250ms ease;
+    }
+    .toggle.on { background: rgba(232,37,58,0.25); }
+    .toggle.on::before { transform: translateX(16px); background: var(--red); }
+
+    /* ===== CODE ===== */
+    .code-block {
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.9;
+      color: var(--muted);
+      padding: 16px 20px;
+      border-left: 2px solid var(--red-dim);
+      background: rgba(255,255,255,0.02);
+      margin-top: 16px;
+    }
+    .code-block .kw { color: var(--red); }
+    .code-block .str { color: rgba(130,210,180,0.8); }
+
+    /* ===== SCENES ===== */
+    .scene-list { display: flex; flex-direction: column; gap: 1px; background: var(--line); }
+    .scene-item {
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+    }
+    .scene-name { font-size: 14px; font-weight: 400; }
+    .scene-cmd { font-family: var(--mono); font-size: 9px; color: var(--faint); margin-top: 3px; letter-spacing: 0.08em; }
+    .scene-swatch { width: 36px; height: 36px; border: 1px solid rgba(255,255,255,0.1); flex: 0 0 auto; }
+
+    /* ===== BOTTOM NAV ===== */
+    .nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      z-index: 10;
+      height: 52px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      padding: 0 24px;
+      gap: 20px;
+    }
+    .nav-btns { display: flex; gap: 1px; }
+    .icon-btn {
+      width: 36px; height: 36px;
+      display: grid; place-items: center;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      transition: color 180ms ease, border-color 180ms ease;
+    }
+    .icon-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+    .dots-row { display: flex; gap: 8px; justify-content: center; align-items: center; }
+    .dot-btn {
+      width: 20px; height: 36px;
+      display: grid; place-items: center;
+      background: none; border: none; cursor: pointer;
+    }
+    .dot-btn::before {
+      content: "";
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      transition: all 260ms cubic-bezier(.19,1,.22,1);
+    }
+    .dot-btn.active::before {
+      width: 16px; height: 3px;
+      border-radius: 999px;
+      background: var(--red);
+    }
+    .counter {
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
+      letter-spacing: 0.12em;
+      white-space: nowrap;
+    }
+
+    /* ===== OVERVIEW ===== */
+    .overview {
+      position: fixed; inset: 0; z-index: 20;
+      display: grid; place-items: center; padding: 24px;
+      background: rgba(4,6,8,0.92);
+      backdrop-filter: blur(20px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 220ms ease;
+    }
+    .overview.open { opacity: 1; pointer-events: auto; }
+    .overview-grid {
+      width: min(1000px, 100%);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--line);
+    }
+    .thumb {
+      min-height: 100px;
+      padding: 14px;
+      background: var(--bg);
+      text-align: left;
+      cursor: pointer;
+      transition: background 160ms ease;
+    }
+    .thumb:hover { background: rgba(255,255,255,0.03); }
+    .thumb small { display: block; font-family: var(--mono); font-size: 9px; color: var(--red); margin-bottom: 12px; letter-spacing: 0.12em; }
+    .thumb strong { font-size: 14px; font-weight: 400; }
+
+    @media (max-width: 900px) {
+      .slide-two { grid-template-columns: 1fr; }
+      .orb-wrap { display: none; }
+      .pin-grid { grid-template-columns: 1fr; }
+      .dots-row { display: none; }
+      .overview-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topline">
+  <span class="topline-id">M.A.Y.A.</span>
+  <span id="sectionName">Neural Home Interface</span>
+  <span id="clock"></span>
+</div>
+
+<!-- Progress -->
+<div class="progress"><div class="progress-fill" id="progress"></div></div>
+
+<!-- Slides -->
+<main id="deck">
+  <div id="track">
+
+    <!-- 00 INTRO -->
+    <section class="slide active" data-name="Intro">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">Arduino Day 2026 — ITIS Crema</div>
+            <div class="title-hero reveal" style="--d:1">M.A.Y.A<span class="accent">.</span></div>
+            <p class="lede reveal" style="--d:2">Assistente agentico locale, dashboard HUD e controllo fisico in tempo reale.</p>
+            <p class="sublede reveal" style="--d:3">Multitask Advanced Yielding Assistant · Gabriele Rossoni &amp; Marcello Patrini</p>
+            <div class="actions reveal" style="--d:4">
+              <button class="btn primary" data-jump="1">Inizia</button>
+              <button class="btn" id="openOverview">Overview</button>
+            </div>
+          </div>
+          <div class="reveal" style="--d:2; display:flex; justify-content:center;">
+            <div class="orb-wrap">
+              <div class="orb-glow"></div>
+              <div class="orb-ring"></div>
+              <div class="orb-ring"></div>
+              <div class="orb-ring"></div>
+              <div class="orb-body"></div>
+              <div class="orb-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 01 CONCEPT -->
+    <section class="slide" data-name="Concept">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">01 / Concept</div>
+            <h2 class="reveal" style="--d:1">Non un chatbot.<br><span class="accent">Un orchestratore.</span></h2>
+            <p class="lede reveal" style="--d:2">MAYA interpreta richieste naturali e coordina luci, porta, audio, sensori, calendario, meteo e automazioni.</p>
+          </div>
+          <div class="card-list reveal" style="--d:3">
+            <div class="card-item">
+              <div class="card-label">Privacy</div>
+              <div class="card-title">Funziona localmente</div>
+              <div class="card-body">Ollama, memoria semantica e logica core girano sul PC. Nessuna dipendenza dal cloud.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">Contesto</div>
+              <div class="card-title">Capisce la casa</div>
+              <div class="card-body">Stato dispositivi, orario, meteo e presenza entrano nelle decisioni dell'agente.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">Azione</div>
+              <div class="card-title">Muove il mondo fisico</div>
+              <div class="card-body">Arduino R4 WiFi traduce comandi in LED, relay, servo, RGB, speaker e sensori.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 ARCHITETTURA -->
+    <section class="slide" data-name="Architettura">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">02 / Architettura</div>
+            <h2 class="reveal" style="--d:1">PC intelligente,<br><span class="accent">Arduino fisico.</span></h2>
+            <p class="lede reveal" style="--d:2">Il PC ragiona e pianifica. Arduino esegue e misura. La divisione dei ruoli mantiene tutto chiaro.</p>
+          </div>
+          <div class="flow reveal" style="--d:3">
+            <div class="flow-node">
+              <strong>FastAPI + AgentCore</strong>
+              <small>Intent router · planner · executor · validator</small>
+            </div>
+            <div class="flow-arrow">JSON seriale 115200 baud / MQTT</div>
+            <div class="flow-node">
+              <strong>Arduino R4 WiFi</strong>
+              <small>Firmware C++ · attuatori · sensori DHT11</small>
+            </div>
+            <div class="flow-arrow">telemetria live</div>
+            <div class="flow-node">
+              <strong>Dashboard HUD</strong>
+              <small>WebSocket · stato casa · scene · orb Three.js</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 HARDWARE -->
+    <section class="slide" data-name="Hardware">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">03 / Hardware</div>
+            <h2 class="reveal" style="--d:1">La casa risponde.<br><span class="accent">Attuatori reali.</span></h2>
+            <p class="lede reveal" style="--d:2">Ogni pin ha un ruolo preciso nella demo: luce, accesso, allarme, atmosfera, telemetria.</p>
+          </div>
+          <div class="pin-grid reveal" style="--d:3">
+            <div class="pin-item"><div class="pin-code">PIN 13</div><div class="pin-desc">LED principale — feedback immediato.</div></div>
+            <div class="pin-item"><div class="pin-code">PIN 7</div><div class="pin-desc">Relay per carichi e dispositivi esterni.</div></div>
+            <div class="pin-item"><div class="pin-code">PIN 9</div><div class="pin-desc">Servo SG90 per porta e accesso fisico.</div></div>
+            <div class="pin-item"><div class="pin-code">PIN 5/6</div><div class="pin-desc">RGB PWM per atmosfera e scene.</div></div>
+            <div class="pin-item"><div class="pin-code">PIN 3</div><div class="pin-desc">Speaker 8Ω — melodie e notifiche.</div></div>
+            <div class="pin-item"><div class="pin-code">PIN 4</div><div class="pin-desc">DHT11 — temperatura e umidità ogni 5s.</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 AGENTCORE -->
+    <section class="slide" data-name="AgentCore">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">04 / AgentCore</div>
+            <h2 class="reveal" style="--d:1">Planner.<br>Executor.<br><span class="accent">Validator.</span></h2>
+            <p class="lede reveal" style="--d:2">La richiesta viene scomposta, eseguita con i tool giusti, e verificata prima della risposta.</p>
+          </div>
+          <div class="steps reveal" style="--d:3">
+            <div class="step-item">
+              <div class="step-num">01</div>
+              <div>
+                <div class="step-title">Planner</div>
+                <div class="step-desc">Scompone richieste ambigue in task ordinati compatibili con il contesto corrente.</div>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-num">02</div>
+              <div>
+                <div class="step-title">Executor</div>
+                <div class="step-desc">Chiama tool hardware, calendario, meteo, news, Spotify, rete e file system.</div>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-num">03</div>
+              <div>
+                <div class="step-title">Validator</div>
+                <div class="step-desc">Controlla l'esito e gestisce retry o fallback se qualcosa non torna.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 VOCE E MEMORIA -->
+    <section class="slide" data-name="Voce e Memoria">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">05 / Sensi digitali</div>
+            <h2 class="reveal" style="--d:1">Ascolta,<br>parla, <span class="accent">ricorda.</span></h2>
+            <p class="lede reveal" style="--d:2">Wake word, STT, TTS e memoria semantica rendono MAYA un'interfaccia continua — non una chat isolata.</p>
+          </div>
+          <div class="card-list reveal" style="--d:3">
+            <div class="card-item">
+              <div class="card-label">Wake word</div>
+              <div class="card-title">hey_maya · ONNX</div>
+              <div class="card-body">Attivazione vocale dedicata prima della trascrizione.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">STT</div>
+              <div class="card-title">Whisper</div>
+              <div class="card-body">Trascrizione italiana accurata per comandi naturali.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">TTS</div>
+              <div class="card-title">Piper · Paola</div>
+              <div class="card-body">Risposte vocali locali sincronizzate con l'orb.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">Memory</div>
+              <div class="card-title">ChromaDB</div>
+              <div class="card-body">Ricordi e preferenze recuperabili nelle conversazioni future.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 AUTOMATION ENGINE -->
+    <section class="slide" data-name="Automation Engine">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">06 / Automazioni</div>
+            <h2 class="reveal" style="--d:1">Scene tipizzate,<br>trigger, <span class="accent">priorità.</span></h2>
+            <p class="lede reveal" style="--d:2">L'Automation Engine OO evita logica sparsa. Ogni scena ha condizioni, cooldown, retry e conflitti gestiti.</p>
+          </div>
+          <div class="card-list reveal" style="--d:3">
+            <div class="card-item">
+              <div class="card-label">EventBus</div>
+              <div class="card-title">Trigger asincroni</div>
+              <div class="card-body">Presenza, timer, meteo, app aperte e telemetria diventano eventi reattivi.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">ContextManager</div>
+              <div class="card-title">Stato globale</div>
+              <div class="card-body">Time slot, scena attiva, meteo, presenza e preferenze in un'unica fotografia.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">DeviceRegistry</div>
+              <div class="card-title">Conflict detection</div>
+              <div class="card-body">Riduce comandi contraddittori e mantiene memoria per-device.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 SCENE -->
+    <section class="slide" data-name="Scene">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">07 / Scene</div>
+            <h2 class="reveal" style="--d:1">Una frase cambia<br><span class="accent">tutta la casa.</span></h2>
+            <p class="lede reveal" style="--d:2">Film, relax, allarme, buonanotte, ospiti e rientro — non accendono un device, coordinano l'ambiente.</p>
+          </div>
+          <div class="scene-list reveal" style="--d:3">
+            <div class="scene-item">
+              <div>
+                <div class="scene-name">Modalità Film</div>
+                <div class="scene-cmd">relay on · luci off · rosso tenue</div>
+              </div>
+              <div class="scene-swatch" style="background:#1a0008;"></div>
+            </div>
+            <div class="scene-item">
+              <div>
+                <div class="scene-name">Buonanotte</div>
+                <div class="scene-cmd">tutto off · porta chiusa · spotify pause</div>
+              </div>
+              <div class="scene-swatch" style="background:#00000f;"></div>
+            </div>
+            <div class="scene-item">
+              <div>
+                <div class="scene-name">Allarme</div>
+                <div class="scene-cmd">override · rosso lampeggiante · melody_alarm</div>
+              </div>
+              <div class="scene-swatch" style="background:var(--red);box-shadow:0 0 16px rgba(232,37,58,0.6);"></div>
+            </div>
+            <div class="scene-item">
+              <div>
+                <div class="scene-name">Buongiorno</div>
+                <div class="scene-cmd">luci on · meteo · calendario del giorno</div>
+              </div>
+              <div class="scene-swatch" style="background:#0a1a0f;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 DASHBOARD -->
+    <section class="slide" data-name="Dashboard HUD">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">08 / Dashboard HUD</div>
+            <h2 class="reveal" style="--d:1">Interfaccia live,<br><span class="accent">non statica.</span></h2>
+            <p class="lede reveal" style="--d:2">Stato casa, meteo, calendario, news, trading, scene e feedback vocale via WebSocket in tempo reale.</p>
+          </div>
+          <div class="reveal" style="--d:3">
+            <div class="dash-grid">
+              <div class="dash-panel">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px;">Orb · Live</div>
+                <div class="dash-orb-wrap">
+                  <div class="dash-orb"></div>
+                </div>
+              </div>
+              <div class="dash-panel">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;">Casa M.A.Y.A.</div>
+                <div class="switch-list">
+                  <div class="switch-row"><span>Luce principale</span><div class="toggle on"></div></div>
+                  <div class="switch-row"><span>Relay TV</span><div class="toggle on"></div></div>
+                  <div class="switch-row"><span>Porta servo</span><div class="toggle"></div></div>
+                  <div class="switch-row"><span>DHT11 <small>22.4°C · 58%</small></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 MQTT -->
+    <section class="slide" data-name="Scalabilità">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">09 / Scalabilità</div>
+            <h2 class="reveal" style="--d:1">Da una stanza<br>a un <span class="accent">ecosistema.</span></h2>
+            <p class="lede reveal" style="--d:2">Il passaggio da seriale USB a MQTT apre la strada a più schede, stanze e nodi distribuiti.</p>
+          </div>
+          <div class="reveal" style="--d:3">
+            <div class="kpi-row">
+              <div class="kpi-item"><span class="kpi-val">1</span><span class="kpi-label">Broker centrale</span></div>
+              <div class="kpi-item"><span class="kpi-val">N</span><span class="kpi-label">Arduino WiFi</span></div>
+              <div class="kpi-item"><span class="kpi-val">ms</span><span class="kpi-label">Broadcast stato</span></div>
+            </div>
+            <div class="code-block">
+              <span class="kw">SUB</span> maya/rooms/studio/cmd<br>
+              { "cmd": <span class="str">"SET"</span>, "target": <span class="str">"light"</span> }<br><br>
+              <span class="kw">PUB</span> maya/rooms/studio/state
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 AUTONOMIA -->
+    <section class="slide" data-name="Sistemi autonomi">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">10 / Autonomia</div>
+            <h2 class="reveal" style="--d:1">Apprende.<br>Prevede.<br><span class="accent">Si ripara.</span></h2>
+            <p class="lede reveal" style="--d:2">I moduli autonomi trasformano MAYA da telecomando intelligente a sistema che osserva e migliora.</p>
+          </div>
+          <div class="card-list reveal" style="--d:3">
+            <div class="card-item">
+              <div class="card-label">ProactiveManager</div>
+              <div class="card-title">Suggerimenti autonomi</div>
+              <div class="card-body">Rileva anomalie, orari ricorrenti e opportunità di intervento.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">SelfHealer</div>
+              <div class="card-title">Auto-patch dei tool</div>
+              <div class="card-body">Legge traceback, propone correzioni, supporta hot-reload dei plugin.</div>
+            </div>
+            <div class="card-item">
+              <div class="card-label">PreferenceLearner</div>
+              <div class="card-title">Abitudini personali</div>
+              <div class="card-body">Impara scene e pattern d'uso per adattare risposte e automazioni.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 ROADMAP -->
+    <section class="slide" data-name="Roadmap">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">11 / Roadmap</div>
+            <h2 class="reveal" style="--d:1">Pronto per<br><span class="accent">Arduino Day.</span></h2>
+            <p class="lede reveal" style="--d:2">Architettura modulare, test CI, hardware funzionante e interfaccia dimostrabile.</p>
+          </div>
+          <div class="reveal" style="--d:3">
+            <div class="kpi-row">
+              <div class="kpi-item"><span class="kpi-val">62</span><span class="kpi-label">Test passati</span></div>
+              <div class="kpi-item"><span class="kpi-val">18</span><span class="kpi-label">Tool integrati</span></div>
+              <div class="kpi-item"><span class="kpi-val">11</span><span class="kpi-label">Scene OO</span></div>
+            </div>
+            <div class="card-list">
+              <div class="card-item">
+                <div class="card-label">Focus finale</div>
+                <div class="card-title">Rifinitura demo e presentazione</div>
+                <div class="card-body">Niente nuove funzioni critiche. Stabilità, narrativa, hardware e UX hanno priorità.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12 FINALE -->
+    <section class="slide" data-name="Finale">
+      <div class="slide-inner">
+        <div class="slide-two">
+          <div>
+            <div class="slide-num reveal">12 / Finale</div>
+            <div class="title-hero reveal" style="--d:1; font-size: clamp(64px, 10vw, 140px);">Un cervello<br>per la <span class="accent">casa.</span></div>
+            <p class="lede reveal" style="--d:2">MAYA unisce AI locale, automazioni, hardware e dashboard in un'unica esperienza coerente.</p>
+            <p class="sublede reveal" style="--d:3">Gabriele Rossoni &amp; Marcello Patrini · 4IB · ITIS di Crema</p>
+            <div class="actions reveal" style="--d:4">
+              <button class="btn primary" data-jump="0">Ricomincia</button>
+            </div>
+          </div>
+          <div class="reveal" style="--d:2; display:flex; justify-content:center;">
+            <div class="orb-wrap">
+              <div class="orb-glow"></div>
+              <div class="orb-ring"></div>
+              <div class="orb-ring"></div>
+              <div class="orb-ring"></div>
+              <div class="orb-body"></div>
+              <div class="orb-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-btns">
+    <button class="icon-btn" id="prev">
+      <svg width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="M15.7 4.3 8 12l7.7 7.7-1.4 1.4L5.2 12l9.1-9.1z"/></svg>
+    </button>
+    <button class="icon-btn" id="next">
+      <svg width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="m8.3 19.7 7.7-7.7-7.7-7.7 1.4-1.4 9.1 9.1-9.1 9.1z"/></svg>
+    </button>
+  </div>
+  <div class="dots-row" id="dots"></div>
+  <div class="counter" id="counter">01 / 13</div>
+</nav>
+
+<!-- Overview -->
+<div class="overview" id="overview" aria-hidden="true">
+  <div class="overview-grid" id="overviewGrid"></div>
+</div>
+
+<script>
+  // Clock
+  function tick() {
+    document.getElementById('clock').textContent =
+      new Date().toLocaleTimeString('it-IT', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+
+  // Slide engine
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const track = document.getElementById('track');
+  const dotsEl = document.getElementById('dots');
+  const progressEl = document.getElementById('progress');
+  const counterEl = document.getElementById('counter');
+  const sectionEl = document.getElementById('sectionName');
+  const overview = document.getElementById('overview');
+  const overviewGrid = document.getElementById('overviewGrid');
+  let idx = 0, locked = false, tx = 0, ty = 0;
+
+  function go(n) {
+    idx = Math.max(0, Math.min(n, slides.length - 1));
+    locked = true; setTimeout(() => locked = false, 680);
+    track.style.transform = `translateX(${-idx * 100}vw)`;
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    document.querySelectorAll('.dot-btn').forEach((d, i) => d.classList.toggle('active', i === idx));
+    progressEl.style.width = (slides.length === 1 ? 100 : idx / (slides.length - 1) * 100) + '%';
+    counterEl.textContent = String(idx + 1).padStart(2,'0') + ' / ' + String(slides.length).padStart(2,'0');
+    sectionEl.textContent = slides[idx].dataset.name;
+  }
+  function move(d) { if (!locked) go(idx + d); }
+
+  slides.forEach((s, i) => {
+    const d = document.createElement('button');
+    d.className = 'dot-btn'; d.type = 'button';
+    d.addEventListener('click', () => go(i));
+    dotsEl.appendChild(d);
+
+    const t = document.createElement('button');
+    t.className = 'thumb'; t.type = 'button';
+    t.innerHTML = `<small>${String(i+1).padStart(2,'0')}</small><strong>${s.dataset.name}</strong>`;
+    t.addEventListener('click', () => { overview.classList.remove('open'); go(i); });
+    overviewGrid.appendChild(t);
+  });
+
+  document.getElementById('prev').addEventListener('click', () => move(-1));
+  document.getElementById('next').addEventListener('click', () => move(1));
+  document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => go(+b.dataset.jump)));
+  document.getElementById('openOverview').addEventListener('click', () => overview.classList.add('open'));
+  overview.addEventListener('click', e => { if (e.target === overview) overview.classList.remove('open'); });
+
+  document.addEventListener('keydown', e => {
+    if ([' ','ArrowRight','ArrowDown','PageDown'].includes(e.key)) { e.preventDefault(); move(1); }
+    if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)) { e.preventDefault(); move(-1); }
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+    if (e.key.toLowerCase() === 'o') overview.classList.toggle('open');
+    if (e.key === 'Escape') overview.classList.remove('open');
+  });
+  document.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaY) < 20) return;
+    e.preventDefault(); move(e.deltaY > 0 ? 1 : -1);
+  }, { passive: false });
+  document.addEventListener('touchstart', e => { tx = e.changedTouches[0].clientX; ty = e.changedTouches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dx = tx - e.changedTouches[0].clientX, dy = ty - e.changedTouches[0].clientY;
+    if (Math.abs(dx) > 44 && Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1);
+    if (Math.abs(dy) > 52 && Math.abs(dy) > Math.abs(dx)) move(dy > 0 ? 1 : -1);
+  }, { passive: true });
+
+  go(0);
+</script>
+</body>
+</html>

@@ -248,7 +248,11 @@ def test_batch_continues_after_timeout(real_tool, monkeypatch):
             return {"status": "error", "message": "timeout", "state": {}}
         return {"status": "ok", "state": {}}
 
-    monkeypatch.setattr(real_tool, "_send_batch_sync", lambda actions, timeout=3.0: {"status": "error", "message": "timeout", "state": {}})
+    monkeypatch.setattr(
+        real_tool,
+        "_send_batch_sync",
+        lambda actions, timeout=3.0: {"status": "error", "message": "timeout", "state": {}},
+    )
     monkeypatch.setattr(real_tool, "_send_sync", fake_send)
 
     result = real_tool.execute(
@@ -267,7 +271,11 @@ def test_batch_continues_after_timeout(real_tool, monkeypatch):
 
 
 def test_batch_treats_all_timeouts_as_partial(real_tool, monkeypatch):
-    monkeypatch.setattr(real_tool, "_send_batch_sync", lambda actions, timeout=3.0: {"status": "error", "message": "timeout", "state": {}})
+    monkeypatch.setattr(
+        real_tool,
+        "_send_batch_sync",
+        lambda actions, timeout=3.0: {"status": "error", "message": "timeout", "state": {}},
+    )
     monkeypatch.setattr(
         real_tool,
         "_send_sync",

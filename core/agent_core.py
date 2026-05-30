@@ -81,7 +81,7 @@ NON aggiungere testo fuori dal JSON.
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
-- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; neopixel: value=0xRRGGBB effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/startup/ok/notify/error/welcome)
+- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: invia comandi al secondo PC (qualsiasi stringa)
 - system: comandi OS (shutdown, open_browser, screenshot)
@@ -758,13 +758,15 @@ class AgentCore:
             exec_result = await self.automation_engine.execute(auto_result, source="voice")
             scene_name = auto_result.name
             status = exec_result.get("status", "ok")
-            
+
             if status == "ok":
                 reply = f"Scena '{scene_name}' eseguita."
             elif status == "skipped":
                 reason = exec_result.get("reason", "")
                 if reason == "cooldown":
-                    reply = f"La scena '{scene_name}' è stata già eseguita di recente. Attendi un po' prima di riprovare."
+                    reply = (
+                        f"La scena '{scene_name}' è stata già eseguita di recente. Attendi un po' prima di riprovare."
+                    )
                 else:
                     reply = f"La scena '{scene_name}' non può essere eseguita al momento (condizioni non soddisfatte)."
             else:

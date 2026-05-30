@@ -653,6 +653,18 @@ void updateMelody() {
     } else {
       melodyNoteIndex = -1;
     }
+  } else if (strcmp(currentMelody, "wake_radar") == 0) {
+    int freqs[] = {880, 1175, 1760, 1175, 988, 1319, 1976, 1319, 1047, 1397, 2093, 1397};
+    int durs[] = {120, 120, 180, 180, 120, 120, 180, 180, 120, 120, 220, 300};
+    int size = 12;
+    if (melodyNoteIndex < size) {
+      tone(SPEAKER_PIN, freqs[melodyNoteIndex]);
+      noteDuration = durs[melodyNoteIndex];
+      noteStartMs = now;
+      melodyNoteIndex++;
+    } else {
+      melodyNoteIndex = -1;
+    }
   } else if (strcmp(currentMelody, "startup") == 0) {
     int freqs[] = {523, 659, 784, 1047}; // C5, E5, G5, C6
     int durs[] = {100, 100, 100, 200};

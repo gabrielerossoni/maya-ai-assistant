@@ -292,14 +292,20 @@ class ArduinoTool:
             try:
                 with self._serial_lock:
                     if self.connection is None:
-                        with self._lock: self._sync_pending.pop(msg_id, None)
+                        with self._lock:
+                            self._sync_pending.pop(msg_id, None)
                         if not self._reconnect():
-                            return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
-                    
+                            return {
+                                "status": "error",
+                                "message": "Arduino not connected",
+                                "state": self.sim_state.copy(),
+                            }
+
                     self.connection.write((json.dumps(payload) + "\n").encode())
                     self.connection.flush()
             except serial.SerialException:
-                with self._lock: self._sync_pending.pop(msg_id, None)
+                with self._lock:
+                    self._sync_pending.pop(msg_id, None)
                 self._reconnect()
                 continue
 
@@ -307,29 +313,32 @@ class ArduinoTool:
                 data = holder[0] or {}
                 state = data.get("state", {})
                 if state:
-                    self.sim_state.update({
-                        "light": state.get("light", self.sim_state["light"]),
-                        "servo": state.get("servo", self.sim_state["servo"]),
-                        "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
-                        "rgb1": state.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
-                        "rgb2": state.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
-                        "rgb3": state.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
-                        "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
-                        "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
-                        "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
-                    })
+                    self.sim_state.update(
+                        {
+                            "light": state.get("light", self.sim_state["light"]),
+                            "servo": state.get("servo", self.sim_state["servo"]),
+                            "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
+                            "rgb1": state.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
+                            "rgb2": state.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
+                            "rgb3": state.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
+                            "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                            "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
+                            "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
+                        }
+                    )
                 status = data.get("status", "error")
                 result = {"status": status, "state": self.sim_state.copy()}
                 if status == "error":
                     result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
                 return result
             else:
-                with self._lock: self._sync_pending.pop(msg_id, None)
+                with self._lock:
+                    self._sync_pending.pop(msg_id, None)
                 if attempt < max_attempts - 1:
                     time.sleep(0.1)
                     continue
                 return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
-        
+
         return {"status": "error", "message": "failed after retries", "state": self.sim_state.copy()}
 
     def _send_batch_sync(self, actions: list, timeout=3.0) -> dict:
@@ -357,14 +366,20 @@ class ArduinoTool:
             try:
                 with self._serial_lock:
                     if self.connection is None:
-                        with self._lock: self._sync_pending.pop(msg_id, None)
+                        with self._lock:
+                            self._sync_pending.pop(msg_id, None)
                         if not self._reconnect():
-                            return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
-                    
+                            return {
+                                "status": "error",
+                                "message": "Arduino not connected",
+                                "state": self.sim_state.copy(),
+                            }
+
                     self.connection.write((json.dumps(payload) + "\n").encode())
                     self.connection.flush()
             except serial.SerialException:
-                with self._lock: self._sync_pending.pop(msg_id, None)
+                with self._lock:
+                    self._sync_pending.pop(msg_id, None)
                 self._reconnect()
                 continue
 
@@ -372,24 +387,27 @@ class ArduinoTool:
                 data = holder[0] or {}
                 state = data.get("state", {})
                 if state:
-                    self.sim_state.update({
-                        "light": state.get("light", self.sim_state["light"]),
-                        "servo": state.get("servo", self.sim_state["servo"]),
-                        "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
-                        "rgb1": state.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
-                        "rgb2": state.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
-                        "rgb3": state.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
-                        "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
-                        "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
-                        "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
-                    })
+                    self.sim_state.update(
+                        {
+                            "light": state.get("light", self.sim_state["light"]),
+                            "servo": state.get("servo", self.sim_state["servo"]),
+                            "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
+                            "rgb1": state.get("rgb1", self.sim_state.get("rgb1", [0, 0, 0])),
+                            "rgb2": state.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
+                            "rgb3": state.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
+                            "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                            "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
+                            "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
+                        }
+                    )
                 status = data.get("status", "error")
                 result = {"status": status, "state": self.sim_state.copy()}
                 if status == "error":
                     result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
                 return result
-            
-            with self._lock: self._sync_pending.pop(msg_id, None)
+
+            with self._lock:
+                self._sync_pending.pop(msg_id, None)
             if attempt < max_attempts - 1:
                 time.sleep(0.2)
                 continue
