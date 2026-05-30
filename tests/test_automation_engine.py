@@ -221,6 +221,44 @@ class TestExecute:
         assert result["warnings"][0]["error"] == "spotify offline"
 
     @pytest.mark.asyncio
+    async def test_clear_active_scene_cancels_background_buzzer_actions(self, engine, mock_tool_manager):
+        seen = []
+
+        async def execute(action):
+            seen.append(action)
+            return {"status": "ok", "state": {"buzzer": bool(action.get("value", 0))}}
+
+        mock_tool_manager.execute = execute
+        auto = Automation(
+            scene=Scene(
+                name="alarm_loop",
+                actions=[
+                    Action(tool="arduino", params={"op": "SET", "target": "buzzer", "value": 1}),
+                    Action(
+                        tool="arduino",
+                        params={"op": "SET", "target": "buzzer", "value": 1},
+                        delay=0.2,
+                        background=True,
+                    ),
+                ],
+            )
+        )
+
+        result = await engine.execute(auto)
+        clear_result = await engine.clear_active_scene()
+        await asyncio.sleep(0.25)
+
+        assert result["status"] == "ok"
+        assert clear_result["status"] == "ok"
+        assert all(not task or task.done() for tasks in engine._background_tasks.values() for task in tasks)
+        background_restarts = [
+            action
+            for action in seen
+            if action.get("target") == "buzzer" and action.get("value") == 1 and action.get("tool") == "arduino"
+        ]
+        assert len(background_restarts) == 1
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("scene_name", ["cena", "buonanotte"])
     async def test_manual_default_scenes_bypass_cooldown(self, engine, mock_tool_manager, scene_name):
         auto = next(a for a in build_default_automations() if a.name == scene_name)

@@ -339,6 +339,7 @@ class AutomationEngine:
         self.socket_manager = socket_manager
         self._automations: dict[str, Automation] = {}
         self._active_tasks: dict[str, asyncio.Task] = {}
+        self._background_tasks: dict[str, set[asyncio.Task]] = {}
         self._scheduler_task: asyncio.Task | None = None
         self.bus = EventBus()
         self._event_log: list[dict] = []  # ultimi N eventi eseguiti
@@ -503,7 +504,11 @@ class AutomationEngine:
                     registry.update_from_arduino_state(state, scene=scene.name)
 
         if background_actions:
-            asyncio.create_task(self._execute_background_actions(scene.name, background_actions))
+            task = asyncio.create_task(self._execute_background_actions(scene.name, background_actions))
+            self._background_tasks.setdefault(scene.name, set()).add(task)
+            task.add_done_callback(
+                lambda done_task, name=scene.name: self._background_tasks.get(name, set()).discard(done_task)
+            )
 
         # Aggiorna contesto
         scene.mark_run()
@@ -560,12 +565,24 @@ class AutomationEngine:
     # ── Esecuzione singola azione con retry ───────────────────────────────────
 
     async def _execute_background_actions(self, scene_name: str, actions: list[Action]):
-        for action in self._compact_arduino_actions(actions):
-            if action.delay > 0:
-                await asyncio.sleep(action.delay)
-            result = await self._execute_action_with_retry(action, f"{scene_name}:background")
-            if result.get("status") == "error":
-                logger.warning(f"[ENGINE] '{scene_name}' background — errore in {action}: {result.get('message')}")
+        try:
+            for action in self._compact_arduino_actions(actions):
+                if action.delay > 0:
+                    await asyncio.sleep(action.delay)
+                result = await self._execute_action_with_retry(action, f"{scene_name}:background")
+                if result.get("status") == "error":
+                    logger.warning(f"[ENGINE] '{scene_name}' background — errore in {action}: {result.get('message')}")
+        except asyncio.CancelledError:
+            logger.info(f"[ENGINE] '{scene_name}' background cancellato")
+            raise
+
+    def _cancel_background_tasks(self, scene_name: str | None = None):
+        names = [scene_name] if scene_name else list(self._background_tasks)
+        for name in names:
+            for task in list(self._background_tasks.get(name, set())):
+                if not task.done():
+                    task.cancel()
+            self._background_tasks.pop(name, None)
 
     def _hardware_first(self, actions: list[Action]) -> list[Action]:
         immediate_arduino = [action for action in actions if action.tool == "arduino" and action.delay <= 0]
@@ -767,6 +784,7 @@ class AutomationEngine:
     async def clear_active_scene(self) -> dict:
         """Disattiva la scena corrente e porta tutti gli attuatori in OFF."""
         previous = context.get("active_scene")
+        self._cancel_background_tasks(previous)
         results = []
         errors = []
         result = await self._execute_action_with_retry(arduino_all_off(), "scene_off")

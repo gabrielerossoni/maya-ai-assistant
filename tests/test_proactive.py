@@ -38,7 +38,7 @@ async def test_proactive_loop_broadcast():
     mock_tm = MagicMock()
     # Mock del WebSocket manager
     with patch("core.websocket_manager.manager.broadcast", new_callable=AsyncMock) as mock_broadcast:
-        pm = ProactiveManager(mock_tm, websocket_manager=manager, interval=0.1)
+        pm = ProactiveManager(mock_tm, websocket_manager=manager, interval=0.1, initial_delay=0)
 
         # Mock di un checker che ritorna sempre un alert
         mock_checker = AsyncMock()
@@ -62,7 +62,7 @@ async def test_proactive_loop_broadcast():
 async def test_proactive_loop_speaks_all_alerts():
     mock_tm = MagicMock()
     mock_voice = MagicMock()
-    pm = ProactiveManager(mock_tm, interval=60, voice_manager=mock_voice)
+    pm = ProactiveManager(mock_tm, interval=60, voice_manager=mock_voice, initial_delay=0)
 
     mock_checker = AsyncMock()
     mock_checker.check.return_value = "Test Alert"
@@ -74,3 +74,22 @@ async def test_proactive_loop_speaks_all_alerts():
     task.cancel()
 
     mock_voice.speak.assert_called_with("Test Alert")
+
+
+@pytest.mark.asyncio
+async def test_proactive_loop_waits_initial_delay_before_checks():
+    mock_tm = MagicMock()
+    pm = ProactiveManager(mock_tm, interval=60, initial_delay=0.2)
+
+    mock_checker = AsyncMock()
+    mock_checker.check.return_value = "Test Alert"
+    mock_checker.name = "Test"
+    pm.checkers = [mock_checker]
+
+    task = asyncio.create_task(pm.start_loop())
+    await asyncio.sleep(0.05)
+    assert mock_checker.check.call_count == 0
+
+    await asyncio.sleep(0.2)
+    task.cancel()
+    assert mock_checker.check.call_count == 1
