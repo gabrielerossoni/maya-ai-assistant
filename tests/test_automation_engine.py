@@ -498,7 +498,7 @@ class TestDefaults:
         foreground = [a for a in auto.scene.actions if not a.background]
         background_actions = [a for a in auto.scene.actions if a.background]
 
-        assert [a.tool for a in foreground] == ["arduino", "arduino", "arduino"]
+        assert [a.tool for a in foreground] == ["arduino", "arduino", "arduino", "display", "display"]
         assert [a.tool for a in background_actions] == ["spotify", "weather", "news", "calendar"]
 
     def test_alarm_has_30_second_rhythmic_sequence(self, fresh_context, fresh_registry):

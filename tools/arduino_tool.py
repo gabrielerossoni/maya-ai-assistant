@@ -14,7 +14,10 @@ try:
 
     SERIAL_AVAILABLE = True
 except ImportError:
+    serial = None
     SERIAL_AVAILABLE = False
+
+SERIAL_EXCEPTION = serial.SerialException if SERIAL_AVAILABLE else OSError
 
 BAUD_RATE = 115200
 TIMEOUT_SEC = 3
@@ -84,7 +87,7 @@ class ArduinoTool:
             self._reader = threading.Thread(target=self._read_loop, daemon=True)
             self._reader.start()
             print(f"[ARDUINO] Connesso su {port} @ {BAUD_RATE}")
-        except serial.SerialException as e:
+        except SERIAL_EXCEPTION as e:
             self.simulated = True
             print(f"[ARDUINO] Errore porta: {e} → simulazione")
 
@@ -113,7 +116,7 @@ class ArduinoTool:
 
                 self._dispatch(data)
 
-            except serial.SerialException:
+            except SERIAL_EXCEPTION:
                 print("[ARDUINO] Connessione persa → tentativo riconnessione...")
                 self._reconnect()
             except Exception as e:
@@ -303,7 +306,7 @@ class ArduinoTool:
 
                     self.connection.write((json.dumps(payload) + "\n").encode())
                     self.connection.flush()
-            except serial.SerialException:
+            except SERIAL_EXCEPTION:
                 with self._lock:
                     self._sync_pending.pop(msg_id, None)
                 self._reconnect()
@@ -377,7 +380,7 @@ class ArduinoTool:
 
                     self.connection.write((json.dumps(payload) + "\n").encode())
                     self.connection.flush()
-            except serial.SerialException:
+            except SERIAL_EXCEPTION:
                 with self._lock:
                     self._sync_pending.pop(msg_id, None)
                 self._reconnect()
@@ -460,6 +463,8 @@ class ArduinoTool:
         return None
 
     def _find_port(self) -> Optional[str]:
+        if not SERIAL_AVAILABLE:
+            return None
         for p in serial.tools.list_ports.comports():
             desc = (p.description or "").lower()
             if any(k in desc for k in ["arduino", "ch340", "atmega", "usb serial", "cp210"]):
@@ -485,7 +490,7 @@ class ArduinoTool:
             self.simulated = False
             print(f"[ARDUINO] Riconnesso su {port} @ {BAUD_RATE}")
             return True
-        except serial.SerialException:
+        except SERIAL_EXCEPTION:
             return False
 
     def close(self):
