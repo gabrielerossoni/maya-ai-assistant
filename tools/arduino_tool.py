@@ -19,6 +19,7 @@ except ImportError:
 BAUD_RATE = 115200
 TIMEOUT_SEC = 3
 SERIAL_PORT = os.getenv("ARDUINO_PORT", "AUTO")
+ARDUINO_BATCH_STEP_TIMEOUT = float(os.getenv("ARDUINO_BATCH_STEP_TIMEOUT", "0.6"))
 
 VALID_TARGETS = {
     "light",
@@ -181,6 +182,9 @@ class ArduinoTool:
         op = action.get("op", "SET")
         extra = {k: action[k] for k in ("effect", "melody") if k in action}
 
+        if str(op).upper() == "BATCH":
+            return self._execute_batch(action.get("actions", []))
+
         # Alias: speaker → buzzer2 (stesso pin, protocollo invariato)
         if target == "speaker":
             target = "buzzer2"
@@ -204,7 +208,31 @@ class ArduinoTool:
         if self.simulated:
             return self._simulate(op, target, value, **extra)
 
+        if "timeout" in action:
+            extra["timeout"] = float(action["timeout"])
         return self._send_sync(op, target, value, **extra)
+
+    def _execute_batch(self, actions: list) -> dict:
+        if not isinstance(actions, list) or not actions:
+            return {"status": "error", "message": "batch Arduino vuoto"}
+
+        results = []
+        for item in actions:
+            if not isinstance(item, dict):
+                return {"status": "error", "message": "azione batch Arduino non valida", "results": results}
+
+            sub_action = {"tool": "arduino", "timeout": ARDUINO_BATCH_STEP_TIMEOUT, **item}
+            result = self.execute(sub_action)
+            results.append(result)
+            if result.get("status") == "error":
+                return {
+                    "status": "error",
+                    "message": result.get("message", "errore batch Arduino"),
+                    "results": results,
+                    "state": self.sim_state.copy(),
+                }
+
+        return {"status": "ok", "results": results, "state": self.sim_state.copy()}
 
     def get_telemetry(self) -> dict:
         return self._telemetry.copy()

@@ -738,8 +738,12 @@ class AgentCore:
             return
 
         if _clean in ["spegni scena", "spegni la scena", "disattiva scena", "disattiva la scena", "stop scena"]:
-            previous = self.automation_engine.clear_active_scene()
-            reply = "Scena disattivata." if previous else "Nessuna scena attiva."
+            clear_result = await self.automation_engine.clear_active_scene()
+            previous = clear_result.get("previous")
+            status = clear_result.get("status")
+            reply = "Scena disattivata." if previous and status == "ok" else "Scena disattivata con avvisi."
+            if not previous:
+                reply = "Nessuna scena attiva. Dispositivi spenti."
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
             await self.memory.add_turn("jarvis", reply)

@@ -74,6 +74,26 @@ def arduino(target: str, value: Any = None, **kwargs) -> Action:
     return Action(tool="arduino", params={"op": "SET", **params})
 
 
+def arduino_batch(actions: list[Action], timeout: float = 3.0) -> Action:
+    commands = [a.params.copy() for a in actions if a.tool == "arduino"]
+    return Action(tool="arduino", params={"op": "BATCH", "actions": commands}, timeout=timeout)
+
+
+def arduino_all_off() -> Action:
+    return arduino_batch(
+        [
+            arduino("light", 0),
+            arduino("servo", 0),
+            arduino("servo2", 0),
+            arduino("rgb", 0, effect=0),
+            arduino("neopixel", 0, effect=0),
+            arduino("buzzer", 0),
+            Action(tool="arduino", params={"op": "SET", "target": "buzzer2", "melody": "off"}),
+        ],
+        timeout=4.0,
+    )
+
+
 def spotify(command: str, **kwargs) -> Action:
     return Action(tool="spotify", params={"command": command, **kwargs})
 
@@ -383,13 +403,14 @@ class AutomationEngine:
         conflicts = []
         start_ts = time.time()
 
-        for action in scene.actions:
+        for action in self._compact_arduino_actions(scene.actions):
             if action.delay > 0:
                 await asyncio.sleep(action.delay)
 
-            conflict = self._detect_action_conflict(action, scene.name)
-            if conflict:
-                conflicts.append(conflict)
+            action_conflicts = self._detect_action_conflicts(action, scene.name)
+            if action_conflicts:
+                conflicts.extend(action_conflicts)
+                conflict = action_conflicts[0]
                 logger.info(
                     f"[ENGINE] Possibile conflitto su {conflict['device']}: "
                     f"{conflict['previous_scene']} -> {scene.name}"
@@ -446,12 +467,50 @@ class AutomationEngine:
     async def execute_actions(self, actions: list[Action], source: str = "manual") -> list[dict]:
         """Esegui una lista di azioni raw (compatibilità con il vecchio sistema)."""
         results = []
-        for action in actions:
+        for action in self._compact_arduino_actions(actions):
             result = await self._execute_action_with_retry(action, source)
             results.append({"tool": action.tool, "result": result})
         return results
 
     # ── Esecuzione singola azione con retry ───────────────────────────────────
+
+    def _compact_arduino_actions(self, actions: list[Action]) -> list[Action]:
+        compacted: list[Action] = []
+        pending: list[Action] = []
+
+        def flush_pending():
+            if not pending:
+                return
+            if len(pending) == 1:
+                compacted.append(pending[0])
+            else:
+                compacted.append(arduino_batch(pending, timeout=max(3.0, sum(a.timeout for a in pending))))
+            pending.clear()
+
+        for action in actions:
+            if action.tool == "arduino" and action.delay <= 0:
+                pending.append(action)
+                continue
+            flush_pending()
+            compacted.append(action)
+
+        flush_pending()
+        return compacted
+
+    def _iter_arduino_params(self, action: Action) -> list[dict]:
+        if action.tool != "arduino":
+            return []
+        if action.params.get("op") == "BATCH":
+            return [item for item in action.params.get("actions", []) if isinstance(item, dict)]
+        return [action.params]
+
+    def _detect_action_conflicts(self, action: Action, scene_name: str) -> list[dict]:
+        conflicts = []
+        for params in self._iter_arduino_params(action):
+            conflict = self._detect_action_conflict(Action(tool="arduino", params=params), scene_name)
+            if conflict:
+                conflicts.append(conflict)
+        return conflicts
 
     def _detect_action_conflict(self, action: Action, scene_name: str) -> dict | None:
         """Rileva scritture ravvicinate sullo stesso device da scene diverse."""
@@ -551,12 +610,21 @@ class AutomationEngine:
     def get_last_scene(self) -> str | None:
         return context.get("active_scene")
 
-    def clear_active_scene(self) -> str | None:
-        """Disattiva la scena corrente a livello di contesto/dashboard."""
+    async def clear_active_scene(self) -> dict:
+        """Disattiva la scena corrente e porta tutti gli attuatori in OFF."""
         previous = context.get("active_scene")
+        results = []
+        errors = []
+        result = await self._execute_action_with_retry(arduino_all_off(), "scene_off")
+        results.append(result)
+        if result.get("status") == "error":
+            errors.append({"action": "arduino_all_off", "error": result.get("message")})
+        elif result.get("state"):
+            registry.update_from_arduino_state(result["state"], scene="scene_off")
         context.set_scene(None)
-        self._log_event({"scene": previous, "source": "manual", "status": "cleared", "errors": [], "ts": time.time()})
-        return previous
+        status = "ok" if not errors else "partial"
+        self._log_event({"scene": previous, "source": "manual", "status": "cleared", "errors": errors, "ts": time.time()})
+        return {"status": status, "previous": previous, "results": results, "errors": errors}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

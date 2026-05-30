@@ -7,6 +7,7 @@ Sostituisce il lineare memory.json — recupera contesto rilevante da mesi di co
 import asyncio
 import json
 import os
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -20,6 +21,7 @@ CHROMA_PERSIST_DIR = os.path.join(MEMORY_DIR, "chroma_db")
 SUMMARIES_FILE = os.path.join(MEMORY_DIR, "memory_summaries.json")
 EMBEDDING_MODEL = "nomic-embed-text"  # Via Ollama
 _ollama_available = True  # Set to False after first connection failure to suppress repeated errors
+TOPIC_SUMMARIES_ENABLED = os.getenv("MEMORY_TOPIC_SUMMARIES_ENABLED", "false").lower() == "true"
 
 _SUMMARY_TOPICS = {
     "domotica": [
@@ -49,6 +51,10 @@ class MemoryManager:
         self.turn_lock = asyncio.Lock()
         self.chroma_client = None
         self.collection = None
+        self._turn_counter = 0
+        self._last_summary_turn_counter = 0
+        self._summary_every_turns = int(os.getenv("MEMORY_SUMMARY_EVERY_TURNS", "50"))
+        self._summary_backoff_until = 0.0
         self._init_chroma()
 
     def _init_chroma(self):
@@ -77,6 +83,8 @@ class MemoryManager:
                 with open(METADATA_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.turns = data.get("turns", [])
+                    self._turn_counter = len(self.turns)
+                    self._last_summary_turn_counter = self._turn_counter
                     pass
             except Exception as e:
                 print(f"[MEMORY] Errore caricamento metadati: {e}")
@@ -124,12 +132,19 @@ class MemoryManager:
 
         async with self.turn_lock:
             self.turns.append(turn)
+            self._turn_counter += 1
 
             if len(self.turns) > 200:  # ← era 1000, troppo per sessioni lunghe
                 self.turns = self.turns[-200:]
 
             # Trigger summary periodico (ogni 50 turni, non-blocking)
-            if len(self.turns) % 50 == 0:
+            if (
+                TOPIC_SUMMARIES_ENABLED
+                and self._summary_every_turns > 0
+                and self._turn_counter - self._last_summary_turn_counter >= self._summary_every_turns
+                and time.time() >= self._summary_backoff_until
+            ):
+                self._last_summary_turn_counter = self._turn_counter
                 turns_snapshot = list(self.turns)
                 asyncio.create_task(self.build_topic_summaries(turns_snapshot))
 
@@ -161,6 +176,8 @@ class MemoryManager:
 
     def _load_summaries(self) -> dict:
         """Carica i summary per topic da disco."""
+        if not TOPIC_SUMMARIES_ENABLED:
+            return {}
         if not os.path.exists(SUMMARIES_FILE):
             return {}
         try:
@@ -171,6 +188,8 @@ class MemoryManager:
 
     async def _summarize_via_llm(self, topic: str, text: str) -> str:
         """Chiama Groq per riassumere preferenze/abitudini dell'utente su un topic."""
+        if not TOPIC_SUMMARIES_ENABLED:
+            return ""
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             return ""
@@ -195,12 +214,19 @@ class MemoryManager:
                 )
                 response.raise_for_status()
                 return response.json()["choices"][0]["message"]["content"].strip()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                self._summary_backoff_until = time.time() + 900
+            print(f"[MEMORY] Errore summary LLM ({topic}): {e}")
+            return ""
         except Exception as e:
             print(f"[MEMORY] Errore summary LLM ({topic}): {e}")
             return ""
 
     async def build_topic_summaries(self, turns_snapshot: Optional[list] = None):
         """Ogni 50 turni, crea summary per topic via LLM e li salva in data/memory_summaries.json."""
+        if not TOPIC_SUMMARIES_ENABLED:
+            return
         turns = turns_snapshot if turns_snapshot is not None else list(self.turns)
         if not turns:
             return

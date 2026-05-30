@@ -577,6 +577,14 @@ void publishTelemetry() {
 
 // ── Melody functions ───────────────────────────
 void startMelody(const char *name) {
+  if (strcmp(name, "off") == 0 || strcmp(name, "stop") == 0) {
+    noTone(SPEAKER_PIN);
+    currentMelody = "";
+    melodyNoteIndex = -1;
+    noteStartMs = 0;
+    noteDuration = 0;
+    return;
+  }
   currentMelody = name;
   melodyNoteIndex = 0;
   noteStartMs = 0;
