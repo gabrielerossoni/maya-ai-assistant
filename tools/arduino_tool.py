@@ -282,30 +282,32 @@ class ArduinoTool:
             payload["value"] = value
         payload.update(extra)
 
-        event = threading.Event()
-        holder: list = [None]
-        with self._lock:
-            self._sync_pending[msg_id] = (event, holder)
-
-        try:
-            with self._serial_lock:
-                if self.connection is None:
-                    with self._lock:
-                        self._sync_pending.pop(msg_id, None)
-                    return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
-                self.connection.write((json.dumps(payload) + "\n").encode())
-                self.connection.flush()
-        except serial.SerialException as e:
+        max_attempts = 2
+        for attempt in range(max_attempts):
+            event = threading.Event()
+            holder: list = [None]
             with self._lock:
-                self._sync_pending.pop(msg_id, None)
-            return {"status": "error", "message": str(e)}
+                self._sync_pending[msg_id] = (event, holder)
 
-        if event.wait(timeout=timeout):
-            data = holder[0] or {}
-            state = data.get("state", {})
-            if state:
-                self.sim_state.update(
-                    {
+            try:
+                with self._serial_lock:
+                    if self.connection is None:
+                        with self._lock: self._sync_pending.pop(msg_id, None)
+                        if not self._reconnect():
+                            return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
+                    
+                    self.connection.write((json.dumps(payload) + "\n").encode())
+                    self.connection.flush()
+            except serial.SerialException:
+                with self._lock: self._sync_pending.pop(msg_id, None)
+                self._reconnect()
+                continue
+
+            if event.wait(timeout=timeout):
+                data = holder[0] or {}
+                state = data.get("state", {})
+                if state:
+                    self.sim_state.update({
                         "light": state.get("light", self.sim_state["light"]),
                         "servo": state.get("servo", self.sim_state["servo"]),
                         "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
@@ -315,17 +317,20 @@ class ArduinoTool:
                         "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
                         "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
                         "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
-                    }
-                )
-            status = data.get("status", "error")
-            result = {"status": status, "state": self.sim_state.copy()}
-            if status == "error":
-                result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
-            return result
-        else:
-            with self._lock:
-                self._sync_pending.pop(msg_id, None)
-            return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
+                    })
+                status = data.get("status", "error")
+                result = {"status": status, "state": self.sim_state.copy()}
+                if status == "error":
+                    result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
+                return result
+            else:
+                with self._lock: self._sync_pending.pop(msg_id, None)
+                if attempt < max_attempts - 1:
+                    time.sleep(0.1)
+                    continue
+                return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
+        
+        return {"status": "error", "message": "failed after retries", "state": self.sim_state.copy()}
 
     def _send_batch_sync(self, actions: list, timeout=3.0) -> dict:
         msg_id = self._next_id()
@@ -342,30 +347,32 @@ class ArduinoTool:
 
         payload = {"id": msg_id, "cmd": "BATCH", "actions": payload_actions}
 
-        event = threading.Event()
-        holder: list = [None]
-        with self._lock:
-            self._sync_pending[msg_id] = (event, holder)
-
-        try:
-            with self._serial_lock:
-                if self.connection is None:
-                    with self._lock:
-                        self._sync_pending.pop(msg_id, None)
-                    return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
-                self.connection.write((json.dumps(payload) + "\n").encode())
-                self.connection.flush()
-        except serial.SerialException as e:
+        max_attempts = 2
+        for attempt in range(max_attempts):
+            event = threading.Event()
+            holder: list = [None]
             with self._lock:
-                self._sync_pending.pop(msg_id, None)
-            return {"status": "error", "message": str(e), "state": self.sim_state.copy()}
+                self._sync_pending[msg_id] = (event, holder)
 
-        if event.wait(timeout=timeout):
-            data = holder[0] or {}
-            state = data.get("state", {})
-            if state:
-                self.sim_state.update(
-                    {
+            try:
+                with self._serial_lock:
+                    if self.connection is None:
+                        with self._lock: self._sync_pending.pop(msg_id, None)
+                        if not self._reconnect():
+                            return {"status": "error", "message": "Arduino not connected", "state": self.sim_state.copy()}
+                    
+                    self.connection.write((json.dumps(payload) + "\n").encode())
+                    self.connection.flush()
+            except serial.SerialException:
+                with self._lock: self._sync_pending.pop(msg_id, None)
+                self._reconnect()
+                continue
+
+            if event.wait(timeout=timeout):
+                data = holder[0] or {}
+                state = data.get("state", {})
+                if state:
+                    self.sim_state.update({
                         "light": state.get("light", self.sim_state["light"]),
                         "servo": state.get("servo", self.sim_state["servo"]),
                         "servo2": state.get("servo2", self.sim_state.get("servo2", 0)),
@@ -375,17 +382,20 @@ class ArduinoTool:
                         "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
                         "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
                         "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
-                    }
-                )
-            status = data.get("status", "error")
-            result = {"status": status, "state": self.sim_state.copy()}
-            if status == "error":
-                result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
-            return result
+                    })
+                status = data.get("status", "error")
+                result = {"status": status, "state": self.sim_state.copy()}
+                if status == "error":
+                    result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
+                return result
+            
+            with self._lock: self._sync_pending.pop(msg_id, None)
+            if attempt < max_attempts - 1:
+                time.sleep(0.2)
+                continue
+            return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
 
-        with self._lock:
-            self._sync_pending.pop(msg_id, None)
-        return {"status": "error", "message": "timeout", "state": self.sim_state.copy()}
+        return {"status": "error", "message": "failed after retries", "state": self.sim_state.copy()}
 
     def _simulate(self, op: str, target: str, value, **extra) -> dict:
         return {"status": "error", "message": "arduino non connesso"}

@@ -121,6 +121,10 @@ def calendar_action(act: str = "list") -> Action:
     return Action(tool="calendar", params={"action": act})
 
 
+def display_action(layout: str, delay: float = 0.0, **params) -> Action:
+    return Action(tool="display", params={"layout": layout, **params}, delay=delay)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CONDITION — predicato sul contesto
 # ─────────────────────────────────────────────────────────────────────────────
@@ -297,9 +301,10 @@ class AutomationEngine:
     - Esporre l'event bus per integrazioni esterne
     """
 
-    def __init__(self, tool_manager=None, memory=None):
+    def __init__(self, tool_manager=None, memory=None, socket_manager=None):
         self._tool_manager = tool_manager
         self.memory = memory
+        self.socket_manager = socket_manager
         self._automations: dict[str, Automation] = {}
         self._active_tasks: dict[str, asyncio.Task] = {}
         self._scheduler_task: asyncio.Task | None = None
@@ -578,6 +583,18 @@ class AutomationEngine:
         if not self._tool_manager:
             return {"status": "error", "message": "ToolManager non configurato"}
 
+        # 0. Check preventivo Spotify: se disabilitato o non connesso, skip immediato
+        if action.tool == "spotify":
+            enabled = os.environ.get("SPOTIFY_ENABLED", "true").strip().lower() not in ("0", "false", "no")
+            if not enabled:
+                logger.info(f"[ENGINE] '{scene_name}' — skip Spotify: disabilitato via ENV")
+                return {"status": "skipped", "message": "Spotify disabilitato."}
+            
+            spotify_tool = self._tool_manager.tools.get("spotify")
+            if spotify_tool and not spotify_tool.sp:
+                logger.info(f"[ENGINE] '{scene_name}' — skip Spotify: non connesso")
+                return {"status": "skipped", "message": "Spotify non connesso."}
+
         last_result = {}
         for attempt in range(max(1, action.retry)):
             try:
@@ -586,8 +603,47 @@ class AutomationEngine:
                     self._tool_manager.execute(tool_action),
                     timeout=action.timeout,
                 )
+                
+                # --- BROADCAST PER DASHBOARD ---
+                if self.socket_manager and result.get("status") == "ok":
+                    ws_map = {
+                        "weather": "weather",
+                        "spotify": "spotify",
+                        "calendar": "calendar",
+                        "news": "news",
+                        "sys_monitor": "stats",
+                        "display": "layout",
+                    }
+                    if action.tool in ws_map:
+                        msg_type = ws_map[action.tool]
+                        payload = {"type": msg_type}
+                        if "data" in result:
+                            if isinstance(result["data"], dict): payload.update(result["data"])
+                            else: payload["data"] = result["data"]
+                        else:
+                            payload.update(result)
+                        payload.pop("status", None)
+                        payload.pop("message", None)
+                        await self.socket_manager.broadcast(payload)
+                    
+                    # Caso speciale Arduino: broadcast stato compatto
+                    if action.tool == "arduino":
+                        st = result.get("state", {})
+                        if st:
+                            await self.socket_manager.broadcast({
+                                "type": "state",
+                                "led": "on" if st.get("light") else "off",
+                                "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                                "servo2": st.get("servo2", 0),
+                                "rgb1": st.get("rgb1", [0, 0, 0]),
+                                "rgb2": st.get("rgb2", [0, 0, 0]),
+                                "rgb3": st.get("rgb3", [0, 0, 0]),
+                                "buzzer": st.get("buzzer", False),
+                            })
+
                 if result.get("status") != "error":
                     return result
+                
                 last_result = result
                 if attempt < action.retry - 1:
                     logger.debug(f"[ENGINE] Retry {attempt + 1}/{action.retry} per {action}")
@@ -717,11 +773,13 @@ def build_default_automations() -> list[Automation]:
             scene=Scene(
                 name="buongiorno",
                 priority=Priority.HIGH,
-                cooldown=3600,
+                cooldown=60,
                 actions=[
                     arduino("light", 1),
                     arduino("rgb", 0xFFD580),
                     arduino("servo", 0),
+                    display_action("news"),
+                    display_action("weather", delay=10),
                     background(spotify("search", query="buongiorno playlist mattina")),
                     background(weather_action()),
                     background(news_action(limit=5)),

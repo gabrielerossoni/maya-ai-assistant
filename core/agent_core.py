@@ -198,6 +198,7 @@ class AgentCore:
         # Inizializza il nuovo AutomationEngine
         self.automation_engine._tool_manager = self.tool_manager
         self.automation_engine.memory = self.memory
+        self.automation_engine.socket_manager = self.socket_manager
         self.automation_engine.register_all(build_default_automations())
         asyncio.create_task(self.automation_engine.start_scheduler())
         print("[AGENT] AutomationEngine pronto con", len(self.automation_engine.list_automations()), "automazioni.")
@@ -757,9 +758,18 @@ class AgentCore:
             exec_result = await self.automation_engine.execute(auto_result, source="voice")
             scene_name = auto_result.name
             status = exec_result.get("status", "ok")
-            reply = (
-                f"Scena '{scene_name}' eseguita." if status == "ok" else f"Scena '{scene_name}' completata con avvisi."
-            )
+            
+            if status == "ok":
+                reply = f"Scena '{scene_name}' eseguita."
+            elif status == "skipped":
+                reason = exec_result.get("reason", "")
+                if reason == "cooldown":
+                    reply = f"La scena '{scene_name}' è stata già eseguita di recente. Attendi un po' prima di riprovare."
+                else:
+                    reply = f"La scena '{scene_name}' non può essere eseguita al momento (condizioni non soddisfatte)."
+            else:
+                reply = f"Scena '{scene_name}' completata con alcuni avvisi."
+
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
             await self.memory.add_turn("jarvis", reply)
