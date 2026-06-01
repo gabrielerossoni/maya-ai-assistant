@@ -236,7 +236,7 @@ class TestSceneControls:
         assert "color.rgb.r === normalized[0]" in html
         assert "value: 16711680" not in html
         assert "setRgbCardState(dev, action._rgbIndex)" in html
-        for label in ["ROSSO", "VERDE", "BLU", "VIOLA", "CALDO", "BIANCO"]:
+        for label in ["ROSSO", "VERDE", "BLU", "VIOLA", "ARANCIO", "BIANCO"]:
             assert label in html
 
     def test_rgb_cards_hold_to_turn_off(self, html):

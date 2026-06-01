@@ -199,8 +199,8 @@ class TestExecute:
     @pytest.mark.asyncio
     async def test_noncritical_action_errors_do_not_make_scene_partial(self, engine, mock_tool_manager):
         async def execute(action):
-            if action["tool"] == "spotify":
-                return {"status": "error", "message": "spotify offline"}
+            if action["tool"] == "weather":
+                return {"status": "error", "message": "weather offline"}
             return {"status": "ok", "state": {}}
 
         mock_tool_manager.execute = execute
@@ -209,7 +209,7 @@ class TestExecute:
                 name="warning_only",
                 actions=[
                     Action(tool="arduino", params={"op": "SET", "target": "light", "value": 1}),
-                    Action(tool="spotify", params={"command": "play"}),
+                    Action(tool="weather", params={"location": "Milano"}),
                 ],
             )
         )
@@ -218,7 +218,7 @@ class TestExecute:
 
         assert result["status"] == "ok"
         assert result["errors"] == []
-        assert result["warnings"][0]["error"] == "spotify offline"
+        assert result["warnings"][0]["error"] == "weather offline"
 
     @pytest.mark.asyncio
     async def test_clear_active_scene_cancels_background_buzzer_actions(self, engine, mock_tool_manager):
@@ -313,7 +313,7 @@ class TestExecute:
         engine.register(auto)
         result = await engine.execute(auto)
         assert result["status"] == "ok"
-        assert mock_tool_manager.execute.call_count == 3
+        assert mock_tool_manager.execute.call_count == 2
 
     @pytest.mark.asyncio
     async def test_execute_prioritizes_hardware_first(self, engine, mock_tool_manager):
@@ -338,7 +338,7 @@ class TestExecute:
         result = await engine.execute(auto)
 
         assert result["status"] == "ok"
-        assert seen == ["arduino", "spotify", "weather"]
+        assert seen == ["arduino", "weather"]
 
 
 # ── Test condizioni ───────────────────────────────────────────────────────────
@@ -536,16 +536,26 @@ class TestDefaults:
         foreground = [a for a in auto.scene.actions if not a.background]
         background_actions = [a for a in auto.scene.actions if a.background]
 
-        assert [a.tool for a in foreground] == ["arduino", "arduino", "arduino", "display", "display"]
-        assert [a.tool for a in background_actions] == ["spotify", "weather", "news", "calendar"]
+        assert [a.tool for a in foreground] == [
+            "arduino",
+            "arduino",
+            "arduino",
+            "display",
+            "news",
+            "display",
+            "weather",
+            "display",
+            "display",
+        ]
+        assert [a.tool for a in background_actions] == ["spotify", "calendar"]
 
-    def test_alarm_has_30_second_rhythmic_sequence(self, fresh_context, fresh_registry):
+    def test_alarm_has_20_second_rhythmic_sequence(self, fresh_context, fresh_registry):
         auto = next(a for a in build_default_automations() if a.name == "allarme")
         background_actions = [a for a in auto.scene.actions if a.background]
 
         assert any(a.params.get("target") == "buzzer" and a.params.get("value") == 0 for a in background_actions)
         assert any(a.params.get("target") == "neopixel" and a.params.get("value") == 0 for a in background_actions)
-        assert round(sum(a.delay for a in background_actions), 1) == 30.0
+        assert round(sum(a.delay for a in background_actions), 1) == 20.0
 
     def test_wake_scene_uses_radar_melody_for_30_seconds(self, fresh_context, fresh_registry):
         auto = next(a for a in build_default_automations() if a.name == "sveglia")

@@ -145,13 +145,14 @@ def test_execute_rejects_unknown_target_and_bad_op(real_tool, monkeypatch):
     assert called is False
 
 
-def test_simulated_mode_returns_not_connected():
+def test_simulated_mode_updates_offline_state():
     tool = ArduinoTool()
     tool.simulated = True
 
     result = tool.execute({"op": "SET", "target": "light", "value": 1})
 
-    assert result == {"status": "error", "message": "arduino non connesso"}
+    assert result["status"] == "ok"
+    assert result["state"]["light"] is True
 
 
 def test_dispatch_updates_state_telemetry_and_event_hooks():
