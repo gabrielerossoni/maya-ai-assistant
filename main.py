@@ -145,7 +145,7 @@ async def lifespan(app: FastAPI):
     if arduino_tool:
         _main_loop = asyncio.get_running_loop()  # cattura il loop del lifespan
         quake_announce_count = 0  # limita a 3 annunci per ciclo di vita processo
-        last_quake_scene_ts = 0.0 # cooldown tra attivazioni scena
+        last_quake_scene_ts = 0.0  # cooldown tra attivazioni scena
 
         def arduino_event_handler(event: dict):
             try:
@@ -163,6 +163,7 @@ async def lifespan(app: FastAPI):
                 if isinstance(ev_name, str) and ev_name.lower() == "quake":
                     nonlocal quake_announce_count, last_quake_scene_ts
                     import time as _t
+
                     now_s = _t.time()
                     # Limita TTS a max 3
                     allow_tts = quake_announce_count < 3
@@ -174,7 +175,9 @@ async def lifespan(app: FastAPI):
                     ar_ok = False
                     try:
                         conn = getattr(arduino_tool, "connection", None)
-                        ar_ok = bool(conn and getattr(conn, "is_open", False)) and not getattr(arduino_tool, "simulated", False)
+                        ar_ok = bool(conn and getattr(conn, "is_open", False)) and not getattr(
+                            arduino_tool, "simulated", False
+                        )
                     except Exception:
                         ar_ok = False
                     # Evita retrigger se la scena è già attiva o in cooldown
@@ -182,7 +185,7 @@ async def lifespan(app: FastAPI):
                     already_active = False
                     try:
                         last_scene = agent.automation_engine.get_last_scene()
-                        already_active = (last_scene == "allarme")
+                        already_active = last_scene == "allarme"
                     except Exception:
                         pass
                     if ar_ok and cooldown_ok and not already_active:
@@ -191,6 +194,7 @@ async def lifespan(app: FastAPI):
                             agent.automation_engine.execute_by_name("allarme", source="event:quake"),
                             _main_loop,
                         )
+
                         # Auto-clear scene after ~20s if still active
                         async def _auto_clear_allarme():
                             try:
@@ -202,23 +206,34 @@ async def lifespan(app: FastAPI):
                                 if last_scene == "allarme":
                                     res = await agent.automation_engine.clear_active_scene()
                                     try:
-                                        await manager.broadcast({"type": "scene_cleared", "scene": "allarme", "status": res.get("status", "ok")})
+                                        await manager.broadcast(
+                                            {
+                                                "type": "scene_cleared",
+                                                "scene": "allarme",
+                                                "status": res.get("status", "ok"),
+                                            }
+                                        )
                                     except Exception:
                                         pass
                             except Exception:
                                 pass
+
                         asyncio.run_coroutine_threadsafe(_auto_clear_allarme(), _main_loop)
                     # Annuncio vocale
                     if allow_tts:
                         quake_announce_count += 1
+
                         def _do_tts():
                             try:
                                 if mag > 0:
-                                    voice_manager.speak(f"Attenzione: rilevata scossa di magnitudo {mag:.1f} sulla scala Richter.")
+                                    voice_manager.speak(
+                                        f"Attenzione: rilevata scossa di magnitudo {mag:.1f} sulla scala Richter."
+                                    )
                                 else:
                                     voice_manager.speak("Attenzione: rilevata scossa sismica.")
                             except Exception:
                                 pass
+
                         # Esegui TTS fuori dal thread seriale (non bloccante)
                         asyncio.run_coroutine_threadsafe(asyncio.to_thread(_do_tts), _main_loop)
             except Exception as e:

@@ -737,7 +737,11 @@ class AutomationEngine:
                 if result.get("status") != "error":
                     # Opportunistic TTS for certain tools during automations
                     try:
-                        if self.voice_manager and os.getenv("MAYA_TTS_AUTOMATIONS", "1").strip().lower() not in ("0","false","no"):
+                        if self.voice_manager and os.getenv("MAYA_TTS_AUTOMATIONS", "1").strip().lower() not in (
+                            "0",
+                            "false",
+                            "no",
+                        ):
                             if action.tool == "weather" and isinstance(result.get("data"), dict):
                                 d = result["data"]
                                 loc = d.get("location") or "qui"
@@ -745,6 +749,7 @@ class AutomationEngine:
                                     # Annuncia le prossime ore e quando smette
                                     hourly = d.get("hourly") or []
                                     from datetime import datetime
+
                                     def _fmt_hhmm(tstr: str) -> str:
                                         try:
                                             # Open-Meteo returns ISO times
@@ -754,6 +759,7 @@ class AutomationEngine:
                                             return h if m == "00" else f"{h}:{m}"
                                         except Exception:
                                             return tstr
+
                                     if hourly:
                                         # Prendi le prossime ore a partire da ORA (max 12)
                                         now = datetime.now()
@@ -769,10 +775,10 @@ class AutomationEngine:
                                         if not next_hours:
                                             next_hours = [h for _, h in _parsed][:12]
                                         # Trova la prima ora "asciutta"
-                                        rainy_codes = {51,53,55,61,63,65,80,81,82,95}
+                                        rainy_codes = {51, 53, 55, 61, 63, 65, 80, 81, 82, 95}
                                         stop_time = None
                                         for h in next_hours:
-                                            precip = (h.get("precip_mm") or 0)
+                                            precip = h.get("precip_mm") or 0
                                             prob = h.get("prob")
                                             code = h.get("code")
                                             is_rainy = (precip and precip > 0.05) or (code in rainy_codes)
@@ -813,11 +819,15 @@ class AutomationEngine:
                                         text = f"Meteo per {loc}: " + ", ".join(parts) + "."
                                         await asyncio.to_thread(self.voice_manager.speak, text)
                             elif action.tool == "news" and isinstance(result.get("news"), list) and result["news"]:
-                                titles = [n.get("title") for n in result["news"] if isinstance(n, dict) and n.get("title")]
+                                titles = [
+                                    n.get("title") for n in result["news"] if isinstance(n, dict) and n.get("title")
+                                ]
                                 if titles:
+
                                     def _strip_src(t: str) -> str:
                                         i = t.rfind(" - ")
                                         return (t[:i] if i > 0 else t).strip()
+
                                     first = _strip_src(titles[0])
                                     if len(titles) > 1:
                                         second = _strip_src(titles[1])
@@ -874,17 +884,23 @@ class AutomationEngine:
 
                                         try:
                                             if isinstance(st.get("light"), bool):
-                                                human_parts.append("La luce è accesa" if st.get("light") else "La luce è spenta")
+                                                human_parts.append(
+                                                    "La luce è accesa" if st.get("light") else "La luce è spenta"
+                                                )
                                         except Exception:
                                             pass
                                         try:
                                             if isinstance(sv, (int, float)):
-                                                human_parts.append("La porta è aperta" if (sv or 0) > 0 else "La porta è chiusa")
+                                                human_parts.append(
+                                                    "La porta è aperta" if (sv or 0) > 0 else "La porta è chiusa"
+                                                )
                                         except Exception:
                                             pass
                                         try:
                                             if isinstance(sv2, (int, float)):
-                                                human_parts.append("Il cancello è aperto" if (sv2 or 0) > 0 else "Il cancello è chiuso")
+                                                human_parts.append(
+                                                    "Il cancello è aperto" if (sv2 or 0) > 0 else "Il cancello è chiuso"
+                                                )
                                         except Exception:
                                             pass
 
@@ -911,9 +927,10 @@ class AutomationEngine:
 
         # Fallback TTS per 'sono rientrato' se il GET status fallisce
         try:
-            if (
-                self.voice_manager
-                and os.getenv("MAYA_TTS_AUTOMATIONS", "1").strip().lower() not in ("0", "false", "no")
+            if self.voice_manager and os.getenv("MAYA_TTS_AUTOMATIONS", "1").strip().lower() not in (
+                "0",
+                "false",
+                "no",
             ):
                 try:
                     op = str(action.params.get("op", "")).upper()

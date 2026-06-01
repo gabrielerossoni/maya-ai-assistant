@@ -443,9 +443,13 @@ class ArduinoTool:
                 elif target in ("rgb", "neopixel"):
                     r = g = b = 0
                     if isinstance(value, dict):
-                        r = int(value.get("r", 0)); g = int(value.get("g", 0)); b = int(value.get("b", 0))
+                        r = int(value.get("r", 0))
+                        g = int(value.get("g", 0))
+                        b = int(value.get("b", 0))
                     elif isinstance(value, int):
-                        r = (value >> 16) & 0xFF; g = (value >> 8) & 0xFF; b = value & 0xFF
+                        r = (value >> 16) & 0xFF
+                        g = (value >> 8) & 0xFF
+                        b = value & 0xFF
                     self.sim_state["rgb1"] = [r, g, b]
                     self.sim_state["rgb2"] = [r, g, b]
                     self.sim_state["rgb3"] = [r, g, b]
@@ -453,15 +457,21 @@ class ArduinoTool:
                 elif target in ("rgb1", "rgb2", "rgb3"):
                     r = g = b = 0
                     if isinstance(value, dict):
-                        r = int(value.get("r", 0)); g = int(value.get("g", 0)); b = int(value.get("b", 0))
+                        r = int(value.get("r", 0))
+                        g = int(value.get("g", 0))
+                        b = int(value.get("b", 0))
                     elif isinstance(value, int):
-                        r = (value >> 16) & 0xFF; g = (value >> 8) & 0xFF; b = value & 0xFF
+                        r = (value >> 16) & 0xFF
+                        g = (value >> 8) & 0xFF
+                        b = value & 0xFF
                     self.sim_state[target] = [r, g, b]
                     self.sim_state["neo_effect"] = int(extra.get("effect", self.sim_state.get("neo_effect", 0)))
                 elif target == "brightness":
                     v = 0 if value is None else int(value)
-                    if v < 0: v = 0
-                    if v > 255: v = 255
+                    if v < 0:
+                        v = 0
+                    if v > 255:
+                        v = 255
                     self.sim_state["brightness"] = v
                 elif target == "buzzer":
                     self.sim_state["buzzer"] = bool(value)
