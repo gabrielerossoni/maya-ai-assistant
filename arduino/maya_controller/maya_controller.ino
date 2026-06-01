@@ -20,13 +20,23 @@
  *             "neo_effect":int,"buzzer":bool,"buzz2_playing":bool}}
  */
 
+#define USE_MPU6050 1
 #include "secrets.h"
 #include <Adafruit_NeoPixel.h>
+#ifdef USE_LSM6DSOX
+#include <Arduino_LSM6DSOX.h>
+#endif
+#ifdef USE_MPU6050
+#include <Wire.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#endif
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include <PubSubClient.h>
 #include <Servo.h>
 #include <WiFiS3.h>
+#include <string.h>
 
 // ── WiFi Credentials ──────────────────────────
 const char *SSID = WIFI_HOTSPOT_SSID;      // Configura il tuo SSID
@@ -54,6 +64,9 @@ uint8_t ledsR[NEOPIXEL_COUNT] = {0};
 uint8_t ledsG[NEOPIXEL_COUNT] = {0};
 uint8_t ledsB[NEOPIXEL_COUNT] = {0};
 int neoEffect = 0; // 0=solid, 1=pulse, 2=rainbow, 3=alert
+uint8_t globalBrightness = 255; // 0-255 global brightness for neopixels
+// Auto-timeout for alert effect (effect=3). Ensures stop after 20s even if host fails
+unsigned long alertEffectUntilMs = 0;
 
 // ── State ─────────────────────────────────────
 bool lightOn = false;
@@ -62,7 +75,7 @@ int servo2Pos = 0;
 bool buzzerOn = false;
 
 // ── Buzzer 2 Melodies State ───────────────────
-const char *currentMelody = "";
+char currentMelody[16] = "";
 int melodyNoteIndex = -1;
 unsigned long noteStartMs = 0;
 int noteDuration = 0;
@@ -73,11 +86,35 @@ unsigned long lastTelemetryMs = 0;
 unsigned long lastMqttConnectAttempt = 0;
 unsigned long lastServo1AttachMs = 0;
 unsigned long lastServo2AttachMs = 0;
+unsigned long servo1HoldDurationMs = 0;
+unsigned long servo2HoldDurationMs = 0;
+
+// ── Accelerometer (optional) ─────────────────
+#ifdef USE_LSM6DSOX
+bool imuReady = false;
+float quakePeakG = 0.0f;
+unsigned long lastQuakeSentMs = 0;
+bool imuAbove = false;
+unsigned long imuAboveStartMs = 0;
+#endif
+#ifdef USE_MPU6050
+Adafruit_MPU6050 mpu;
+bool mpuReady = false;
+float quakePeakG_mpu = 0.0f;
+unsigned long lastQuakeSentMs_mpu = 0;
+bool mpuAbove = false;
+unsigned long mpuAboveStartMs = 0;
+#endif
 
 const unsigned long BUZZ_DURATION_MS = 200;
 const unsigned long TELEMETRY_INTERVAL = 5000;
 const unsigned long MQTT_CONNECT_INTERVAL = 10000;
 const unsigned long SERVO_DETACH_DELAY = 1000;
+
+// ── Quake detection tuning ─────────────────────
+#define QUAKE_THRESHOLD_G      0.15f   // soglia in g (valori più alti = meno sensibile)
+#define QUAKE_MIN_DURATION_MS   500    // tempo minimo sopra soglia per trigger
+#define QUAKE_COOLDOWN_MS      5000    // tempo minimo tra eventi
 
 // ── MQTT & WiFi ───────────────────────────────
 WiFiClient espClient;
@@ -132,6 +169,7 @@ void setup() {
 
   // NeoPixel initialization
   strip.begin();
+  strip.setBrightness(globalBrightness);
   strip.show(); // Initialize all pixels to 'off'
 
   // Generate unique MQTT client ID
@@ -202,14 +240,93 @@ void loop() {
   }
 
   // 6. Servo auto-detach logic
-  if (servo1Attached && (millis() - lastServo1AttachMs >= SERVO_DETACH_DELAY)) {
+  if (servo1Attached && (millis() - lastServo1AttachMs >= (servo1HoldDurationMs ? servo1HoldDurationMs : SERVO_DETACH_DELAY))) {
     myServo.detach();
     servo1Attached = false;
   }
-  if (servo2Attached && (millis() - lastServo2AttachMs >= SERVO_DETACH_DELAY)) {
+  if (servo2Attached && (millis() - lastServo2AttachMs >= (servo2HoldDurationMs ? servo2HoldDurationMs : SERVO_DETACH_DELAY))) {
     myServo2.detach();
     servo2Attached = false;
   }
+
+#ifdef USE_LSM6DSOX
+  // 7. Accelerometer quake detection (optional)
+  if (!imuReady) {
+    if (IMU.begin()) {
+      imuReady = true;
+    }
+  } else {
+    float ax, ay, az;
+    if (IMU.accelerationAvailable()) {
+      IMU.readAcceleration(ax, ay, az);
+      // Compute deviation from 1g on Z, simple high-pass
+      float gmag = sqrt(ax * ax + ay * ay + az * az);
+      float dev = fabs(gmag - 1.0f); // in g units
+      unsigned long nowms = millis();
+      const float THRESH = QUAKE_THRESHOLD_G;
+      if (dev > THRESH) {
+        if (!imuAbove) { imuAbove = true; imuAboveStartMs = nowms; quakePeakG = 0.0f; }
+        if (dev > quakePeakG) quakePeakG = dev; // track peak while above
+        if ((nowms - imuAboveStartMs) >= QUAKE_MIN_DURATION_MS && (nowms - lastQuakeSentMs) > QUAKE_COOLDOWN_MS) {
+          float mag = max(0.0f, log10f(quakePeakG * 1000.0f) + 1.0f);
+          StaticJsonDocument<128> ev;
+          ev["event"] = "quake";
+          ev["magnitude"] = mag;
+          ev["peak_g"] = quakePeakG;
+          serializeJson(ev, Serial);
+          Serial.print('\n');
+          lastQuakeSentMs = nowms;
+          imuAbove = false;
+          quakePeakG = 0.0f;
+        }
+      } else {
+        imuAbove = false;
+        quakePeakG *= 0.9f;
+      }
+    }
+  }
+#endif
+
+#ifdef USE_MPU6050
+  // 7b. Accelerometer quake detection (MPU6050)
+  if (!mpuReady) {
+    if (mpu.begin()) {
+      mpuReady = true;
+      mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
+      mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+    }
+  } else {
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+    // Convert to g units
+    float ax = a.acceleration.x / 9.80665f;
+    float ay = a.acceleration.y / 9.80665f;
+    float az = a.acceleration.z / 9.80665f;
+    float gmag = sqrt(ax * ax + ay * ay + az * az);
+    float dev = fabs(gmag - 1.0f);
+    unsigned long nowms = millis();
+    const float THRESH2 = QUAKE_THRESHOLD_G;
+    if (dev > THRESH2) {
+      if (!mpuAbove) { mpuAbove = true; mpuAboveStartMs = nowms; quakePeakG_mpu = 0.0f; }
+      if (dev > quakePeakG_mpu) quakePeakG_mpu = dev;
+      if ((nowms - mpuAboveStartMs) >= QUAKE_MIN_DURATION_MS && (nowms - lastQuakeSentMs_mpu) > QUAKE_COOLDOWN_MS) {
+        float mag = max(0.0f, log10f(quakePeakG_mpu * 1000.0f) + 1.0f);
+        StaticJsonDocument<128> ev;
+        ev["event"] = "quake";
+        ev["magnitude"] = mag;
+        ev["peak_g"] = quakePeakG_mpu;
+        serializeJson(ev, Serial);
+        Serial.print('\n');
+        lastQuakeSentMs_mpu = nowms;
+        mpuAbove = false;
+        quakePeakG_mpu = 0.0f;
+      }
+    } else {
+      mpuAbove = false;
+      quakePeakG_mpu *= 0.9f;
+    }
+  }
+#endif
 }
 
 // ── WiFi Setup ────────────────────────────────
@@ -357,21 +474,31 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
 
   } else if (strcmp(target, "servo") == 0) {
     if (isSET) {
-      servoPos = constrain(doc["value"].as<int>(), 0, 180);
+      int newPos = constrain(doc["value"].as<int>(), 0, 180);
+      int delta = abs(newPos - servoPos);
+      servoPos = newPos;
       myServo.attach(SERVO_PIN);
       myServo.write(servoPos);
       lastServo1AttachMs = millis();
       servo1Attached = true;
+      // Hold duration proportional to movement: base 120ms + 4ms per degree (cap 600ms)
+      servo1HoldDurationMs = 120 + (unsigned long)(4 * delta);
+      if (servo1HoldDurationMs > 600) servo1HoldDurationMs = 600;
     }
     if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "servo2") == 0) {
     if (isSET) {
-      servo2Pos = constrain(doc["value"].as<int>(), 0, 180);
+      int newPos2 = constrain(doc["value"].as<int>(), 0, 180);
+      int delta2 = abs(newPos2 - servo2Pos);
+      servo2Pos = newPos2;
       myServo2.attach(SERVO2_PIN);
       myServo2.write(servo2Pos);
       lastServo2AttachMs = millis();
       servo2Attached = true;
+      // Hold duration proportional to movement: base 120ms + 4ms per degree (cap 600ms)
+      servo2HoldDurationMs = 120 + (unsigned long)(4 * delta2);
+      if (servo2HoldDurationMs > 600) servo2HoldDurationMs = 600;
     }
     if (!quiet) sendResponse(id, true);
 
@@ -386,6 +513,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       }
       for (int i = 0; i < 8; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      if (neoEffect == 3) alertEffectUntilMs = millis() + 20000; else alertEffectUntilMs = 0;
       updateNeoPixels(); // Force immediate update
     }
     if (!quiet) sendResponse(id, true);
@@ -401,6 +529,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       }
       for (int i = 8; i < 16; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      if (neoEffect == 3) alertEffectUntilMs = millis() + 20000; else alertEffectUntilMs = 0;
       updateNeoPixels(); // Force immediate update
     }
     if (!quiet) sendResponse(id, true);
@@ -416,6 +545,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       }
       for (int i = 16; i < 24; i++) { ledsR[i] = r; ledsG[i] = g; ledsB[i] = b; }
       neoEffect = doc["effect"] | 0;
+      if (neoEffect == 3) alertEffectUntilMs = millis() + 20000; else alertEffectUntilMs = 0;
       updateNeoPixels(); // Force immediate update
     }
     if (!quiet) sendResponse(id, true);
@@ -453,7 +583,17 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
         ledsR[i] = r; ledsG[i] = g; ledsB[i] = b;
       }
       neoEffect = doc["effect"] | 0;
+      if (neoEffect == 3) alertEffectUntilMs = millis() + 20000; else alertEffectUntilMs = 0;
       updateNeoPixels(); // Force immediate update
+    }
+    if (!quiet) sendResponse(id, true);
+
+  } else if (strcmp(target, "brightness") == 0) {
+    if (isSET) {
+      int b = constrain(doc["value"].as<int>(), 0, 255);
+      globalBrightness = (uint8_t)b;
+      strip.setBrightness(globalBrightness);
+      updateNeoPixels();
     }
     if (!quiet) sendResponse(id, true);
 
@@ -508,6 +648,7 @@ void buildState(JsonObject state) {
   state["light"] = lightOn;
   state["servo"] = servoPos;
   state["servo2"] = servo2Pos;
+  state["brightness"] = globalBrightness;
   JsonArray r1 = state.createNestedArray("rgb1");
   r1.add(ledsR[0]); r1.add(ledsG[0]); r1.add(ledsB[0]);
   JsonArray r2 = state.createNestedArray("rgb2");
@@ -603,15 +744,18 @@ void publishTelemetry() {
 
 // ── Melody functions ───────────────────────────
 void startMelody(const char *name) {
+  // Stop any currently playing tone before switching melody
+  noTone(SPEAKER_PIN);
   if (strcmp(name, "off") == 0 || strcmp(name, "stop") == 0) {
     noTone(SPEAKER_PIN);
-    currentMelody = "";
+    currentMelody[0] = '\0';
     melodyNoteIndex = -1;
     noteStartMs = 0;
     noteDuration = 0;
     return;
   }
-  currentMelody = name;
+  strncpy(currentMelody, name, sizeof(currentMelody) - 1);
+  currentMelody[sizeof(currentMelody) - 1] = '\0';
   melodyNoteIndex = 0;
   noteStartMs = 0;
   noteDuration = 0;
@@ -746,21 +890,42 @@ void updateNeoPixels() {
     return; // ~33 FPS
   lastUpdate = now;
 
-  if (neoEffect == 0) { // solid — use individual LED colors
+  // Safety timeout: if alert effect exceeded, turn everything off and reset effect
+  if (neoEffect == 3 && alertEffectUntilMs > 0 && now >= alertEffectUntilMs) {
+    neoEffect = 0;
+    alertEffectUntilMs = 0;
+    for (int i = 0; i < NEOPIXEL_COUNT; i++) { ledsR[i] = 0; ledsG[i] = 0; ledsB[i] = 0; }
+    strip.setBrightness(globalBrightness);
     for (int i = 0; i < NEOPIXEL_COUNT; i++) {
-      strip.setPixelColor(i, strip.Color(ledsR[i], ledsG[i], ledsB[i]));
+      strip.setPixelColor(i, 0);
+    }
+    strip.show();
+    return;
+  }
+
+  if (neoEffect == 0) { // solid — use individual LED colors
+    strip.setBrightness(globalBrightness);
+    for (int i = 0; i < NEOPIXEL_COUNT; i++) {
+      uint32_t c = strip.gamma32(strip.Color(ledsR[i], ledsG[i], ledsB[i]));
+      strip.setPixelColor(i, c);
     }
     strip.show();
   } else if (neoEffect == 1) { // pulse
+    strip.setBrightness(globalBrightness);
     pulseVal += pulseDir * 5;
     if (pulseVal >= 255) { pulseVal = 255; pulseDir = -1; }
     if (pulseVal <= 30)  { pulseVal = 30;  pulseDir = 1;  }
 
     for (int i = 0; i < NEOPIXEL_COUNT; i++) {
-      strip.setPixelColor(i, strip.Color((ledsR[i] * pulseVal) / 255, (ledsG[i] * pulseVal) / 255, (ledsB[i] * pulseVal) / 255));
+      uint8_t r = (ledsR[i] * pulseVal) / 255;
+      uint8_t g = (ledsG[i] * pulseVal) / 255;
+      uint8_t b = (ledsB[i] * pulseVal) / 255;
+      uint32_t c = strip.gamma32(strip.Color(r, g, b));
+      strip.setPixelColor(i, c);
     }
     strip.show();
   } else if (neoEffect == 2) { // rainbow — all LEDs
+    strip.setBrightness(globalBrightness);
     rainbowHue += 1;
     for (int i = 0; i < NEOPIXEL_COUNT; i++) {
       uint8_t pixelHue = rainbowHue + (i * 256 / NEOPIXEL_COUNT);
@@ -768,6 +933,7 @@ void updateNeoPixels() {
     }
     strip.show();
   } else if (neoEffect == 3) { // alert — flash red on all LEDs
+    strip.setBrightness(globalBrightness);
     static unsigned long lastFlash = 0;
     if (now - lastFlash >= 250) {
       lastFlash = now;

@@ -33,6 +33,7 @@ VALID_TARGETS = {
     "rgb2",
     "rgb3",
     "neopixel",
+    "brightness",
     "buzzer",
     "buzzer2",
     "speaker",
@@ -53,6 +54,7 @@ class ArduinoTool:
             "rgb2": [0, 0, 0],
             "rgb3": [0, 0, 0],
             "neo_effect": 0,
+            "brightness": 255,
             "buzzer": False,
             "buzz2_playing": False,
         }
@@ -159,6 +161,7 @@ class ArduinoTool:
                         "rgb2": s.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
                         "rgb3": s.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
                         "neo_effect": s.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                        "brightness": s.get("brightness", self.sim_state.get("brightness", 255)),
                         "buzzer": s.get("buzzer", self.sim_state["buzzer"]),
                         "buzz2_playing": s.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
                     }
@@ -326,12 +329,18 @@ class ArduinoTool:
                             "rgb2": state.get("rgb2", self.sim_state.get("rgb2", [0, 0, 0])),
                             "rgb3": state.get("rgb3", self.sim_state.get("rgb3", [0, 0, 0])),
                             "neo_effect": state.get("neo_effect", self.sim_state.get("neo_effect", 0)),
+                            "brightness": state.get("brightness", self.sim_state.get("brightness", 255)),
                             "buzzer": state.get("buzzer", self.sim_state["buzzer"]),
                             "buzz2_playing": state.get("buzz2_playing", self.sim_state.get("buzz2_playing", False)),
                         }
                     )
                 status = data.get("status", "error")
                 result = {"status": status, "state": self.sim_state.copy()}
+                # Pass-through sensor data when present
+                if "temp" in data:
+                    result["temp"] = data.get("temp")
+                if "humidity" in data:
+                    result["humidity"] = data.get("humidity")
                 if status == "error":
                     result["message"] = data.get("message") or data.get("msg") or "errore Arduino"
                 return result
@@ -420,6 +429,48 @@ class ArduinoTool:
         return {"status": "error", "message": "failed after retries", "state": self.sim_state.copy()}
 
     def _simulate(self, op: str, target: str, value, **extra) -> dict:
+        # Minimal, coherent simulation for offline/dev usage
+        try:
+            if op == "GET" and target == "status":
+                return {"status": "ok", "state": self.sim_state.copy()}
+            if op == "SET":
+                if target == "light":
+                    self.sim_state["light"] = bool(value)
+                elif target == "servo":
+                    self.sim_state["servo"] = int(value or 0)
+                elif target == "servo2":
+                    self.sim_state["servo2"] = int(value or 0)
+                elif target in ("rgb", "neopixel"):
+                    r = g = b = 0
+                    if isinstance(value, dict):
+                        r = int(value.get("r", 0)); g = int(value.get("g", 0)); b = int(value.get("b", 0))
+                    elif isinstance(value, int):
+                        r = (value >> 16) & 0xFF; g = (value >> 8) & 0xFF; b = value & 0xFF
+                    self.sim_state["rgb1"] = [r, g, b]
+                    self.sim_state["rgb2"] = [r, g, b]
+                    self.sim_state["rgb3"] = [r, g, b]
+                    self.sim_state["neo_effect"] = int(extra.get("effect", self.sim_state.get("neo_effect", 0)))
+                elif target in ("rgb1", "rgb2", "rgb3"):
+                    r = g = b = 0
+                    if isinstance(value, dict):
+                        r = int(value.get("r", 0)); g = int(value.get("g", 0)); b = int(value.get("b", 0))
+                    elif isinstance(value, int):
+                        r = (value >> 16) & 0xFF; g = (value >> 8) & 0xFF; b = value & 0xFF
+                    self.sim_state[target] = [r, g, b]
+                    self.sim_state["neo_effect"] = int(extra.get("effect", self.sim_state.get("neo_effect", 0)))
+                elif target == "brightness":
+                    v = 0 if value is None else int(value)
+                    if v < 0: v = 0
+                    if v > 255: v = 255
+                    self.sim_state["brightness"] = v
+                elif target == "buzzer":
+                    self.sim_state["buzzer"] = bool(value)
+                elif target == "buzzer2":
+                    mel = str(extra.get("melody", "")).lower()
+                    self.sim_state["buzz2_playing"] = False if mel in ("off", "stop") else True
+                return {"status": "ok", "state": self.sim_state.copy()}
+        except Exception:
+            pass
         return {"status": "error", "message": "arduino non connesso"}
 
     def get_sensor_data(self) -> dict:

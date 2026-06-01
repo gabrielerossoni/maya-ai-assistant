@@ -68,15 +68,17 @@ body::after{
 .track{height:100%;display:flex;will-change:transform;transition:transform 1s cubic-bezier(.22,1,.36,1)}
 .slide{
   flex:0 0 100vw;height:100vh;position:relative;overflow:hidden;
-  padding:100px clamp(24px,5vw,80px) 80px;
+  padding:clamp(60px,8vh,100px) clamp(24px,5vw,80px) clamp(54px,6vh,80px);
   display:grid;place-items:center;
 }
 .stage{
   width:min(1600px,100%);
-  height:min(840px,calc(100vh - 200px));
+  height:calc(100vh - 200px);
   display:grid;grid-template-columns:repeat(12,minmax(0,1fr));
-  gap:clamp(32px,3vw,54px);
+  gap:clamp(28px,2.8vw,54px);
   align-items:center;
+  transform-origin: top center;
+  will-change: transform;
 }
 .copy{grid-column:1/6;display:grid;gap:20px;align-content:center;min-width:0}
 .copy.wide{grid-column:1/7}
@@ -88,10 +90,10 @@ body::after{
 .slide.active .reveal{opacity:1;transform:none;filter:none}
 
 .eyebrow{font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.25em;text-transform:uppercase;color:var(--red-soft);margin-bottom:4px}
-.title{font-size:clamp(64px,8vw,120px);line-height:.85;letter-spacing:-.08em;font-weight:900;max-width:12ch}
-.title.small{font-size:clamp(44px,5.5vw,84px);line-height:.92;max-width:16ch}
+.title{font-size:clamp(64px,8vw,120px);line-height:.9;letter-spacing:-.06em;font-weight:900;max-width:14ch;word-break:normal;overflow-wrap:break-word;hyphens:auto}
+.title.small{font-size:clamp(44px,5.5vw,84px);line-height:1;max-width:20ch;word-break:normal;overflow-wrap:break-word;hyphens:auto}
 .title .accent{color:var(--red);text-shadow: 0 0 30px rgba(232,37,58,.4)}
-.lede{max-width:60ch;color:#e8e8ed;font-size:clamp(17px,1.3vw,21px);line-height:1.6;font-weight:450}
+.lede{max-width:65ch;color:#e8e8ed;font-size:clamp(17px,1.3vw,21px);line-height:1.6;font-weight:450;word-break:normal;overflow-wrap:break-word;hyphens:auto}
 .sub{font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
 
 .actions{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px}
@@ -149,13 +151,13 @@ body::after{
 .compare{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .compare-box{
   padding:28px;border:1px solid var(--line);border-radius:24px;background:rgba(255,255,255,.02);
-  display:grid;gap:20px;min-height:420px;position:relative;
+  display:grid;gap:20px;min-height:clamp(340px,38vh,420px);position:relative;
 }
 .compare-box::before{content:"";position:absolute;top:0;left:30px;width:40px;height:2px;background:var(--muted);opacity:.3}
 .compare-box:last-child::before{background:var(--red);opacity:1}
 .compare-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
 .compare-head h3{font-size:28px;line-height:1.1;letter-spacing:-.03em}
-.compare-head p{font-size:14px;line-height:1.6;color:var(--muted);margin-top:8px;max-width:32ch}
+.compare-head p{font-size:14px;line-height:1.6;color:var(--muted);margin-top:8px;max-width:40ch;overflow-wrap:break-word;hyphens:auto}
 .pill{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding:7px 12px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
 .pill.red{border-color:var(--line-red);background:rgba(232,37,58,.15);color:#fff;box-shadow:0 0 15px rgba(232,37,58,.2)}
 .pill.gray{background:rgba(255,255,255,.05);color:var(--muted)}
@@ -170,7 +172,7 @@ body::after{
 .stack-row{padding:20px 24px;border-radius:18px;background:#08080a;border:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;transition:all .3s ease}
 .stack-row:hover{border-color:var(--line-strong);transform:translateX(4px);background:#0c0c0e}
 .stack-row strong{display:block;font-size:18px;line-height:1.2;letter-spacing:-.01em}
-.stack-row p{margin-top:8px;font-size:13px;line-height:1.5;color:var(--muted);max-width:44ch}
+.stack-row p{margin-top:8px;font-size:13px;line-height:1.6;color:var(--muted);max-width:48ch;overflow-wrap:break-word;hyphens:auto}
 .badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .badge{padding:6px 10px;border-radius:6px;border:1px solid var(--line);font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;background:rgba(255,255,255,.03)}
 .badge.red{border-color:var(--line-red);background:rgba(232,37,58,.1);color:#fff}
@@ -195,7 +197,7 @@ body::after{
 .step::before{content:"";position:absolute;top:0;left:32px;width:60px;height:3px;background:var(--red);box-shadow:0 0 15px var(--red)}
 .step-num{font-family:var(--mono);font-size:11px;color:var(--red-soft);font-weight:800;letter-spacing:.25em;text-transform:uppercase}
 .step h3{font-size:34px;line-height:1;letter-spacing:-.04em;font-weight:900}
-.step p{font-size:15px;color:var(--muted);line-height:1.6;max-width:32ch}
+.step p{font-size:15px;color:var(--muted);line-height:1.6;max-width:40ch;overflow-wrap:break-word;hyphens:auto}
 .mini-list{display:grid;gap:10px}
 .mini-list div{padding:14px 16px;border-radius:12px;background:#08080a;border:1px solid rgba(255,255,255,.05);font-size:13px;color:#ececee;line-height:1.5;position:relative;padding-left:32px}
 .mini-list div::before{content:"";position:absolute;left:14px;top:20px;width:4px;height:4px;border-radius:50%;background:var(--red)}
@@ -276,7 +278,7 @@ body::after{
 .card:hover{transform:translateY(-8px);background:rgba(255,255,255,.04);border-color:var(--line-strong)}
 .card .tag{font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--red-soft)}
 .card h3{font-size:24px;line-height:1.1;letter-spacing:-.03em;font-weight:900}
-.card p{color:var(--muted);font-size:14px;line-height:1.6;max-width:32ch}
+.card p{color:var(--muted);font-size:14px;line-height:1.6;max-width:40ch;overflow-wrap:break-word;hyphens:auto}
 .card::before{content:"";display:block;width:50px;height:3px;background:var(--red);box-shadow:0 0 10px var(--red)}
 
 .scene-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
@@ -288,7 +290,7 @@ body::after{
 .scene-chip{display:inline-flex;align-items:center;gap:10px;width:max-content;font-family:var(--mono);font-size:9px;padding:8px 14px;border-radius:6px;border:1px solid var(--line);color:#fff;text-transform:uppercase;letter-spacing:.15em;background:rgba(255,255,255,.05)}
 .scene-chip i{width:8px;height:8px;border-radius:50%;background:var(--scene,var(--red));box-shadow:0 0 10px var(--scene,var(--red))}
 .scene-card h3{font-size:26px;line-height:1.1;letter-spacing:-.03em;font-weight:900}
-.scene-card p{font-size:14px;color:var(--muted);line-height:1.6}
+.scene-card p{font-size:14px;color:var(--muted);line-height:1.6;overflow-wrap:break-word;hyphens:auto}
 .scene-card .cmd{margin-top:auto;font-family:var(--mono);font-size:10px;color:#fff;line-height:1.6;padding:12px 14px;background:#08080a;border-radius:8px;border:1px solid rgba(255,255,255,.05)}
 
 .repo-grid{display:grid;grid-template-columns:1fr 420px;gap:20px}
@@ -303,7 +305,7 @@ body::after{
 .quality-list{display:grid;gap:14px}
 .quality-row{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-radius:20px;border:1px solid rgba(255,255,255,.06);background:#08080a;gap:20px}
 .quality-row b{font-size:16px;font-weight:700;color:#fff}
-.quality-row span{display:block;margin-top:6px;font-size:13px;color:var(--dim);line-height:1.5;max-width:40ch}
+.quality-row span{display:block;margin-top:6px;font-size:13px;color:var(--dim);line-height:1.5;max-width:48ch;overflow-wrap:break-word;hyphens:auto}
 .quality-row strong{font-family:var(--mono);font-size:10px;color:var(--red-soft);letter-spacing:.12em;text-transform:uppercase;padding:6px 10px;border-radius:6px;background:rgba(232,37,58,.08)}
 
 .bottom{position:fixed;left:0;right:0;bottom:0;height:64px;z-index:50;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:0 32px;border-top:1px solid var(--line);background:rgba(5,5,5,.75);backdrop-filter:blur(24px)}
@@ -342,6 +344,25 @@ body::after{
   .signal-grid,.panel-grid,.hud-kpis,.overview-grid{grid-template-columns:repeat(2,1fr)}
   .orb-zone{min-height:400px}
 }
+
+/* Su schermi ampi evita il capo manuale nelle title quando non serve */
+@media (min-width: 1160px){
+  .title br, .title.small br { display:none; }
+}
+
+.slide[data-name="Agent Loop"]{padding-top:clamp(48px,6vh,80px);padding-bottom:clamp(44px,5vh,70px)}
+.slide[data-name="Agent Loop"] .title.small{font-size:clamp(34px,4.2vw,62px);line-height:.95;max-width:18ch;letter-spacing:-.05em}
+.slide[data-name="Agent Loop"] .pipeline{gap:16px}
+.slide[data-name="Agent Loop"] .full{display:grid;grid-template-rows:auto auto 1fr;gap:14px;align-content:stretch}
+.slide[data-name="Agent Loop"] .lede{margin-top:4px}
+.slide[data-name="Agent Loop"] .step{min-height:clamp(240px,28vh,300px);padding:22px}
+.slide[data-name="Agent Loop"] .step h3{font-size:30px}
+.slide[data-name="Agent Loop"] .step p{max-width:36ch}
+.slide[data-name="Agent Loop"] .mini-list div{padding:12px 14px 12px 28px;font-size:12.5px}
+
+.slide[data-name="Dashboard"] .hud-main{min-height:clamp(420px,56vh,520px)}
+.slide[data-name="Dashboard"] .console{max-height:120px;overflow:hidden}
+.slide[data-name="Dashboard"] .panel-grid{gap:12px}
 @media (max-width:820px){
   .topbar{padding:0 24px}.section-name{display:none}.bottom{grid-template-columns:auto auto}.dots{display:none}.count{text-align:right}
   .signal-grid,.panel-grid,.hud-kpis,.overview-grid{grid-template-columns:1fr}
@@ -651,7 +672,7 @@ body::after{
       <div class="stage">
         <div class="copy wide">
           <div class="eyebrow reveal">08 · Pitch finale</div>
-          <h2 class="title reveal" style="--d:1">Un cervello<br>per la <span class="accent">casa.</span></h2>
+          <h2 class="title reveal" style="--d:1">Un cervello<br> per la <span class="accent">casa.</span></h2>
           <p class="lede reveal" style="--d:2">M.A.Y.A. convince perché unisce in modo concreto AI locale, automazioni, interfaccia live e hardware reale. Non è un chatbot con lucine: è un sistema che ragiona e muove il mondo fisico.</p>
           <p class="sub reveal" style="--d:3">Gabriele Rossoni &amp; Marcello Patrini · 4IB · ITIS di Crema</p>
           <div class="actions reveal" style="--d:4">
@@ -718,6 +739,7 @@ function updateUI(){
   progress.style.width = ((idx/(slides.length-1))*100) + '%';
   count.textContent = String(idx+1).padStart(2,'0') + ' / ' + String(slides.length).padStart(2,'0');
   sectionName.textContent = slides[idx].dataset.name;
+  fitActiveSlide();
 }
 
 function go(n, resetAutoFlag=true){
@@ -798,8 +820,27 @@ document.addEventListener('touchend', e => {
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopAuto(); else startAuto(); });
 document.addEventListener('pointerdown', resetAuto);
 
+function fitActiveSlide(){
+  const slide = slides[idx];
+  if(!slide) return;
+  const stage = slide.querySelector('.stage');
+  if(!stage) return;
+  stage.style.transform = 'scale(1)';
+  const vb = slide.getBoundingClientRect();
+  const sb = stage.getBoundingClientRect();
+  const pad = 12; // small safety
+  const available = vb.height - pad;
+  if (sb.height > available) {
+    const scale = Math.max(0.75, Math.min(1, available / sb.height));
+    stage.style.transform = `scale(${scale})`;
+  }
+}
+
+window.addEventListener('resize', ()=>{ fitActiveSlide(); });
+
 go(0, false);
 startAuto();
+fitActiveSlide();
 </script>
 </body>
 </html>

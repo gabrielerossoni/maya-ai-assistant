@@ -16,6 +16,7 @@ import asyncio
 import logging
 import os
 import time
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
@@ -333,10 +334,11 @@ class AutomationEngine:
     - Esporre l'event bus per integrazioni esterne
     """
 
-    def __init__(self, tool_manager=None, memory=None, socket_manager=None):
+    def __init__(self, tool_manager=None, memory=None, socket_manager=None, voice_manager=None):
         self._tool_manager = tool_manager
         self.memory = memory
         self.socket_manager = socket_manager
+        self.voice_manager = voice_manager
         self._automations: dict[str, Automation] = {}
         self._active_tasks: dict[str, asyncio.Task] = {}
         self._background_tasks: dict[str, set[asyncio.Task]] = {}
@@ -458,95 +460,96 @@ class AutomationEngine:
         logger.info(f"[ENGINE] Esecuzione '{scene.name}' (priorità={scene.priority}, source={source})")
 
         await self._scene_lock.acquire()
-        if not scene.can_run(ignore_cooldown=ignore_cooldown):
-            self._scene_lock.release()
-            reason = self._blocked_reason(scene, ignore_cooldown=ignore_cooldown)
-            logger.info(f"[ENGINE] '{scene.name}' bloccata: {reason}")
-            return {"status": "skipped", "reason": reason}
+        try:
+            if not scene.can_run(ignore_cooldown=ignore_cooldown):
+                reason = self._blocked_reason(scene, ignore_cooldown=ignore_cooldown)
+                logger.info(f"[ENGINE] '{scene.name}' bloccata: {reason}")
+                return {"status": "skipped", "reason": reason}
 
-        results = []
-        errors = []
-        warnings = []
-        conflicts = []
-        start_ts = time.time()
+            results = []
+            errors = []
+            warnings = []
+            conflicts = []
+            start_ts = time.time()
 
-        foreground_actions = self._hardware_first([action for action in scene.actions if not action.background])
-        background_actions = [action for action in scene.actions if action.background]
+            foreground_actions = self._hardware_first([action for action in scene.actions if not action.background])
+            background_actions = [action for action in scene.actions if action.background]
 
-        for action in self._compact_arduino_actions(foreground_actions):
-            if action.delay > 0:
-                await asyncio.sleep(action.delay)
+            for action in self._compact_arduino_actions(foreground_actions):
+                if action.delay > 0:
+                    await asyncio.sleep(action.delay)
 
-            action_conflicts = self._detect_action_conflicts(action, scene.name)
-            if action_conflicts:
-                conflicts.extend(action_conflicts)
-                conflict = action_conflicts[0]
-                logger.info(
-                    f"[ENGINE] Possibile conflitto su {conflict['device']}: "
-                    f"{conflict['previous_scene']} -> {scene.name}"
+                action_conflicts = self._detect_action_conflicts(action, scene.name)
+                if action_conflicts:
+                    conflicts.extend(action_conflicts)
+                    conflict = action_conflicts[0]
+                    logger.info(
+                        f"[ENGINE] Possibile conflitto su {conflict['device']}: "
+                        f"{conflict['previous_scene']} -> {scene.name}"
+                    )
+
+                result = await self._execute_action_with_retry(action, scene.name)
+                results.append(result)
+
+                if result.get("status") == "error":
+                    entry = {"action": str(action), "error": result.get("message")}
+                    if self._is_critical_action_error(action):
+                        errors.append(entry)
+                    else:
+                        warnings.append(entry)
+                    logger.warning(f"[ENGINE] '{scene.name}' — errore in {action}: {result.get('message')}")
+
+                # Aggiorna registry dopo azioni Arduino
+                if action.tool == "arduino" and result.get("status") in {"ok", "partial"}:
+                    state = result.get("state", {})
+                    if state:
+                        registry.update_from_arduino_state(state, scene=scene.name)
+
+            if background_actions:
+                task = asyncio.create_task(self._execute_background_actions(scene.name, background_actions))
+                self._background_tasks.setdefault(scene.name, set()).add(task)
+                task.add_done_callback(
+                    lambda done_task, name=scene.name: self._background_tasks.get(name, set()).discard(done_task)
                 )
 
-            result = await self._execute_action_with_retry(action, scene.name)
-            results.append(result)
+            # Aggiorna contesto
+            scene.mark_run()
+            context.set_scene(scene.name)
 
-            if result.get("status") == "error":
-                entry = {"action": str(action), "error": result.get("message")}
-                if self._is_critical_action_error(action):
-                    errors.append(entry)
-                else:
-                    warnings.append(entry)
-                logger.warning(f"[ENGINE] '{scene.name}' — errore in {action}: {result.get('message')}")
+            # Sincronizza con la memoria della conversazione (se presente)
+            if self.memory:
+                await self.memory.add_turn(
+                    "system", f"[AUTOMATION] Eseguita automazione '{scene.name}' (source={source})", persist_db=False
+                )
 
-            # Aggiorna registry dopo azioni Arduino
-            if action.tool == "arduino" and result.get("status") in {"ok", "partial"}:
-                state = result.get("state", {})
-                if state:
-                    registry.update_from_arduino_state(state, scene=scene.name)
+            elapsed = round(time.time() - start_ts, 3)
+            status = "ok" if not errors else "partial"
 
-        if background_actions:
-            task = asyncio.create_task(self._execute_background_actions(scene.name, background_actions))
-            self._background_tasks.setdefault(scene.name, set()).add(task)
-            task.add_done_callback(
-                lambda done_task, name=scene.name: self._background_tasks.get(name, set()).discard(done_task)
-            )
+            event_entry = {
+                "scene": scene.name,
+                "source": source,
+                "status": status,
+                "errors": errors,
+                "warnings": warnings,
+                "conflicts": conflicts,
+                "elapsed": elapsed,
+                "ts": start_ts,
+            }
+            self._log_event(event_entry)
 
-        # Aggiorna contesto
-        scene.mark_run()
-        context.set_scene(scene.name)
+            await self.bus.publish("scene_executed", event_entry)
 
-        # Sincronizza con la memoria della conversazione (se presente)
-        if self.memory:
-            await self.memory.add_turn(
-                "system", f"[AUTOMATION] Eseguita automazione '{scene.name}' (source={source})", persist_db=False
-            )
-
-        elapsed = round(time.time() - start_ts, 3)
-        status = "ok" if not errors else "partial"
-
-        event_entry = {
-            "scene": scene.name,
-            "source": source,
-            "status": status,
-            "errors": errors,
-            "warnings": warnings,
-            "conflicts": conflicts,
-            "elapsed": elapsed,
-            "ts": start_ts,
-        }
-        self._log_event(event_entry)
-
-        await self.bus.publish("scene_executed", event_entry)
-
-        logger.info(f"[ENGINE] '{scene.name}' completata in {elapsed}s — status={status}")
-        self._scene_lock.release()
-        return {
-            "status": status,
-            "results": results,
-            "errors": errors,
-            "warnings": warnings,
-            "conflicts": conflicts,
-            "elapsed": elapsed,
-        }
+            logger.info(f"[ENGINE] '{scene.name}' completata in {elapsed}s — status={status}")
+            return {
+                "status": status,
+                "results": results,
+                "errors": errors,
+                "warnings": warnings,
+                "conflicts": conflicts,
+                "elapsed": elapsed,
+            }
+        finally:
+            self._scene_lock.release()
 
     async def execute_by_name(self, name: str, source: str = "manual") -> dict:
         automation = self._automations.get(name)
@@ -572,6 +575,18 @@ class AutomationEngine:
                 result = await self._execute_action_with_retry(action, f"{scene_name}:background")
                 if result.get("status") == "error":
                     logger.warning(f"[ENGINE] '{scene_name}' background — errore in {action}: {result.get('message')}")
+                    msg = (result.get("message") or "").lower()
+                    if "arduino not connected" in msg or "arduino non connesso" in msg:
+                        # Evita spam infinito: interrompi la sequenza e libera la scena
+                        try:
+                            self._cancel_background_tasks(scene_name)
+                        except Exception:
+                            pass
+                        try:
+                            context.set_scene(None)
+                        except Exception:
+                            pass
+                        break
         except asyncio.CancelledError:
             logger.info(f"[ENGINE] '{scene_name}' background cancellato")
             raise
@@ -720,6 +735,167 @@ class AutomationEngine:
                             )
 
                 if result.get("status") != "error":
+                    # Opportunistic TTS for certain tools during automations
+                    try:
+                        if self.voice_manager and os.getenv("MAYA_TTS_AUTOMATIONS", "1").strip().lower() not in ("0","false","no"):
+                            if action.tool == "weather" and isinstance(result.get("data"), dict):
+                                d = result["data"]
+                                loc = d.get("location") or "qui"
+                                if scene_name == "piove":
+                                    # Annuncia le prossime ore e quando smette
+                                    hourly = d.get("hourly") or []
+                                    from datetime import datetime
+                                    def _fmt_hhmm(tstr: str) -> str:
+                                        try:
+                                            # Open-Meteo returns ISO times
+                                            dt = datetime.fromisoformat(tstr)
+                                            h = dt.strftime("%H")
+                                            m = dt.strftime("%M")
+                                            return h if m == "00" else f"{h}:{m}"
+                                        except Exception:
+                                            return tstr
+                                    if hourly:
+                                        # Prendi le prossime ore a partire da ORA (max 12)
+                                        now = datetime.now()
+                                        _parsed = []
+                                        for h in hourly:
+                                            ts = h.get("time", "")
+                                            try:
+                                                dt = datetime.fromisoformat(ts)
+                                            except Exception:
+                                                dt = None
+                                            _parsed.append((dt, h))
+                                        next_hours = [h for dt, h in _parsed if (dt is None or dt >= now)][:12]
+                                        if not next_hours:
+                                            next_hours = [h for _, h in _parsed][:12]
+                                        # Trova la prima ora "asciutta"
+                                        rainy_codes = {51,53,55,61,63,65,80,81,82,95}
+                                        stop_time = None
+                                        for h in next_hours:
+                                            precip = (h.get("precip_mm") or 0)
+                                            prob = h.get("prob")
+                                            code = h.get("code")
+                                            is_rainy = (precip and precip > 0.05) or (code in rainy_codes)
+                                            if not is_rainy and (prob is None or prob <= 30):
+                                                stop_time = _fmt_hhmm(h.get("time", ""))
+                                                break
+                                        # Crea testo breve
+                                        first = next_hours[0]
+                                        p0 = int(round(float(first.get("prob") or 0)))
+                                        t0 = _fmt_hhmm(first.get("time", ""))
+                                        if stop_time:
+                                            text = f"Pioggia nelle prossime ore. Probabilità {p0}% alle {t0}. Dovrebbe smettere verso le {stop_time}."
+                                        else:
+                                            text = f"Pioggia prevista nelle prossime ore. Probabilità {p0}% alle {t0}."
+                                        await asyncio.to_thread(self.voice_manager.speak, text)
+                                else:
+                                    temp = d.get("temp")
+                                    _cr = d.get("condition") or ""
+                                    cond = _cr.lower()
+                                    # Normalizza abbreviazioni con confini di parola per evitare rimpiazzi sovrapposti
+                                    subs = [
+                                        (r"\bparzialm\.?\b", "parzialmente"),
+                                        (r"\bparz\.?\b", "parzialmente"),
+                                        (r"\bnuvol\.?\b", "nuvoloso"),
+                                        (r"\bposs\.?\b", "possibili"),
+                                        (r"\btempor\.?\b", "temporali"),
+                                        (r"\bpreval\.?\b", "prevalentemente"),
+                                        (r"\bprev\.?\b", "prevalentemente"),
+                                    ]
+                                    for pat, rep in subs:
+                                        cond = re.sub(pat, rep, cond)
+                                    parts = []
+                                    if temp is not None:
+                                        parts.append(f"{int(round(float(temp)))} gradi")
+                                    if cond:
+                                        parts.append(cond)
+                                    if parts:
+                                        text = f"Meteo per {loc}: " + ", ".join(parts) + "."
+                                        await asyncio.to_thread(self.voice_manager.speak, text)
+                            elif action.tool == "news" and isinstance(result.get("news"), list) and result["news"]:
+                                titles = [n.get("title") for n in result["news"] if isinstance(n, dict) and n.get("title")]
+                                if titles:
+                                    def _strip_src(t: str) -> str:
+                                        i = t.rfind(" - ")
+                                        return (t[:i] if i > 0 else t).strip()
+                                    first = _strip_src(titles[0])
+                                    if len(titles) > 1:
+                                        second = _strip_src(titles[1])
+                                        text = f"Ultime notizie: {first}. Inoltre, {second}."
+                                    else:
+                                        text = f"Ultime notizie: {first}."
+                                    await asyncio.to_thread(self.voice_manager.speak, text)
+                            elif action.tool == "arduino":
+                                try:
+                                    op = str(action.params.get("op", "")).upper()
+                                except Exception:
+                                    op = ""
+                                if op == "GET":
+                                    st = result.get("state", {}) if isinstance(result, dict) else {}
+                                    items = []
+                                    if isinstance(st.get("light"), bool):
+                                        items.append("luce accesa" if st.get("light") else "luce spenta")
+                                    sv = st.get("servo")
+                                    if isinstance(sv, (int, float)):
+                                        items.append("porta aperta" if (sv or 0) > 0 else "porta chiusa")
+                                    sv2 = st.get("servo2")
+                                    if isinstance(sv2, (int, float)):
+                                        items.append("cancello aperto" if (sv2 or 0) > 0 else "cancello chiuso")
+                                    t = result.get("temp")
+                                    h = result.get("humidity")
+                                    if (t is None and h is None) and getattr(self, "_tool_manager", None):
+                                        try:
+                                            atool = self._tool_manager.tools.get("arduino")
+                                            if atool and hasattr(atool, "get_sensor_data"):
+                                                sdata = await asyncio.to_thread(atool.get_sensor_data)
+                                                if isinstance(sdata, dict):
+                                                    t = sdata.get("temp", t)
+                                                    h = sdata.get("humidity", h)
+                                        except Exception:
+                                            pass
+                                    if t is not None:
+                                        items.append(f"temperatura {int(round(float(t)))} gradi")
+                                    if h is not None:
+                                        items.append(f"umidità {int(round(float(h)))} percento")
+                                    # Sempre saluto per 'sono rientrato'
+                                    if scene_name == "sono rientrato":
+                                        await asyncio.to_thread(self.voice_manager.speak, "Bentornato!")
+                                    if scene_name == "sono rientrato":
+                                        # Phrasing più umano usando SOLO dati Arduino
+                                        human_parts = []
+                                        if t is not None and h is not None:
+                                            human_parts.append(
+                                                f"In casa ci sono {int(round(float(t)))} gradi e {int(round(float(h)))} percento di umidità"
+                                            )
+                                        elif t is not None:
+                                            human_parts.append(f"In casa ci sono {int(round(float(t)))} gradi")
+                                        elif h is not None:
+                                            human_parts.append(f"Umidità {int(round(float(h)))} percento")
+
+                                        try:
+                                            if isinstance(st.get("light"), bool):
+                                                human_parts.append("La luce è accesa" if st.get("light") else "La luce è spenta")
+                                        except Exception:
+                                            pass
+                                        try:
+                                            if isinstance(sv, (int, float)):
+                                                human_parts.append("La porta è aperta" if (sv or 0) > 0 else "La porta è chiusa")
+                                        except Exception:
+                                            pass
+                                        try:
+                                            if isinstance(sv2, (int, float)):
+                                                human_parts.append("Il cancello è aperto" if (sv2 or 0) > 0 else "Il cancello è chiuso")
+                                        except Exception:
+                                            pass
+
+                                        if human_parts:
+                                            human_text = ". ".join(human_parts) + "."
+                                            await asyncio.to_thread(self.voice_manager.speak, human_text)
+                                    elif items:
+                                        text = "Stato casa: " + ", ".join(items) + "."
+                                        await asyncio.to_thread(self.voice_manager.speak, text)
+                    except Exception:
+                        pass
                     return result
 
                 last_result = result
@@ -732,6 +908,26 @@ class AutomationEngine:
             except Exception as e:
                 last_result = {"status": "error", "message": str(e)}
                 logger.error(f"[ENGINE] Eccezione su {action}: {e}")
+
+        # Fallback TTS per 'sono rientrato' se il GET status fallisce
+        try:
+            if (
+                self.voice_manager
+                and os.getenv("MAYA_TTS_AUTOMATIONS", "1").strip().lower() not in ("0", "false", "no")
+            ):
+                try:
+                    op = str(action.params.get("op", "")).upper()
+                except Exception:
+                    op = ""
+                if (
+                    scene_name == "sono rientrato"
+                    and action.tool == "arduino"
+                    and op == "GET"
+                    and last_result.get("status") == "error"
+                ):
+                    await asyncio.to_thread(self.voice_manager.speak, "Bentornato!")
+        except Exception:
+            pass
 
         return last_result
 
@@ -787,7 +983,11 @@ class AutomationEngine:
         self._cancel_background_tasks(previous)
         results = []
         errors = []
+        # doppio tentativo: se Arduino si è appena disconnesso, aspetta un attimo
         result = await self._execute_action_with_retry(arduino_all_off(), "scene_off")
+        if result.get("status") == "error" and "Arduino not connected" in result.get("message", ""):
+            await asyncio.sleep(0.8)
+            result = await self._execute_action_with_retry(arduino_all_off(), "scene_off")
         results.append(result)
         if result.get("status") == "error":
             errors.append({"action": "arduino_all_off", "error": result.get("message")})
@@ -823,7 +1023,8 @@ def build_default_automations() -> list[Automation]:
                     spotify("pause"),
                     arduino("light", 0),
                     arduino("servo", 0),
-                    arduino("rgb", {"r": 0, "g": 0, "b": 8}),
+                    arduino("brightness", 32),
+                    arduino("rgb", {"r": 0, "g": 0, "b": 16}),
                     calendar_action("list"),
                 ],
             ),
@@ -858,10 +1059,12 @@ def build_default_automations() -> list[Automation]:
                     arduino("rgb", {"r": 255, "g": 213, "b": 128}),
                     arduino("servo", 0),
                     display_action("news"),
-                    display_action("weather", delay=10),
+                    news_action(limit=5),
+                    display_action("weather"),
+                    weather_action(),
+                    display_action("orb", exitAfter=True),
+                    display_action("orb", delay=4),
                     background(spotify("search", query="buongiorno playlist mattina")),
-                    background(weather_action()),
-                    background(news_action(limit=5)),
                     background(calendar_action("list")),
                 ],
             ),
@@ -957,9 +1160,9 @@ def build_default_automations() -> list[Automation]:
                     arduino("light", 1),
                     arduino("servo", 90),
                     arduino("rgb", {"r": 255, "g": 140, "b": 66}),
+                    Action(tool="arduino", params={"op": "GET", "target": "status"}, delay=0.2, retry=2, timeout=1.5),
                     spotify("search", query="relax after work playlist"),
                     timer_action(5, "Ricordati di chiudere la porta!"),
-                    news_action(limit=3),
                 ],
             ),
             aliases=["sono tornato", "rientro", "torno"],
@@ -977,7 +1180,8 @@ def build_default_automations() -> list[Automation]:
                     arduino("neopixel", {"r": 255, "g": 0, "b": 0}, effect=3),
                     arduino("buzzer", 1),
                     arduino_melody("alarm"),
-                    *_background_buzzer_pulse(duration=30.0, interval=0.5),
+                    *_background_buzzer_pulse(duration=20.0, interval=0.5),
+                    # Le azioni finali non aggiungono ulteriore ritardo: la pulsazione ha già consumato ~20s
                     delayed_background(arduino_melody("off"), 0.0),
                     delayed_background(arduino("neopixel", 0, effect=0), 0.0),
                 ],
@@ -1010,7 +1214,7 @@ def build_default_automations() -> list[Automation]:
                 cooldown=3600,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", {"r": 255, "g": 68, "b": 0}),
+                    arduino("rgb", {"r": 255, "g": 140, "b": 66}),
                     arduino("servo", 0),
                     spotify("search", query="cena romantica musica italiana"),
                 ],

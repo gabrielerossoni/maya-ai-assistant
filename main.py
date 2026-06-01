@@ -117,7 +117,17 @@ async def lifespan(app: FastAPI):
             return
         time.sleep(1.5)
         # Cache-buster per forzare il ricaricamento della dashboard
-        webbrowser.open(f"http://127.0.0.1:{http_port}/?v={int(time.time())}")
+        params = [f"v={int(time.time())}"]
+        _scale = os.environ.get("DASHBOARD_UI_SCALE") or os.environ.get("DASHBOARD_SCALE")
+        if _scale:
+            params.append(f"scale={_scale}")
+        _cols = os.environ.get("DASHBOARD_COLUMNS")
+        if _cols:
+            params.append(f"cols={_cols}")
+        _density = os.environ.get("DASHBOARD_DENSITY")
+        if _density:
+            params.append(f"density={_density}")
+        webbrowser.open(f"http://127.0.0.1:{http_port}/?{'&'.join(params)}")
 
     threading.Thread(target=_open_browser, daemon=True).start()
 
@@ -134,6 +144,8 @@ async def lifespan(app: FastAPI):
     arduino_tool = agent.tool_manager.tools.get("arduino")
     if arduino_tool:
         _main_loop = asyncio.get_running_loop()  # cattura il loop del lifespan
+        quake_announce_count = 0  # limita a 3 annunci per ciclo di vita processo
+        last_quake_scene_ts = 0.0 # cooldown tra attivazioni scena
 
         def arduino_event_handler(event: dict):
             try:
@@ -144,14 +156,89 @@ async def lifespan(app: FastAPI):
                 else:
                     payload = {"type": "arduino_event", **event}
 
-                asyncio.run_coroutine_threadsafe(
-                    manager.broadcast(payload),
-                    _main_loop,
-                )
+                asyncio.run_coroutine_threadsafe(manager.broadcast(payload), _main_loop)
+
+                # Se l'evento è una scossa (quake), attiva la scena allarme e annuncia la magnitudo
+                ev_name = event.get("event") or event.get("type")
+                if isinstance(ev_name, str) and ev_name.lower() == "quake":
+                    nonlocal quake_announce_count, last_quake_scene_ts
+                    import time as _t
+                    now_s = _t.time()
+                    # Limita TTS a max 3
+                    allow_tts = quake_announce_count < 3
+                    try:
+                        mag = float(event.get("magnitude") or event.get("mag") or 0)
+                    except Exception:
+                        mag = 0.0
+                    # Evita di saturare azioni hardware quando Arduino è offline
+                    ar_ok = False
+                    try:
+                        conn = getattr(arduino_tool, "connection", None)
+                        ar_ok = bool(conn and getattr(conn, "is_open", False)) and not getattr(arduino_tool, "simulated", False)
+                    except Exception:
+                        ar_ok = False
+                    # Evita retrigger se la scena è già attiva o in cooldown
+                    cooldown_ok = True  # rimosso cooldown di 60s su richiesta
+                    already_active = False
+                    try:
+                        last_scene = agent.automation_engine.get_last_scene()
+                        already_active = (last_scene == "allarme")
+                    except Exception:
+                        pass
+                    if ar_ok and cooldown_ok and not already_active:
+                        last_quake_scene_ts = now_s
+                        asyncio.run_coroutine_threadsafe(
+                            agent.automation_engine.execute_by_name("allarme", source="event:quake"),
+                            _main_loop,
+                        )
+                        # Auto-clear scene after ~20s if still active
+                        async def _auto_clear_allarme():
+                            try:
+                                await asyncio.sleep(20.5)
+                                try:
+                                    last_scene = agent.automation_engine.get_last_scene()
+                                except Exception:
+                                    last_scene = None
+                                if last_scene == "allarme":
+                                    res = await agent.automation_engine.clear_active_scene()
+                                    try:
+                                        await manager.broadcast({"type": "scene_cleared", "scene": "allarme", "status": res.get("status", "ok")})
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
+                        asyncio.run_coroutine_threadsafe(_auto_clear_allarme(), _main_loop)
+                    # Annuncio vocale
+                    if allow_tts:
+                        quake_announce_count += 1
+                        def _do_tts():
+                            try:
+                                if mag > 0:
+                                    voice_manager.speak(f"Attenzione: rilevata scossa di magnitudo {mag:.1f} sulla scala Richter.")
+                                else:
+                                    voice_manager.speak("Attenzione: rilevata scossa sismica.")
+                            except Exception:
+                                pass
+                        # Esegui TTS fuori dal thread seriale (non bloccante)
+                        asyncio.run_coroutine_threadsafe(asyncio.to_thread(_do_tts), _main_loop)
             except Exception as e:
                 print(f"[ARDUINO] Event handler error: {e}")
 
         arduino_tool.register_event_hook(arduino_event_handler)
+
+    # Forward AutomationEngine bus events to dashboard (scene pill updates also for scheduler/event triggers)
+    async def _on_scene_event(_event: str, data: dict):
+        try:
+            scene = data.get("scene")
+            status = data.get("status", "ok")
+            await manager.broadcast({"type": "scene_executed", "scene": scene, "status": status})
+        except Exception:
+            pass
+
+    try:
+        agent.automation_engine.bus.subscribe("scene_executed", _on_scene_event)
+    except Exception:
+        pass
 
     try:
         yield
@@ -180,6 +267,7 @@ agent = AgentCore()
 agent.socket_manager = manager
 display = DisplayTool()
 voice_manager = VoiceManager(agent, manager)
+agent.voice_manager = voice_manager
 
 
 # ---------------------------------------------------------------------------

@@ -110,7 +110,7 @@ class WeatherTool:
             # Primo step: Geocoding
             geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=it&format=json"
             try:
-                geo_res = requests.get(geo_url).json()
+                geo_res = requests.get(geo_url, timeout=3).json()
                 if "results" not in geo_res or len(geo_res["results"]) == 0:
                     return {"status": "error", "message": f"Località '{location}' non trovata."}
 
@@ -124,11 +124,11 @@ class WeatherTool:
             weather_url = (
                 f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                 "&current_weather=true"
-                "&hourly=relativehumidity_2m,surface_pressure,visibility"
+                "&hourly=relativehumidity_2m,surface_pressure,visibility,precipitation,precipitation_probability,weathercode"
                 "&daily=temperature_2m_max,temperature_2m_min,weathercode"
                 "&timezone=auto"
             )
-            w_res = requests.get(weather_url).json()
+            w_res = requests.get(weather_url, timeout=4).json()
             current = w_res.get("current_weather", {})
             daily = w_res.get("daily", {})
             hourly = w_res.get("hourly", {})
@@ -155,22 +155,52 @@ class WeatherTool:
                 "condition": condition,
                 "icon": icon,
                 "daily": [],
+                "hourly": [],
             }
 
             # Prepara previsioni per i prossimi 5 giorni
-            for i in range(1, 6):
-                day_code = daily.get("weathercode")[i]
-                day_cond, day_icon = self.WMO_CODES.get(day_code, ("Variabile", "cloud-sun"))
-                data["daily"].append(
-                    {
-                        "date": daily.get("time")[i],
-                        "max": daily.get("temperature_2m_max")[i],
-                        "min": daily.get("temperature_2m_min")[i],
-                        "code": day_code,
-                        "condition": day_cond,
-                        "icon": day_icon,
+            try:
+                t_arr = daily.get("time") or []
+                w_arr = daily.get("weathercode") or []
+                mx = daily.get("temperature_2m_max") or []
+                mn = daily.get("temperature_2m_min") or []
+                n = min(len(t_arr), len(w_arr), len(mx), len(mn))
+                for i in range(1, min(6, n)):
+                    day_code = w_arr[i]
+                    day_cond, day_icon = self.WMO_CODES.get(day_code, ("Variabile", "cloud-sun"))
+                    data["daily"].append(
+                        {
+                            "date": t_arr[i],
+                            "max": mx[i],
+                            "min": mn[i],
+                            "code": day_code,
+                            "condition": day_cond,
+                            "icon": day_icon,
+                        }
+                    )
+            except Exception:
+                pass
+
+            # Prepara hourly compatto per le prossime ore
+            try:
+                h_time = hourly.get("time") or []
+                h_prec = hourly.get("precipitation") or []
+                h_prob = hourly.get("precipitation_probability") or []
+                h_code = hourly.get("weathercode") or []
+                n = min(len(h_time), len(h_prec), len(h_code))
+                for i in range(n):
+                    code_i = h_code[i]
+                    cond_i, _ = self.WMO_CODES.get(code_i, ("Variabile", "cloud-sun"))
+                    item = {
+                        "time": h_time[i],
+                        "precip_mm": h_prec[i] if h_prec[i] is not None else 0,
+                        "prob": (h_prob[i] if i < len(h_prob) else None),
+                        "code": code_i,
+                        "condition": cond_i,
                     }
-                )
+                    data["hourly"].append(item)
+            except Exception:
+                pass
 
             return {"status": "ok", "message": f"Meteo a {name}: {data['temp']}°C", "data": data}
         except Exception as e:

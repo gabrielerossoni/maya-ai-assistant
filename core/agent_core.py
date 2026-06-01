@@ -81,7 +81,7 @@ NON aggiungere testo fuori dal JSON.
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
-- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
+- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/brightness/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); brightness: 0-255; buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: invia comandi al secondo PC (qualsiasi stringa)
 - system: comandi OS (shutdown, open_browser, screenshot)
@@ -157,6 +157,7 @@ class AgentCore:
         self._last_layout = {"type": "orb", "params": {}}
         self._last_final_data = ("", {"type": "orb", "params": {}})
         self.socket_manager = None
+        self.voice_manager = None
         self._intent_cache: OrderedDict[str, str] = OrderedDict()
         self._current_task_layout: dict = {}
         self._current_task_final_data: dict = {}
@@ -199,6 +200,7 @@ class AgentCore:
         self.automation_engine._tool_manager = self.tool_manager
         self.automation_engine.memory = self.memory
         self.automation_engine.socket_manager = self.socket_manager
+        self.automation_engine.voice_manager = getattr(self, "voice_manager", None)
         self.automation_engine.register_all(build_default_automations())
         asyncio.create_task(self.automation_engine.start_scheduler())
         print("[AGENT] AutomationEngine pronto con", len(self.automation_engine.list_automations()), "automazioni.")

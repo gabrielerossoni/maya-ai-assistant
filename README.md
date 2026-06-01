@@ -418,6 +418,12 @@ SPOTIFY_ENABLED=false       # true solo se hai credenziali Spotify
 GROQ_API_KEY=               # LLM cloud: primario se OLLAMA_ENABLED=false, altrimenti fallback
 GROQ_MODEL=llama-3.3-70b-versatile
 GROQ_ROUTER_MODEL=llama-3.1-8b-instant
+ 
+# Presentazioni su schermi grandi (Dashboard)
+# Scala UI e disposizione card anche in Electron (valori propagati come query al frontend)
+DASHBOARD_UI_SCALE=1.0      # es. 1.25 o 1.5 per ingrandire l'interfaccia
+DASHBOARD_COLUMNS=4         # numero colonne card domotiche (default 3)
+DASHBOARD_DENSITY=compact   # oppure numero px (es. 8) per il gap tra card
 ```
 
 ### 3. Download modelli Ollama
@@ -477,6 +483,14 @@ python main.py
 La dashboard si apre automaticamente su `http://127.0.0.1:8000`.
 
 > **Wrapper desktop (opzionale):** installa Node.js, esegui `npm install` nella root, poi avvia con `MAYA_DESKTOP.bat`.
+
+### Schermi Grandi — Consigli Rapidi
+
+- Imposta nel `.env`:
+  - `DASHBOARD_UI_SCALE=1.25` (o 1.5) per aumentare la scala UI.
+  - `DASHBOARD_COLUMNS=4` (o 5/6) per più card affiancate.
+  - `DASHBOARD_DENSITY=compact` per ridurre lo spazio tra card (oppure un numero in px, es. 8).
+- Queste variabili sono applicate sia all'apertura automatica del browser sia a Electron (URL con query `?scale=..&cols=..&density=..`).
 
 ---
 

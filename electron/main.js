@@ -7,7 +7,16 @@ let mainWindow;
 let pythonProcess;
 const PORT = process.env.MAYA_PORT || 8000;
 const HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
-const DASHBOARD_URL = `http://127.0.0.1:${PORT}`;
+const SCALE = process.env.DASHBOARD_UI_SCALE || process.env.DASHBOARD_SCALE || '';
+const COLS = process.env.DASHBOARD_COLUMNS || '';
+const DENSITY = process.env.DASHBOARD_DENSITY || '';
+const QUERY_PARTS = [
+    `v=${Date.now()}`,
+    SCALE ? `scale=${SCALE}` : null,
+    COLS ? `cols=${COLS}` : null,
+    DENSITY ? `density=${DENSITY}` : null,
+].filter(Boolean);
+const DASHBOARD_URL = `http://127.0.0.1:${PORT}/?${QUERY_PARTS.join('&')}`;
 
 function startPython() {
     pythonProcess = spawn('python', ['main.py'], {

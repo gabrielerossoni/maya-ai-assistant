@@ -45,7 +45,8 @@ class DisplayTool:
 
     def execute(self, action: dict) -> dict:
         layout = action.get("layout")
-        params = action.get("params", {})
+        # Collect additional params from top-level keys (excluding tool/layout)
+        params = {k: v for k, v in action.items() if k not in ("tool", "layout")}
         if not layout:
             return {"status": "error", "message": "Layout non specificato."}
 

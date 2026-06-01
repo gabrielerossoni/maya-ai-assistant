@@ -34,6 +34,11 @@
             --glass-border: 1px solid rgba(255, 0, 0, 0.5);
             --transition: all 0.9s cubic-bezier(0.4, 0, 0.2, 1);
             --hud-color: rgba(255, 0, 0, 0.4);
+            --ui-scale: 1;
+            --dom-cols: 3;
+            --dom-gap: 10px;
+            --sb-width: 260px;
+            --card-accent: rgba(255,42,42,0.9);
         }
 
         /* =============================================
@@ -996,6 +1001,8 @@
             background: rgba(255, 30, 30, 0.06);
             border-color: rgba(255, 30, 30, 0.3);
             color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(255, 42, 42, 0.08);
         }
 
         .dom-scene-chip:active {
@@ -1015,7 +1022,7 @@
         .dom-content {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 260px;
+            grid-template-columns: 1fr var(--sb-width, 260px);
             gap: 0;
             overflow: hidden;
         }
@@ -1042,31 +1049,82 @@
 
         .dom-cards-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(var(--dom-cols, 3), 1fr);
+            gap: var(--dom-gap, 10px);
+        }
+
+        .dom-kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(120px, 1fr));
             gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 12px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: transform 0.2s ease, background 0.25s ease, border-color 0.25s ease;
+            backdrop-filter: saturate(120%) blur(4px);
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.045);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .kpi-name {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 8px;
+            letter-spacing: 2px;
+            opacity: 0.45;
+        }
+
+        .kpi-val {
+            font-size: 18px;
         }
 
         /* Device card */
         .dom-card {
-            background: rgba(255, 255, 255, 0.025);
+            background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,0.03), rgba(255,255,255,0.01) 60%);
             border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 16px;
-            padding: 18px 16px 14px;
+            border-radius: 18px;
+            padding: 18px 16px 16px;
             cursor: pointer;
-            transition: background 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
+            transition: background 0.28s ease, border-color 0.28s ease, transform 0.18s ease, box-shadow 0.28s ease;
             position: relative;
             overflow: hidden;
             user-select: none;
             display: flex;
             flex-direction: column;
             gap: 14px;
-            min-height: 108px;
+            min-height: 118px;
+            backdrop-filter: saturate(120%) blur(6px);
+            box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+        }
+
+        /* Accent header line + corner glow */
+        .dom-card::before{
+            content:""; position:absolute; left:12px; right:12px; top:10px; height:2px;
+            background: linear-gradient(90deg, transparent, var(--accent-card, var(--card-accent)), transparent);
+            opacity: .35;
+        }
+        .dom-card::after{
+            content:""; position:absolute; right:-18px; bottom:-18px; width:120px; height:120px; border-radius:50%;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.04), transparent 60%);
+            pointer-events:none;
         }
 
         .dom-card:hover {
-            background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(255, 255, 255, 0.1);
-            transform: translateY(-1px);
+            background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,0.05), rgba(255,255,255,0.02) 60%);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
         }
 
         .dom-card:active {
@@ -1074,55 +1132,62 @@
         }
 
         .dom-card.active {
-            background: rgba(76, 175, 80, 0.07);
-            border-color: rgba(76, 175, 80, 0.32);
+            background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,0.05), rgba(255,255,255,0.025) 60%),
+                        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.04));
+            border-color: color-mix(in lab, var(--accent-card, var(--card-accent)) 40%, rgba(255,255,255,0.16));
+            box-shadow: 0 20px 40px rgba(0,0,0,.36), 0 0 0 1px rgba(255,255,255,0.04) inset;
         }
 
         .dom-card.active:hover {
-            background: rgba(76, 175, 80, 0.1);
+            background: radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,0.06), rgba(255,255,255,0.03) 60%),
+                        linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.05));
         }
 
         .dom-card-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: flex; justify-content: space-between; align-items: center;
         }
 
         .dom-card-icon {
-            font-size: 20px;
+            position: relative;
+            font-size: 22px;
             line-height: 1;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,.4));
         }
+        .dom-card-icon::before{
+            content:""; position:absolute; inset:-8px; border-radius:50%;
+            background: radial-gradient(circle at 50% 40%, color-mix(in lab, var(--accent-card, var(--card-accent)) 70%, rgba(255,255,255,.0)), transparent 70%);
+            opacity:.28; filter: blur(8px);
+        }
+
+        /* Icon set — Outline Thin (Maya red) */
+        .icon { width: 18px; height: 18px; stroke: var(--accent); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display:inline-block; }
+        .dom-chip-icon .icon { width: 16px; height: 16px; }
+        .dom-status-pill .icon { width: 14px; height: 14px; margin-left: 2px; }
+        .dom-scene-chip:hover .icon { filter: drop-shadow(0 0 8px rgba(255,30,30,0.35)); }
+
+        /* Zone sliders — modern red style */
+        .zone-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: #1a1d24; border-radius: 999px; outline: none; cursor: pointer; }
+        .zone-slider:focus { outline: none; }
+        .zone-slider::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, var(--accent) 0%, rgba(255,255,255,0.08) 0%); border-radius: 999px; }
+        .zone-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(255,42,42,0.18); margin-top: -6px; border: none; }
+        .zone-slider::-moz-range-track { height: 4px; background: #1a1d24; border-radius: 999px; }
+        .zone-slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: none; box-shadow: 0 0 0 4px rgba(255,42,42,0.18); }
 
         /* Toggle pill */
-        .dom-toggle {
-            width: 30px;
-            height: 17px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 9px;
-            position: relative;
-            transition: background 0.3s ease;
-            flex-shrink: 0;
-        }
+        .dom-toggle { width: 34px; height: 18px; background: rgba(255,255,255,0.1); border-radius: 999px; position: relative;
+            transition: background 0.25s ease, transform 0.18s ease, box-shadow 0.2s ease; flex-shrink:0; box-shadow: inset 0 2px 6px rgba(0,0,0,.3); }
 
-        .dom-toggle::after {
-            content: '';
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 13px;
-            height: 13px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.45);
-            transition: left 0.3s ease, background 0.3s ease;
-        }
+        .dom-toggle::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
+            background: linear-gradient(180deg, #fefefe, #cfcfcf); box-shadow: 0 1px 4px rgba(0,0,0,.3);
+            transition: left 0.25s ease, background 0.25s ease, box-shadow 0.25s ease; }
 
-        .dom-card.active .dom-toggle {
-            background: rgba(76, 175, 80, 0.45);
-        }
+        .dom-card.active .dom-toggle { background: linear-gradient(90deg, rgba(120,255,160,.35), rgba(120,255,160,.18)); }
 
-        .dom-card.active .dom-toggle::after {
-            left: 15px;
-            background: #4CAF50;
+        .dom-card.active .dom-toggle::after { left: 18px; background: linear-gradient(180deg, #9dffb8, #46d36f); box-shadow: 0 2px 8px rgba(77, 238, 152, .6); }
+
+        .dom-toggle:hover {
+            box-shadow: 0 0 8px rgba(255, 42, 42, 0.35);
+            transform: translateY(-1px);
         }
 
         .dom-card-name {
@@ -1141,9 +1206,20 @@
         }
 
         .dom-card.active .dom-card-state {
-            opacity: 0.7;
-            color: #4CAF50;
+            opacity: 0.8;
+            color: color-mix(in lab, var(--accent-card, var(--card-accent)) 80%, #ffffff 15%);
         }
+
+        .dom-hero { display:flex; align-items:center; justify-content:center; min-height: 46px; }
+        .servo-dial .dial { width: 68px; height: 68px; }
+        .servo-dial .dial-bg { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 6; }
+        .servo-dial .dial-val { fill: none; stroke: color-mix(in lab, var(--accent-card, var(--card-accent)) 80%, #ffffff 10%); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 302; stroke-dashoffset: 302; transition: stroke-dashoffset .6s ease; transform: rotate(-90deg); transform-origin: 50% 50%; }
+        .dom-card.active .servo-dial .dial-val { stroke-dashoffset: 0; }
+
+        .buzzer-hero { width: 44px; height: 44px; border-radius:50%; position:relative; background: radial-gradient(circle at 35% 30%, rgba(255,90,90,.9), rgba(255,50,50,.6)); box-shadow: inset 0 2px 8px rgba(0,0,0,.4), 0 4px 18px rgba(0,0,0,.3); }
+        .buzzer-hero .pulse { position:absolute; inset:0; border-radius:50%; box-shadow: 0 0 0 0 rgba(255,60,60,.5); opacity:.7; }
+        .dom-card.active .buzzer-hero .pulse { animation: buzz-pulse 1.4s ease-out infinite; }
+        @keyframes buzz-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,60,60,.5); opacity:.9; } 100% { box-shadow: 0 0 0 18px rgba(255,60,60,0); opacity:0; } }
 
         /* Buzzer card (pulse on trigger) */
         .dom-card-buzzer {
@@ -1157,12 +1233,28 @@
 
         /* RGB bar */
         .dom-rgb-bar {
-            height: 5px;
-            border-radius: 3px;
-            background: rgba(255, 255, 255, 0.08);
-            transition: background 0.5s ease;
-            margin-top: 4px;
+            height: 6px;
+            border-radius: 4px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+            transition: background 0.5s ease, box-shadow 0.3s ease;
+            margin-top: 6px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.06);
         }
+        .dom-rgb-bar.has-color { box-shadow: none; }
+
+        .dom-rgb-bar:hover {
+            filter: brightness(1.05) saturate(1.15);
+        }
+
+        .rgb-swatches { display:flex; gap:8px; margin-top:8px; }
+        .rgb-swatches .sw { width:14px; height:14px; border-radius:50%; border:1px solid rgba(255,255,255,.16); box-shadow: inset 0 1px 2px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.06); cursor:pointer; transition: transform .15s ease, box-shadow .15s ease; }
+        .rgb-swatches .sw:hover { transform: scale(1.1); box-shadow: inset 0 1px 2px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.06); }
+
+        /* Per-card accent colors */
+        #dev-servo { --accent-card: #ffb020; }
+        #dev-servo2 { --accent-card: #ff8c42; }
+        #dev-alarm { --accent-card: #ff3b3b; }
+        #dev-rgb1, #dev-rgb2, #dev-rgb3 { --accent-card: #7ad1ff; }
 
         /* Right sidebar */
         .dom-sidebar-new {
@@ -1236,6 +1328,25 @@
 
         .dom-metric-fill.green {
             background: #4CAF50;
+        }
+
+        body.wide {
+            --sb-width: 340px;
+        }
+
+        body.cols-5plus .dom-card {
+            min-height: 96px;
+            padding: 16px 14px 12px;
+        }
+
+        @media (min-width: 1440px) {
+            body.wide { --sb-width: 380px; }
+            .dom-kpi-row { grid-template-columns: repeat(4, minmax(140px, 1fr)); }
+        }
+
+        @media (min-width: 2160px) {
+            body.wide { --sb-width: 420px; }
+            .dom-kpi-row { grid-template-columns: repeat(4, minmax(180px, 1fr)); }
         }
 
         /* =============================================
@@ -2901,11 +3012,14 @@
                             <div class="dom-header-title">Casa M.A.Y.A.</div>
                         </div>
                         <div class="dom-header-right">
-                            <span class="dom-status-pill" id="dom-scene-pill" style="display:none">
-                                <span class="dot" style="background:rgba(255,30,30,0.7);box-shadow:0 0 6px rgba(255,30,30,0.5)"></span><span id="dom-scene-pill-text">—</span>
+                            <span class="dom-status-pill" id="dom-scene-pill">
+                                <span class="dot" style="background:rgba(255,30,30,0.7);box-shadow:0 0 6px rgba(255,30,30,0.5)"></span>
+                                🎛️
+                                <span id="dom-scene-pill-text">—</span>
                             </span>
                             <span class="dom-status-pill" id="dom-arduino-pill">
-                                <span class="dot"></span>ARDUINO
+                                <span class="dot"></span>
+                                🔌 ARDUINO
                             </span>
                             <span class="dom-status-pill online">
                                 <span class="dot"></span>MAYA ONLINE
@@ -2917,13 +3031,13 @@
                         <span class="dom-scene-strip-label">SCENE</span>
                         <div class="dom-scene-chip" id="chip-buongiorno" onclick="toggleScene('buongiorno')"><span class="dom-chip-icon">☀️</span>Buongiorno</div>
                         <div class="dom-scene-chip" id="chip-sveglia" onclick="toggleScene('sveglia')"><span class="dom-chip-icon">⏰</span>Sveglia</div>
-                        <div class="dom-scene-chip" id="chip-film" onclick="toggleScene('modalità film')"><span class="dom-chip-icon">🎦</span>Film</div>
-                        <div class="dom-scene-chip" id="chip-relax" onclick="toggleScene('modalità relax')"><span class="dom-chip-icon">🛋️</span>Relax</div>
+                        <div class="dom-scene-chip" id="chip-film" onclick="toggleScene('modalità film')"><span class="dom-chip-icon">🎬</span>Film</div>
+                        <div class="dom-scene-chip" id="chip-relax" onclick="toggleScene('modalità relax')"><span class="dom-chip-icon">🧘</span>Relax</div>
                         <div class="dom-scene-chip" id="chip-buonanotte" onclick="toggleScene('buonanotte')"><span class="dom-chip-icon">🌙</span>Buonanotte</div>
                         <div class="dom-scene-chip" id="chip-cena" onclick="toggleScene('cena')"><span class="dom-chip-icon">🍽️</span>Cena</div>
                         <div class="dom-scene-chip" id="chip-ospiti-arrivo" onclick="toggleScene('ospiti in arrivo')"><span class="dom-chip-icon">👥</span>Ospiti</div>
                         <div class="dom-scene-chip" id="chip-rientro" onclick="toggleScene('sono rientrato')"><span class="dom-chip-icon">🏠</span>Rientro</div>
-                        <div class="dom-scene-chip" id="chip-uscita" onclick="toggleScene('vado fuori')"><span class="dom-chip-icon">🚶</span>Uscita</div>
+                        <div class="dom-scene-chip" id="chip-uscita" onclick="toggleScene('vado fuori')"><span class="dom-chip-icon">🚪</span>Uscita</div>
                         <div class="dom-scene-chip" id="chip-piove" onclick="toggleScene('piove')"><span class="dom-chip-icon">🌧️</span>Piove</div>
                         <div class="dom-scene-chip" id="chip-allarme" onclick="toggleScene('allarme')"><span class="dom-chip-icon">🚨</span>Allarme</div>
                     </div>
@@ -2934,6 +3048,7 @@
                             <span class="dom-section-label">DISPOSITIVI</span>
                             <div class="dom-cards-grid">
                                 <!-- Luce Indicatore -->
+                                <!--
                                 <div class="dom-card" id="dev-light" onclick="toggleDevice('light')">
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">💡</span>
@@ -2944,11 +3059,18 @@
                                         <div class="dom-card-state" id="dev-light-state">OFF</div>
                                     </div>
                                 </div>
+                                -->
                                 <!-- Porta (Servo1) -->
                                 <div class="dom-card" id="dev-servo" onclick="toggleDevice('servo')">
                                     <div class="dom-card-top">
-                                        <span class="dom-card-icon">🔒</span>
+                                        <span class="dom-card-icon">🚪</span>
                                         <div class="dom-toggle"></div>
+                                    </div>
+                                    <div class="dom-hero servo-dial" aria-hidden="true">
+                                        <svg viewBox="0 0 120 120" class="dial">
+                                            <circle class="dial-bg" cx="60" cy="60" r="48"/>
+                                            <circle class="dial-val" cx="60" cy="60" r="48"/>
+                                        </svg>
                                     </div>
                                     <div>
                                         <div class="dom-card-name">Porta</div>
@@ -2958,8 +3080,14 @@
                                 <!-- Cancello (Servo2) -->
                                 <div class="dom-card" id="dev-servo2" onclick="toggleDevice('servo2')">
                                   <div class="dom-card-top">
-                                    <span class="dom-card-icon">🚪</span>
+                                    <span class="dom-card-icon">🚧</span>
                                     <div class="dom-toggle"></div>
+                                  </div>
+                                  <div class="dom-hero servo-dial" aria-hidden="true">
+                                    <svg viewBox="0 0 120 120" class="dial">
+                                        <circle class="dial-bg" cx="60" cy="60" r="48"/>
+                                        <circle class="dial-val" cx="60" cy="60" r="48"/>
+                                    </svg>
                                   </div>
                                   <div>
                                     <div class="dom-card-name">Cancello</div>
@@ -2971,6 +3099,7 @@
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">🔔</span>
                                     </div>
+                                    <div class="dom-hero buzzer-hero" aria-hidden="true"><span class="pulse"></span></div>
                                     <div>
                                         <div class="dom-card-name">Buzzer</div>
                                         <div class="dom-card-state" id="dev-alarm-state">STANDBY</div>
@@ -2978,6 +3107,7 @@
                                     <div class="casa-dot" id="casa-buzzer-dot"></div>
                                 </div>
                                 <!-- Buzzer2 / Audio -->
+                                <!--
                                 <div class="dom-card dom-card-buzzer" id="dev-buzz2" onclick="toggleDevice('buzz2')">
                                   <div class="dom-card-top">
                                     <span class="dom-card-icon">🎵</span>
@@ -2987,6 +3117,7 @@
                                     <div class="dom-card-state" id="dev-buzz2-state">IDLE</div>
                                   </div>
                                 </div>
+                                -->
                                 <!-- RGB Soggiorno -->
                                 <div class="dom-card" id="dev-rgb1" onclick="toggleDevice('rgb1')">
                                     <div class="dom-card-top">
@@ -2998,6 +3129,13 @@
                                         <div class="dom-card-name">Soggiorno</div>
                                         <div class="dom-card-state" id="dev-rgb1-state">OFF</div>
                                     </div>
+                                    <div class="rgb-swatches" aria-hidden="false">
+                                        <span class="sw" data-idx="1" style="background:#ff3030"></span>
+                                        <span class="sw" data-idx="3" style="background:#4488ff"></span>
+                                        <span class="sw" data-idx="5" style="background:#ffaa00"></span>
+                                        <span class="sw" data-idx="6" style="background:#ffffff"></span>
+                                    </div>
+                                    <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb1" aria-label="Intensità Soggiorno" style="width:100%; margin-top:6px;" />
                                 </div>
                                 <!-- RGB Camera -->
                                 <div class="dom-card" id="dev-rgb2" onclick="toggleDevice('rgb2')">
@@ -3010,6 +3148,13 @@
                                         <div class="dom-card-name">Camera</div>
                                         <div class="dom-card-state" id="dev-rgb2-state">OFF</div>
                                     </div>
+                                    <div class="rgb-swatches" aria-hidden="false">
+                                        <span class="sw" data-idx="1" style="background:#ff3030"></span>
+                                        <span class="sw" data-idx="3" style="background:#4488ff"></span>
+                                        <span class="sw" data-idx="5" style="background:#ffaa00"></span>
+                                        <span class="sw" data-idx="6" style="background:#ffffff"></span>
+                                    </div>
+                                    <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb2" aria-label="Intensità Camera" style="width:100%; margin-top:6px;" />
                                 </div>
                                 <!-- RGB Studio -->
                                 <div class="dom-card" id="dev-rgb3" onclick="toggleDevice('rgb3')">
@@ -3022,6 +3167,13 @@
                                         <div class="dom-card-name">Studio</div>
                                         <div class="dom-card-state" id="dev-rgb3-state">OFF</div>
                                     </div>
+                                    <div class="rgb-swatches" aria-hidden="false">
+                                        <span class="sw" data-idx="1" style="background:#ff3030"></span>
+                                        <span class="sw" data-idx="3" style="background:#4488ff"></span>
+                                        <span class="sw" data-idx="5" style="background:#ffaa00"></span>
+                                        <span class="sw" data-idx="6" style="background:#ffffff"></span>
+                                    </div>
+                                    <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb3" aria-label="Intensità Studio" style="width:100%; margin-top:6px;" />
                                 </div>
                             </div>
                         </div>
@@ -3199,6 +3351,8 @@
         let map;
         let audioContext, analyser, dataArray;
         let orbState = 'idle';
+        let currentLayout = 'orb';
+        let lastLayoutChangeTs = 0;
         function setStatus(text) {
             document.getElementById('log-strip').innerText = text;
             const sb = document.getElementById('chat-log-status-bar');
@@ -3655,6 +3809,34 @@
             renderer.render(scene, camera);
         }
         window.addEventListener('load', async () => {
+            // UI params via query string (from .env → main.py / electron)
+            try {
+                const q = new URLSearchParams(location.search);
+                const scale = parseFloat(q.get('scale') || q.get('ui_scale') || '');
+                if (!isNaN(scale) && scale > 0) {
+                    document.documentElement.style.setProperty('--ui-scale', String(scale));
+                    // Non-standard ma efficace in Electron/Chromium
+                    document.body.style.zoom = String(scale);
+                }
+                const cols = parseInt(q.get('cols') || q.get('columns') || '', 10);
+                if (!isNaN(cols) && cols >= 1 && cols <= 8) {
+                    document.documentElement.style.setProperty('--dom-cols', String(cols));
+                    if (cols >= 5) { document.body.classList.add('cols-5plus'); document.body.classList.add('wide'); }
+                }
+                const density = (q.get('density') || '').toLowerCase();
+                if (density) {
+                    const px = parseInt(density, 10);
+                    if (!isNaN(px)) {
+                        document.documentElement.style.setProperty('--dom-gap', `${px}px`);
+                    } else if (density === 'compact') {
+                        document.documentElement.style.setProperty('--dom-gap', '6px');
+                    } else if (density === 'comfortable') {
+                        document.documentElement.style.setProperty('--dom-gap', '12px');
+                    }
+                }
+                const wideParam = (q.get('wide') || '').toLowerCase();
+                if (['1','true','yes','wide'].includes(wideParam)) { document.body.classList.add('wide'); }
+            } catch (_) { /* noop */ }
             initBackground();
             initClock();
             initThree();
@@ -3736,7 +3918,21 @@
             ws = new WebSocket(`${proto}//${location.host}/ws`);
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
-                if (d.type === 'layout') { enterWorkMode(); setLayout(d.layout, d.params); setActiveNav(d.layout); }
+                if (d.type === 'layout') {
+                    if (d.layout === 'orb') {
+                        const now = Date.now();
+                        if (currentLayout !== 'orb' && (now - lastLayoutChangeTs) < 1200) {
+                            // Ignora un push a orb immediatamente dopo una scelta utente
+                            return;
+                        }
+                        setLayout('orb', d.params || {});
+                        setActiveNav('idle');
+                    } else {
+                        enterWorkMode();
+                        setLayout(d.layout, d.params);
+                        setActiveNav(d.layout);
+                    }
+                }
                 if (d.type === 'voice_status') setOrbState(d.status.toLowerCase());
                 if (d.type === 'news' && d.articles) updateNews(d.articles);
                 if (d.type === 'weather') {
@@ -3752,12 +3948,16 @@
                         if (el) el.textContent = t.temp.toFixed(1) + ' °C';
                         const f = document.getElementById('dom-temp-fill');
                         if (f) f.style.width = Math.min(100, Math.max(0, (t.temp / 50) * 100)) + '%';
+                        const k = document.getElementById('kpi-temp');
+                        if (k) k.textContent = t.temp.toFixed(1) + ' °C';
                     }
                     if (t.humidity !== undefined) {
                         const el = document.getElementById('casa-humidity-val');
                         if (el) el.textContent = t.humidity.toFixed(0) + '%';
                         const f = document.getElementById('dom-humidity-fill');
                         if (f) f.style.width = Math.min(100, Math.max(0, t.humidity)) + '%';
+                        const k = document.getElementById('kpi-hum');
+                        if (k) k.textContent = t.humidity.toFixed(0) + '%';
                     }
                 }
                 if (d.type === 'stats') {
@@ -3765,11 +3965,15 @@
                         document.getElementById('dash-cpu').innerText = `${Math.round(d.neural_load)}%`;
                         const f = document.getElementById('dom-cpu-fill');
                         if (f) f.style.width = Math.min(100, d.neural_load) + '%';
+                        const k = document.getElementById('kpi-cpu');
+                        if (k) k.textContent = `${Math.round(d.neural_load)}%`;
                     }
                     if (d.memory !== undefined) {
                         document.getElementById('dash-ram').innerText = `${Math.round(d.memory)}%`;
                         const f = document.getElementById('dom-ram-fill');
                         if (f) f.style.width = Math.min(100, d.memory) + '%';
+                        const k = document.getElementById('kpi-ram');
+                        if (k) k.textContent = `${Math.round(d.memory)}%`;
                     }
                     if (d.gpu !== undefined) {
                         document.getElementById('dash-gpu').innerText = `${Math.round(d.gpu)}%`;
@@ -3826,12 +4030,10 @@
             if (status) document.body.classList.add(status.toLowerCase());
             setStatus(`MAYA | ${orbState.toUpperCase()}`);
             if (status === 'listening' || status === 'processing' || status === 'speaking') {
-                // Qualsiasi attività vocale → entra in work-mode (prima attivazione)
-                enterWorkMode();
+                if (currentLayout !== 'orb') enterWorkMode();
                 clearInactivityTimer();
             } else if (status === 'idle') {
-                // Avvia il countdown per tornare alla schermata 1
-                startInactivityTimer(600000); // 10 minuti
+                startInactivityTimer(600000);
             }
         }
         // =============================================
@@ -3842,6 +4044,8 @@
             const content = document.getElementById('content-area');
             const cmd = document.getElementById('cmd-container');
             const cmdInput = document.getElementById('cmd-input');
+            currentLayout = layout;
+            lastLayoutChangeTs = Date.now();
             if (layout === 'orb') {
                 // Chiude i panel ma NON esce da work-mode (lo fa solo il timer)
                 orb.classList.remove('corner');
@@ -3850,6 +4054,9 @@
                 document.body.classList.remove('content-open');
                 cmdInput.placeholder = "Comando neurale...";
                 smoothResize();
+                if (params && (params.exitAfter === true || params.exitAfter === '1' || params.exitAfter === 1)) {
+                    setTimeout(() => { try { exitWorkMode(); } catch(_) {} }, 150);
+                }
                 return;
             }
             // Apre work-mode se non già attivo
@@ -4020,6 +4227,30 @@
                 itemDiv.appendChild(infoDiv);
                 itemDiv.appendChild(dateDiv);
                 list.appendChild(itemDiv);
+            });
+        }
+        // Swatch click to set a specific RGB preset
+        function setupRgbSwatches() {
+            ['rgb1','rgb2','rgb3'].forEach(dev => {
+                const card = document.getElementById(`dev-${dev}`);
+                if (!card) return;
+                card.querySelectorAll('.rgb-swatches .sw').forEach(sw => {
+                    sw.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const idx = parseInt(sw.getAttribute('data-idx') || '0', 10);
+                        if (isNaN(idx)) return;
+                        domRgbIndex[dev] = idx;
+                        const base = RGB_CYCLE[idx]?.rgb || {r:0,g:0,b:0};
+                        zoneCurrentRgb[dev] = base;
+                        zoneBaseRgb[dev] = base; // nuova base quando l'utente sceglie un preset
+                        const slider = document.getElementById(`slider-${dev}`);
+                        const pct = slider ? parseInt(slider.value||'100',10) : 100;
+                        const scaled = _scaleColor(base, pct);
+                        sendArduinoAction({ op:'SET', target: dev, value: scaled });
+                        setRgbCardState(dev, idx);
+                        refreshDomUI();
+                    });
+                });
             });
         }
 
@@ -4342,7 +4573,7 @@
                 pill.style.color = status === 'ok' ? '#4CAF50' : '#ffb300';
                 if (_scenePillTimer) clearTimeout(_scenePillTimer);
                 _scenePillTimer = setTimeout(() => {
-                    pill.style.opacity = '0.35';
+                    pill.style.opacity = '0.75';
                     pill.style.color = '';
                     pill.style.borderColor = '';
                 }, 8000);
@@ -4365,8 +4596,8 @@
             const pillText = document.getElementById('dom-scene-pill-text');
             if (pill && pillText) {
                 pillText.textContent = '—';
-                pill.style.display = 'none';
-                pill.style.opacity = '1';
+                pill.style.display = 'flex';
+                pill.style.opacity = '0.65';
                 pill.style.color = '';
                 pill.style.borderColor = '';
             }
@@ -4380,15 +4611,20 @@
             rgb1: false, rgb2: false, rgb3: false
         };
         const RGB_CYCLE = [
-            { label: 'OFF', rgb: { r: 0, g: 0, b: 0 }, hex: '#14171c' },
-            { label: 'ROSSO', rgb: { r: 255, g: 48, b: 48 }, hex: '#ff3030' },
-            { label: 'VERDE', rgb: { r: 76, g: 175, b: 80 }, hex: '#4caf50' },
-            { label: 'BLU', rgb: { r: 68, g: 136, b: 255 }, hex: '#4488ff' },
-            { label: 'VIOLA', rgb: { r: 160, g: 32, b: 240 }, hex: '#a020f0' },
-            { label: 'CALDO', rgb: { r: 255, g: 170, b: 0 }, hex: '#ffaa00' },
+            { label: 'OFF',   rgb: { r: 0,   g: 0,   b: 0   }, hex: '#0f1115' },
+            { label: 'ROSSO', rgb: { r: 255, g: 30,  b: 30  }, hex: '#ff1e1e' },
+            { label: 'VERDE', rgb: { r: 0,   g: 255, b: 153 }, hex: '#00ff99' },
+            { label: 'BLU',   rgb: { r: 30,  g: 144, b: 255 }, hex: '#1e90ff' },
+            { label: 'VIOLA', rgb: { r: 174, g: 69,  b: 255 }, hex: '#ae45ff' },
+            { label: 'ARANCIO', rgb: { r: 255, g: 106, b: 0 }, hex: '#ff6a00' },
             { label: 'BIANCO', rgb: { r: 255, g: 255, b: 255 }, hex: '#ffffff' },
         ];
         const domRgbIndex = { rgb1: 0, rgb2: 0, rgb3: 0 };
+        const zoneCurrentRgb = { rgb1: {r:0,g:0,b:0}, rgb2: {r:0,g:0,b:0}, rgb3: {r:0,g:0,b:0} };
+        // Base di riferimento per lo scaling degli slider (colore pieno impostato da scena o preset)
+        const zoneBaseRgb = { rgb1: {r:0,g:0,b:0}, rgb2: {r:0,g:0,b:0}, rgb3: {r:0,g:0,b:0} };
+        // Indica se il colore attuale corrisponde a un preset noto (per mostrare label corretta)
+        const domRgbIsPreset = { rgb1: true, rgb2: true, rgb3: true };
         const domRgbSwatches = {
             rgb1: 'casa-rgb1-swatch',
             rgb2: 'casa-rgb2-swatch',
@@ -4399,7 +4635,10 @@
             domRgbIndex[dev] = index;
             domState[dev] = rgb.rgb.r !== 0 || rgb.rgb.g !== 0 || rgb.rgb.b !== 0;
             const sw = document.getElementById(domRgbSwatches[dev]);
-            if (sw) sw.style.background = rgb.hex;
+            if (sw) {
+                sw.style.background = rgb.hex;
+                if (index > 0) sw.classList.add('has-color'); else sw.classList.remove('has-color');
+            }
         }
         function nextRgbAction(dev) {
             const current = domState[dev] ? domRgbIndex[dev] : 0;
@@ -4410,6 +4649,46 @@
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'tool', action: { tool: 'arduino', ...action } }));
             }
+        }
+        // (Rimosso) Global brightness slider wiring
+        function _scaleColor(rgb, pct) {
+            const f = Math.max(0, Math.min(100, pct)) / 100.0;
+            const clamp = (x) => Math.max(0, Math.min(255, Math.round(x)));
+            return { r: clamp((rgb.r||0)*f), g: clamp((rgb.g||0)*f), b: clamp((rgb.b||0)*f) };
+        }
+        function _currentZoneColor(dev) {
+            // Usa sempre il colore base (pieno) come riferimento per gli slider, non quello già scalato
+            const z = zoneBaseRgb[dev];
+            if (z && (z.r !== undefined)) return z;
+            const idx = domRgbIndex[dev] || 0;
+            return RGB_CYCLE[idx]?.rgb || {r:0,g:0,b:0};
+        }
+        function setupZoneSliders() {
+            const bind = (dev) => {
+                const el = document.getElementById(`slider-${dev}`);
+                const card = document.getElementById(`dev-${dev}`);
+                if (!el || !card) return;
+                let _t = null;
+                el.addEventListener('pointerdown', (e)=> e.stopPropagation());
+                el.addEventListener('click', (e)=> e.stopPropagation());
+                el.addEventListener('input', (e) => {
+                    e.stopPropagation();
+                    const pct = parseInt(el.value||'100', 10);
+                    // Se la base non è ancora definita (0,0,0) ma la zona ha un colore reale, adottalo come base
+                    const zb = zoneBaseRgb[dev] || {r:0,g:0,b:0};
+                    if ((zb.r||0)+(zb.g||0)+(zb.b||0) === 0) {
+                        const curr = zoneCurrentRgb[dev] || {r:0,g:0,b:0};
+                        if ((curr.r||0)+(curr.g||0)+(curr.b||0) > 0) zoneBaseRgb[dev] = { ...curr };
+                    }
+                    const base = _currentZoneColor(dev);
+                    const scaled = _scaleColor(base, pct);
+                    clearTimeout(_t);
+                    _t = setTimeout(()=>{
+                        sendArduinoAction({ op:'SET', target: dev, value: scaled });
+                    }, 100);
+                });
+            };
+            ['rgb1','rgb2','rgb3'].forEach(bind);
         }
         const rgbHoldState = { rgb1: null, rgb2: null, rgb3: null };
         const rgbSuppressClick = { rgb1: false, rgb2: false, rgb3: false };
@@ -4450,17 +4729,18 @@
                 servo2: () => ({ op: 'SET', target: 'servo2', value: domState.servo2 ? 0 : 90 }),
                 buzz2:  () => ({ op: 'SET', target: 'buzzer2', melody: 'beep' }),
                 alarm: () => ({ op: 'SET', target: 'buzzer', value: 1 }),
-                rgb1: () => nextRgbAction('rgb1'),
-                rgb2: () => nextRgbAction('rgb2'),
-                rgb3: () => nextRgbAction('rgb3'),
+                rgb1: () => { const a = nextRgbAction('rgb1'); const s=document.getElementById('slider-rgb1'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb1', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
+                rgb2: () => { const a = nextRgbAction('rgb2'); const s=document.getElementById('slider-rgb2'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb2', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
+                rgb3: () => { const a = nextRgbAction('rgb3'); const s=document.getElementById('slider-rgb3'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb3', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
             };
             const action = actionMap[dev]?.();
             if (!action) return;
-            const { _rgbIndex, ...arduinoAction } = action;
+            const { _rgbIndex, _baseVal, ...arduinoAction } = action;
             sendArduinoAction(arduinoAction);
             if (dev !== 'alarm') {
                 if (dev in domRgbIndex) {
                     setRgbCardState(dev, action._rgbIndex);
+                    if (_baseVal) zoneBaseRgb[dev] = _baseVal;
                 } else {
                     domState[dev] = !domState[dev];
                 }
@@ -4487,7 +4767,13 @@
                     if (stateEl) stateEl.textContent = '—';
                 } else if (domState[dev]) {
                     el.classList.add('active');
-                    if (stateEl) stateEl.textContent = (dev in domRgbIndex) ? RGB_CYCLE[domRgbIndex[dev]].label : labels.onLabel;
+                    if (stateEl) {
+                        if (dev in domRgbIndex && (domRgbIsPreset[dev] ?? true)) {
+                            stateEl.textContent = RGB_CYCLE[domRgbIndex[dev]].label;
+                        } else {
+                            stateEl.textContent = labels.onLabel;
+                        }
+                    }
                 } else {
                     el.classList.remove('active');
                     if (stateEl) stateEl.textContent = labels.offLabel;
@@ -4501,15 +4787,28 @@
                     const rgb = Array.isArray(d[key]) ? d[key] : [0, 0, 0];
                     const normalized = rgb.map(v => Math.min(255, Math.max(0, Number(v) || 0)));
                     const hex = '#' + normalized.map(v => v.toString(16).padStart(2, '0')).join('');
+                    // Memorizza sempre il colore reale corrente della zona
+                    zoneCurrentRgb[key] = { r: normalized[0], g: normalized[1], b: normalized[2] };
                     const knownIndex = RGB_CYCLE.findIndex(color =>
                         color.rgb.r === normalized[0] && color.rgb.g === normalized[1] && color.rgb.b === normalized[2]
                     );
                     if (knownIndex >= 0) {
+                        domRgbIsPreset[key] = true;
                         setRgbCardState(key, knownIndex);
+                        // Se lo slider è al 100%, aggiorna anche la base alla nuova selezione piena
+                        const s = document.getElementById(`slider-${key}`);
+                        const pct = s ? parseInt(s.value||'100',10) : 100;
+                        if (pct === 100) zoneBaseRgb[key] = { r: normalized[0], g: normalized[1], b: normalized[2] };
                     } else {
                         domState[key] = rgb.some(v => v > 0);
                         const sw = document.getElementById(swatchId);
-                        if (sw) sw.style.background = hex;
+                        if (sw) { sw.style.background = hex; if (domState[key]) sw.classList.add('has-color'); else sw.classList.remove('has-color'); }
+                        // Colore non-preset: mostra etichetta generica e mantieni base attuale;
+                        // se slider al 100%, adotta questo come nuova base piena
+                        domRgbIsPreset[key] = false;
+                        const s = document.getElementById(`slider-${key}`);
+                        const pct = s ? parseInt(s.value||'100',10) : 100;
+                        if (pct === 100) zoneBaseRgb[key] = { r: normalized[0], g: normalized[1], b: normalized[2] };
                     }
                 }
             };
@@ -4518,6 +4817,8 @@
         const _rgb2Update = _updateRgbSwatch('rgb2', 'casa-rgb2-swatch');
         const _rgb3Update = _updateRgbSwatch('rgb3', 'casa-rgb3-swatch');
         setupRgbHoldControls();
+        setupRgbSwatches();
+        setupZoneSliders();
         function updateArduino(d) {
             if (d.system && d.system.reset_storage) {
                 document.getElementById('debug-controls').style.display = 'flex';
@@ -4542,6 +4843,7 @@
                 const dot = document.getElementById('casa-buzzer-dot');
                 if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
             }
+            // (Rimosso) brightness UI sync
             if (pill && (d.system || d.led || d.servo)) pill.classList.add('online');
             refreshDomUI();
         }
