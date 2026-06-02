@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import atexit
 import os
-import signal
 import socket
-import sys
 import tempfile
 
 
@@ -113,6 +111,19 @@ def kill_existing() -> bool:
 
     proc = psutil.Process(pid)
     print(f"[KILL] Termino PID {pid} ({proc.name()})…")
+    if _request_http_shutdown(pid):
+        try:
+            proc.wait(timeout=10)
+            print("[KILL] Processo terminato con shutdown ordinato.")
+            try:
+                if os.path.isfile(PID_FILE):
+                    os.remove(PID_FILE)
+            except OSError:
+                pass
+            return True
+        except psutil.TimeoutExpired:
+            print("[KILL] Shutdown ordinato scaduto, passo alla terminazione processo.")
+
     try:
         proc.terminate()
         proc.wait(timeout=8)
@@ -131,6 +142,25 @@ def kill_existing() -> bool:
     return True
 
 
+def _request_http_shutdown(pid: int) -> bool:
+    import urllib.error
+    import urllib.request
+
+    first = int(os.environ.get("MAYA_PORT", "8000"))
+    for port in range(first, first + 24):
+        url = f"http://127.0.0.1:{port}/shutdown?pid={pid}"
+        req = urllib.request.Request(url, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=1.2) as res:
+                body = res.read(256).decode("utf-8", errors="ignore").replace(" ", "")
+                if res.status == 200 and '"status":"ok"' in body:
+                    print(f"[KILL] Richiesto shutdown ordinato su porta {port}.")
+                    return True
+        except (urllib.error.URLError, TimeoutError, OSError):
+            continue
+    return False
+
+
 def skip_guard() -> bool:
     return os.environ.get("MAYA_SKIP_INSTANCE_GUARD", "").strip().lower() in (
         "1",
@@ -140,17 +170,5 @@ def skip_guard() -> bool:
 
 
 def install_signal_handlers(guard: InstanceGuard) -> None:
-    """atexit + SIGTERM se il runtime lo consente."""
-
-    def _shutdown(*_args: object) -> None:
-        guard.release()
-        sys.exit(0)
-
+    """Rilascia il lock a processo terminato senza intercettare i segnali uvicorn."""
     atexit.register(guard.release)
-    sigterm = getattr(signal, "SIGTERM", None)
-    if sigterm is None:
-        return
-    try:
-        signal.signal(sigterm, _shutdown)
-    except (ValueError, OSError):
-        pass

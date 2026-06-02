@@ -118,6 +118,32 @@ def arduino_melody(melody: str, delay: float = 0.0, background_action: bool = Fa
     return action
 
 
+def _background_alarm_sequence(duration: float = 20.0, pulse_interval: float = 0.5) -> list[Action]:
+    events: list[tuple[float, Action]] = []
+
+    elapsed = pulse_interval
+    i = 0
+    while elapsed < duration:
+        events.append((elapsed, arduino("buzzer", 1 if i % 2 == 0 else 0)))
+        elapsed += pulse_interval
+        i += 1
+
+    events.extend(
+        [
+            (duration, arduino("buzzer", 0)),
+            (duration, arduino_melody("off")),
+            (duration, arduino("neopixel", 0, effect=0)),
+        ]
+    )
+
+    actions: list[Action] = []
+    previous_ts = 0.0
+    for ts, action in sorted(events, key=lambda item: item[0]):
+        actions.append(delayed_background(action, max(0.0, ts - previous_ts)))
+        previous_ts = ts
+    return actions
+
+
 def timer_action(minutes: int, message: str) -> Action:
     return Action(tool="timer", params={"minutes": minutes, "message": message})
 
@@ -334,6 +360,11 @@ class AutomationEngine:
     - Esporre l'event bus per integrazioni esterne
     """
 
+    # Secondi di grazia dopo l'avvio: i trigger automatici (time/context)
+    # vengono ignorati per evitare attivazioni spurie prima che il sistema
+    # si sia stabilizzato (es. "piove" che parte subito all'accensione).
+    STARTUP_GRACE_SECONDS = float(os.getenv("AUTOMATION_STARTUP_GRACE", "60"))
+
     def __init__(self, tool_manager=None, memory=None, socket_manager=None, voice_manager=None):
         self._tool_manager = tool_manager
         self.memory = memory
@@ -348,6 +379,7 @@ class AutomationEngine:
         self._event_subscriptions: dict[tuple[str, str], Callable] = {}
         self.scheduler_interval = float(os.getenv("AUTOMATION_SCHEDULER_INTERVAL", "5"))
         self._scene_lock = asyncio.Lock()
+        self._boot_ts: float = time.time()  # timestamp di avvio per grace period
 
     # ── Registrazione ─────────────────────────────────────────────────────────
 
@@ -950,11 +982,24 @@ class AutomationEngine:
 
     # ── Scheduler temporale ───────────────────────────────────────────────────
 
+    def _in_startup_grace(self) -> bool:
+        """True se siamo ancora nel periodo di grazia post-avvio."""
+        return time.time() - self._boot_ts < self.STARTUP_GRACE_SECONDS
+
     async def start_scheduler(self):
         """Loop asincrono che controlla trigger temporali e di contesto."""
         logger.info("[ENGINE] Scheduler avviato")
+        if self.STARTUP_GRACE_SECONDS > 0:
+            logger.info(
+                f"[ENGINE] Grace period attivo: trigger automatici sospesi per {self.STARTUP_GRACE_SECONDS:.0f}s"
+            )
         while True:
             try:
+                # Grace period: salta trigger automatici subito dopo l'avvio
+                if self._in_startup_grace():
+                    await asyncio.sleep(self.scheduler_interval)
+                    continue
+
                 now = datetime.now().strftime("%H:%M")
 
                 for automation in list(self._automations.values()):
@@ -1116,7 +1161,9 @@ def build_default_automations() -> list[Automation]:
                 exclusive=True,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", {"r": 34, "g": 0, "b": 0}),
+                    arduino("rgb1", {"r": 34, "g": 0, "b": 0}),
+                    arduino("rgb2", {"r": 34, "g": 0, "b": 0}),
+                    arduino("rgb3", 0),
                 ],
             ),
             aliases=["film", "cinema", "guardo un film"],
@@ -1128,7 +1175,9 @@ def build_default_automations() -> list[Automation]:
                 priority=Priority.LOW,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", {"r": 68, "g": 0, "b": 85}),
+                    arduino("rgb1", {"r": 68, "g": 0, "b": 85}),
+                    arduino("rgb2", {"r": 68, "g": 0, "b": 85}),
+                    arduino("rgb3", 0),
                 ],
             ),
             aliases=["relax"],
@@ -1197,10 +1246,7 @@ def build_default_automations() -> list[Automation]:
                     arduino("neopixel", {"r": 255, "g": 0, "b": 0}, effect=3),
                     arduino("buzzer", 1),
                     arduino_melody("alarm"),
-                    *_background_buzzer_pulse(duration=20.0, interval=0.5),
-                    # Le azioni finali non aggiungono ulteriore ritardo: la pulsazione ha già consumato ~20s
-                    delayed_background(arduino_melody("off"), 0.0),
-                    delayed_background(arduino("neopixel", 0, effect=0), 0.0),
+                    *_background_alarm_sequence(duration=20.0, pulse_interval=0.5),
                 ],
             ),
         ),
@@ -1231,7 +1277,9 @@ def build_default_automations() -> list[Automation]:
                 cooldown=3600,
                 actions=[
                     arduino("light", 0),
-                    arduino("rgb", {"r": 255, "g": 140, "b": 66}),
+                    arduino("rgb1", {"r": 255, "g": 140, "b": 66}),
+                    arduino("rgb2", {"r": 255, "g": 140, "b": 66}),
+                    arduino("rgb3", 0),
                     arduino("servo", 0),
                     spotify("search", query="cena romantica musica italiana"),
                 ],

@@ -6,8 +6,42 @@ Tutte le funzioni ricevono le dipendenze come parametro per evitare import circo
 """
 
 import asyncio
+import sys
+import threading
+
+_stdin_queue = None
+_stdin_thread = None
+
+
+def _start_stdin_thread(loop):
+    global _stdin_queue, _stdin_thread
+    if _stdin_queue is not None:
+        return
+    _stdin_queue = asyncio.Queue()
+
+    def read_target():
+        while True:
+            try:
+                line = sys.stdin.readline()
+                if not line:
+                    loop.call_soon_threadsafe(_stdin_queue.put_nowait, None)
+                    break
+                loop.call_soon_threadsafe(_stdin_queue.put_nowait, line)
+            except Exception:
+                break
+
+    _stdin_thread = threading.Thread(target=read_target, daemon=True)
+    _stdin_thread.start()
+
+
+async def get_stdin_line(loop):
+    _start_stdin_thread(loop)
+    return await _stdin_queue.get()
+
+
 import os
 import random
+import signal
 import time
 
 import ollama
@@ -140,7 +174,7 @@ async def sensor_broadcaster(agent, manager):
     while True:
         try:
             arduino_tool = agent.tool_manager.tools.get("arduino")
-            if arduino_tool:
+            if arduino_tool and not getattr(arduino_tool, "simulated", True):
                 result = await asyncio.to_thread(arduino_tool.get_sensor_data)
                 if result is not None:
                     await manager.broadcast(
@@ -253,7 +287,12 @@ async def broadcast_state(agent, manager, MODELS):
 
     _debug_reset_client = os.environ.get("MAYA_DEBUG_RESET_CLIENT", "").strip().lower() in ("1", "true", "yes")
 
-    arduino_connected = arduino_tool and not arduino_tool.simulated
+    arduino_connected = (
+        bool(arduino_tool)
+        and not arduino_tool.simulated
+        and arduino_tool.connection is not None
+        and getattr(arduino_tool.connection, "is_open", False)
+    )
     state_payload = {
         "type": "state",
         "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, "memory") else 0,
@@ -288,6 +327,7 @@ async def broadcast_state(agent, manager, MODELS):
         "rgb2": list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])) if arduino_connected else None,
         "rgb3": list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])) if arduino_connected else None,
         "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)) if arduino_connected else None,
+        "buzz2_playing": bool(arduino_tool.sim_state.get("buzz2_playing", False)) if arduino_connected else None,
         "system": {
             "model": MODELS.get("router", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),
@@ -313,14 +353,17 @@ async def interactive_console(agent, manager):
 
             _sys.stdout.write("MAYA > ")
             _sys.stdout.flush()
-            user_input = await loop.run_in_executor(None, _sys.stdin.readline)
+            user_input = await get_stdin_line(loop)
+            if user_input is None:
+                break
             user_input = user_input.strip()
             if not user_input:
                 continue
 
             if user_input.lower() in ["exit", "quit", "esci"]:
                 print("[MAYA] Spegnimento in corso...")
-                os._exit(0)
+                os.kill(os.getpid(), signal.SIGINT)
+                return
 
             # Invia il comando dal terminale come se venisse dalla dashboard
             print(f"Richiesta: {user_input}")

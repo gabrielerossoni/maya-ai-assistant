@@ -161,6 +161,7 @@ class AgentCore:
         self._intent_cache: OrderedDict[str, str] = OrderedDict()
         self._current_task_layout: dict = {}
         self._current_task_final_data: dict = {}
+        self._last_reversible_command: dict | None = None
 
     async def initialize(self):
         """Inizializza tutti i componenti."""
@@ -252,8 +253,39 @@ class AgentCore:
 
         # --- 1. HARD ROUTING: DOMOTIC ---
         # Azione hardware esplicita: VERBO + OGGETTO
-        domotic_verbs = ["accendi", "spegni", "apri", "chiudi"]
-        domotic_objects = ["luce", "led", "servo", "tapparella", "cancello", "campanello", "rgb", "speaker"]
+        domotic_verbs = [
+            "accendi",
+            "spegni",
+            "apri",
+            "chiudi",
+            "attiva",
+            "disattiva",
+            "imposta",
+            "metti",
+            "suona",
+        ]
+        domotic_objects = [
+            "luce",
+            "luci",
+            "led",
+            "lampada",
+            "lampade",
+            "servo",
+            "porta",
+            "cancello",
+            "cancellino",
+            "campanello",
+            "rgb",
+            "neopixel",
+            "speaker",
+            "buzzer",
+            "soggiorno",
+            "camera",
+            "giardino",
+            "studio",
+            "luminosità",
+            "luminosita",
+        ]
         if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
             return "DOMOTIC"
 
@@ -557,12 +589,37 @@ class AgentCore:
         actions = []
         reply = "Comando eseguito."
 
-        if "accendi" in lower and ("luce" in lower or "led" in lower):
+        clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower).strip()
+        direct = self._parse_direct_arduino_command(clean)
+        if direct:
+            action, ok_reply, _ = direct
+            actions.append(action)
+            return {"intent": lower[:30], "actions": actions, "reply": ok_reply}
+
+        light_words = ("luce", "luci", "led", "lampada", "lampade", "illuminazione")
+
+        if "accendi" in lower and any(word in lower for word in light_words):
             actions.append({"tool": "arduino", "command": "LIGHT_ON"})
             reply = "Luce accesa!"
-        elif "spegni" in lower and ("luce" in lower or "led" in lower):
-            actions.append({"tool": "arduino", "command": "LIGHT_OFF"})
-            reply = "Luce spenta!"
+        elif "spegni" in lower and any(word in lower for word in light_words):
+            actions.append(
+                {
+                    "tool": "arduino",
+                    "op": "BATCH",
+                    "actions": [
+                        {"op": "SET", "target": "light", "value": 0},
+                        {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
+                        {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
+                    ],
+                }
+            )
+            reply = "Luci spente!"
+        elif ("chiudi" in lower or "chiudere" in lower) and "porta" in lower:
+            actions.append({"tool": "arduino", "op": "SET", "target": "servo", "value": 0})
+            reply = "Porta chiusa!"
+        elif ("chiudi" in lower or "chiudere" in lower) and any(word in lower for word in ("cancello", "cancellino")):
+            actions.append({"tool": "arduino", "op": "SET", "target": "servo2", "value": 0})
+            reply = "Cancellino chiuso!"
         elif "apri" in lower and "servo" in lower:
             actions.append({"tool": "arduino", "command": "SERVO_OPEN"})
             reply = "Servo aperto!"
@@ -640,6 +697,7 @@ class AgentCore:
                                 "rgb2": st.get("rgb2", [0, 0, 0]),
                                 "rgb3": st.get("rgb3", [0, 0, 0]),
                                 "buzzer": st.get("buzzer", False),
+                                "buzz2_playing": st.get("buzz2_playing", False),
                             }
                         )
 
@@ -663,6 +721,331 @@ class AgentCore:
         else:
             self._last_final_data = final_data
 
+    async def _reply_fast(self, reply: str, layout: dict | None = None):
+        await self.memory.add_turn("jarvis", reply)
+        self._set_final_layout(reply, layout or {"type": "current", "params": {}})
+        return reply
+
+    async def _broadcast_arduino_state(self, state: dict):
+        if not self.socket_manager or not state:
+            return
+        await self.socket_manager.broadcast(
+            {
+                "type": "state",
+                "led": "on" if state.get("light") else "off",
+                "servo": "open" if (state.get("servo") or 0) > 0 else "0",
+                "servo2": state.get("servo2", 0),
+                "rgb1": state.get("rgb1", [0, 0, 0]),
+                "rgb2": state.get("rgb2", [0, 0, 0]),
+                "rgb3": state.get("rgb3", [0, 0, 0]),
+                "buzzer": state.get("buzzer", False),
+                "buzz2_playing": state.get("buzz2_playing", False),
+            }
+        )
+
+    def _rgb_value_from_text(self, text: str) -> dict | int:
+        colors = {
+            "rosso": {"r": 255, "g": 30, "b": 30},
+            "verde": {"r": 0, "g": 255, "b": 153},
+            "blu": {"r": 30, "g": 144, "b": 255},
+            "azzurro": {"r": 68, "g": 136, "b": 255},
+            "viola": {"r": 174, "g": 69, "b": 255},
+            "arancio": {"r": 255, "g": 106, "b": 0},
+            "arancione": {"r": 255, "g": 106, "b": 0},
+            "giallo": {"r": 255, "g": 213, "b": 128},
+            "rosa": {"r": 255, "g": 90, "b": 160},
+            "bianco": {"r": 255, "g": 255, "b": 255},
+            "caldo": {"r": 255, "g": 213, "b": 128},
+        }
+        for name, value in colors.items():
+            if re.search(rf"\b{name}\b", text):
+                return value
+        return {"r": 255, "g": 255, "b": 255}
+
+    def _zone_label(self, target: str) -> str:
+        return {
+            "rgb1": "Soggiorno",
+            "rgb2": "Camera",
+            "rgb3": "Giardino",
+            "rgb": "RGB",
+            "neopixel": "NeoPixel",
+        }.get(target, target)
+
+    def _parse_direct_arduino_command(self, text: str) -> tuple[dict, str, str] | None:
+        light_words = r"(luce|luci|led|lampad[ae]|illuminazione)"
+        open_words = r"(apri|aprire|alza)"
+        close_words = r"(chiudi|chiudere|abbassa)"
+        on_words = r"(accendi|attiva|metti|imposta)"
+        off_words = r"(spegni|disattiva|stop|ferma)"
+
+        if re.search(r"\b(stato|status)\b", text) and re.search(r"\b(arduino|casa|domotica|dispositivi)\b", text):
+            return (
+                {"tool": "arduino", "op": "GET", "target": "status"},
+                "Stato casa aggiornato.",
+                "Arduino non e' connesso.",
+            )
+
+        if re.search(r"\b(sensor[ei]|temperatura casa|umidit[àa])\b", text):
+            return (
+                {"tool": "arduino", "op": "GET", "target": "sensor_read"},
+                "Sensori letti.",
+                "Non riesco a leggere i sensori: Arduino non e' connesso.",
+            )
+
+        if re.search(rf"\b{on_words}\b", text) and re.search(rf"\b{light_words}\b", text):
+            light_color = self._rgb_value_from_text(text)
+            return (
+                {
+                    "tool": "arduino",
+                    "op": "BATCH",
+                    "actions": [
+                        {"op": "SET", "target": "light", "value": 1},
+                        {"op": "SET", "target": "rgb", "value": light_color, "effect": 0},
+                        {"op": "SET", "target": "neopixel", "value": light_color, "effect": 0},
+                    ],
+                },
+                "Luci accese.",
+                "Non riesco ad accendere le luci: Arduino non e' connesso.",
+            )
+
+        if re.search(rf"\b{off_words}\b", text) and re.search(rf"\b{light_words}\b", text):
+            return (
+                {
+                    "tool": "arduino",
+                    "op": "BATCH",
+                    "actions": [
+                        {"op": "SET", "target": "light", "value": 0},
+                        {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
+                        {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
+                    ],
+                },
+                "Luci spente.",
+                "Non riesco a spegnere le luci: Arduino non e' connesso.",
+            )
+
+        if re.search(rf"\b{open_words}\b", text) and re.search(r"\b(porta|servo)\b", text):
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},
+                "Porta aperta.",
+                "Non riesco ad aprire la porta: Arduino non e' connesso.",
+            )
+        if re.search(rf"\b{close_words}\b", text) and re.search(r"\b(porta|servo)\b", text):
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
+                "Porta chiusa.",
+                "Non riesco a chiudere la porta: Arduino non e' connesso.",
+            )
+
+        if re.search(rf"\b{open_words}\b", text) and re.search(r"\b(cancello|cancellino|servo2)\b", text):
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo2", "value": 90},
+                "Cancellino aperto.",
+                "Non riesco ad aprire il cancellino: Arduino non e' connesso.",
+            )
+        if re.search(rf"\b{close_words}\b", text) and re.search(r"\b(cancello|cancellino|servo2)\b", text):
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0},
+                "Cancellino chiuso.",
+                "Non riesco a chiudere il cancellino: Arduino non e' connesso.",
+            )
+
+        zone = None
+        if re.search(r"\bsoggiorno\b", text):
+            zone = "rgb1"
+        elif re.search(r"\bcamera\b", text):
+            zone = "rgb2"
+        elif re.search(r"\b(giardino|studio)\b", text):
+            zone = "rgb3"
+        elif re.search(
+            r"\b(rgb|neopixel|colore|colori|luce|luci|led|lampad[ae]|illuminazione|effetto|effetti)\b", text
+        ):
+            zone = "rgb"
+
+        if zone and re.search(rf"\b{off_words}\b", text):
+            label = self._zone_label(zone)
+            return (
+                {"tool": "arduino", "op": "SET", "target": zone, "value": 0, "effect": 0},
+                f"{label} spento.",
+                f"Non riesco a spegnere {label}: Arduino non e' connesso.",
+            )
+        if zone and (
+            re.search(rf"\b{on_words}\b", text)
+            or re.search(
+                r"\b(rosso|verde|blu|azzurro|viola|arancio|arancione|giallo|rosa|bianco|caldo|arcobaleno|rainbow|pulse|pulsa|respiro|alert|allerta|sfumatura)\b",
+                text,
+            )
+        ):
+            effect = 0
+            if re.search(r"\b(pulse|pulsa|respiro)\b", text):
+                effect = 1
+            elif re.search(r"\b(rainbow|arcobaleno)\b", text):
+                effect = 2
+            elif re.search(r"\b(alert|allerta)\b", text):
+                effect = 3
+            return (
+                {
+                    "tool": "arduino",
+                    "op": "SET",
+                    "target": zone,
+                    "value": self._rgb_value_from_text(text),
+                    "effect": effect,
+                },
+                f"{self._zone_label(zone)} aggiornato.",
+                f"Non riesco ad aggiornare {self._zone_label(zone)}: Arduino non e' connesso.",
+            )
+
+        if re.search(r"\b(luminosit[àa]|brightness)\b", text):
+            match = re.search(r"\b(\d{1,3})\b", text)
+            if match:
+                pct = max(0, min(100, int(match.group(1))))
+                value = round((pct / 100) * 255)
+                return (
+                    {"tool": "arduino", "op": "SET", "target": "brightness", "value": value},
+                    f"Luminosita' impostata al {pct} percento.",
+                    "Non riesco a impostare la luminosita': Arduino non e' connesso.",
+                )
+
+        if re.search(rf"\b{off_words}\b", text) and re.search(r"\b(buzzer|speaker|audio|suono|campanello)\b", text):
+            return (
+                {"tool": "arduino", "op": "SET", "target": "speaker", "melody": "off"},
+                "Buzzer spento.",
+                "Non riesco a spegnere il buzzer: Arduino non e' connesso.",
+            )
+        if re.search(r"\b(suona|beep|campanello|buzzer|speaker|audio|suono)\b", text):
+            melody = "beep"
+            for name in ("notify", "error", "welcome", "ok", "startup", "alarm", "wake_radar"):
+                if name in text:
+                    melody = name
+                    break
+            return (
+                {"tool": "arduino", "op": "SET", "target": "speaker", "melody": melody},
+                "Buzzer attivato.",
+                "Non riesco ad attivare il buzzer: Arduino non e' connesso.",
+            )
+
+        return None
+
+    def _parse_direct_calendar_command(self, text: str) -> tuple[dict | None, str] | None:
+        if re.search(r"\b(prossim[oi]|mostra|vedi|leggi|lista|elenca)\b", text) and re.search(
+            r"\b(calendario|eventi|agenda)\b", text
+        ):
+            return ({"tool": "calendar", "action": "list"}, "Ecco i prossimi eventi.")
+
+        if not re.search(r"\b(cancella|elimina|rimuovi)\b", text) or not re.search(
+            r"\b(evento|appuntamento|calendario|agenda)\b", text
+        ):
+            return None
+
+        title = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", text).strip()
+        title = re.sub(r"\b(cancella|elimina|rimuovi)\b", " ", title)
+        title = re.sub(
+            r"\b(evento|appuntamento|dal|dalla|nel|nella|sul|sulla|il|la|calendario|agenda|chiamato|chiamata|titolo)\b",
+            " ",
+            title,
+        )
+        title = re.sub(r"\s+", " ", title).strip(" .,;:-")
+        if not title:
+            return (None, "Dimmi il titolo dell'evento da cancellare.")
+        return ({"tool": "calendar", "action": "delete", "title": title}, f"Cancello l'evento '{title}'.")
+
+    async def _run_direct_calendar_command(self, parsed: tuple[dict | None, str]) -> str:
+        action, fallback_reply = parsed
+        if action is None:
+            return fallback_reply
+        result = await self.tool_manager.execute(action)
+        if self.socket_manager and action.get("action") in {"list", "delete"}:
+            refreshed = await self.tool_manager.execute({"tool": "calendar", "action": "list"})
+            if refreshed.get("status") == "ok" and "events" in refreshed:
+                await self.socket_manager.broadcast({"type": "calendar_data", "events": refreshed["events"]})
+        return result.get("message", fallback_reply)
+
+    async def _run_direct_arduino_command(self, parsed: tuple[dict, str, str]) -> str:
+        action, ok_reply, error_reply = parsed
+        undo_action = None
+        if action.get("op") == "SET" and action.get("target") in {"servo", "servo2"}:
+            arduino_tool = self.tool_manager.tools.get("arduino")
+            state = arduino_tool.sim_state if arduino_tool else {}
+            if action["target"] in state:
+                undo_action = {
+                    "tool": "arduino",
+                    "op": "SET",
+                    "target": action["target"],
+                    "value": int(state.get(action["target"]) or 0),
+                }
+        result = await self.tool_manager.execute(action)
+        if result.get("status") == "ok":
+            await self._broadcast_arduino_state(result.get("state", {}))
+            if undo_action and undo_action.get("value") != action.get("value"):
+                self._last_reversible_command = {
+                    "type": "servo",
+                    "action": undo_action,
+                    "label": "porta" if action.get("target") == "servo" else "cancellino",
+                }
+            return ok_reply
+        return error_reply
+
+    async def _stop_alarm_direct(self) -> str:
+        previous = self.automation_engine.get_last_scene()
+        self.automation_engine._cancel_background_tasks("allarme")
+        if previous == "allarme":
+            clear_result = await self.automation_engine.clear_active_scene()
+            status = clear_result.get("status")
+        else:
+            action = {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "buzzer", "value": 0},
+                    {"op": "SET", "target": "speaker", "melody": "off"},
+                    {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
+                ],
+            }
+            clear_result = await self.tool_manager.execute(action)
+            status = clear_result.get("status")
+            await self._broadcast_arduino_state(clear_result.get("state", {}))
+        if self.socket_manager:
+            await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
+        return "Allarme fermato." if status == "ok" else "Allarme fermato con alcuni avvisi."
+
+    async def _open_dashboard_panel(self, layout: str) -> str:
+        labels = {"weather": "Meteo", "calendar": "Calendario", "news": "Notizie"}
+        if self.socket_manager:
+            await self.socket_manager.broadcast({"type": "layout", "layout": layout, "params": {}})
+        if layout == "calendar":
+            result = await self.tool_manager.execute({"tool": "calendar", "action": "list"})
+            if self.socket_manager and result.get("status") == "ok" and "events" in result:
+                await self.socket_manager.broadcast({"type": "calendar_data", "events": result["events"]})
+        elif layout == "weather":
+            result = await self.tool_manager.execute({"tool": "weather", "location": None})
+            if self.socket_manager and result.get("status") == "ok" and isinstance(result.get("data"), dict):
+                await self.socket_manager.broadcast({"type": "weather", **result["data"]})
+        elif layout == "news":
+            result = await self.tool_manager.execute({"tool": "news", "limit": 5})
+            if self.socket_manager and result.get("status") == "ok" and "news" in result:
+                await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
+        return f"Scheda {labels[layout]} aperta."
+
+    async def _undo_last_reversible_command(self) -> str:
+        item = self._last_reversible_command
+        self._last_reversible_command = None
+        if not item:
+            return "Nessun comando servo o scena da annullare."
+        if item.get("type") == "scene":
+            result = await self.automation_engine.clear_active_scene()
+            if self.socket_manager:
+                await self.socket_manager.broadcast({"type": "scene_cleared", "scene": item.get("scene")})
+            return "Ultima scena annullata." if result.get("status") == "ok" else "Ultima scena annullata con avvisi."
+        if item.get("type") == "servo":
+            result = await self.tool_manager.execute(item["action"])
+            await self._broadcast_arduino_state(result.get("state", {}))
+            label = item.get("label", "servo")
+            return (
+                f"Ultimo comando {label} annullato."
+                if result.get("status") == "ok"
+                else f"Non riesco ad annullare {label}: Arduino non e' connesso."
+            )
+        return "Nessun comando annullabile."
+
     # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
     async def process(self, user_input: str, progress_cb=None):
         """Pipeline completa ReAct: Ragiona → Agisci → Osserva."""
@@ -682,13 +1065,38 @@ class AgentCore:
         # Rimuovi prefissi vocali comuni
         _clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower_input).strip()
 
+        if re.search(r"\b(annulla|undo|ripristina)\b", _clean) and re.search(
+            r"\b(ultimo comando|ultimo|comando|azione)\b", _clean
+        ):
+            reply = await self._undo_last_reversible_command()
+            yield await self._reply_fast(reply)
+            return
+
+        if re.search(r"\b(ferma|stop|spegni|disattiva)\b", _clean) and re.search(r"\ballarme\b", _clean):
+            reply = await self._stop_alarm_direct()
+            yield await self._reply_fast(reply)
+            return
+
+        dashboard_layout = None
+        if re.search(r"\b(apri|mostra|visualizza|vai a|vai alla)\b", _clean) and re.search(
+            r"\b(scheda|pannello|tab|pagina)?\s*(meteo|calendario|notizie|news)\b", _clean
+        ):
+            if re.search(r"\bmeteo\b", _clean):
+                dashboard_layout = "weather"
+            elif re.search(r"\b(calendario|agenda)\b", _clean):
+                dashboard_layout = "calendar"
+            elif re.search(r"\b(notizie|news)\b", _clean):
+                dashboard_layout = "news"
+        if dashboard_layout:
+            reply = await self._open_dashboard_panel(dashboard_layout)
+            yield await self._reply_fast(reply, {"type": dashboard_layout, "params": {}})
+            return
+
         if _clean in ["apri chat", "apri la chat", "mostra chat", "mostra la chat", "apri console", "mostra console"]:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "toggle_console", "action": "open"})
             reply = "Console neurale aperta, signore."
-            await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
+            yield await self._reply_fast(reply)
             return
 
         if _clean in [
@@ -702,9 +1110,7 @@ class AgentCore:
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "toggle_console", "action": "close"})
             reply = "Console minimizzata."
-            await self.memory.add_turn("jarvis", reply)
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
+            yield await self._reply_fast(reply)
             return
 
         spotify_action = None
@@ -740,6 +1146,14 @@ class AgentCore:
             yield reply
             return
 
+        direct_calendar = self._parse_direct_calendar_command(_clean)
+        if direct_calendar:
+            reply = await self._run_direct_calendar_command(direct_calendar)
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
         if _clean in ["spegni scena", "spegni la scena", "disattiva scena", "disattiva la scena", "stop scena"]:
             clear_result = await self.automation_engine.clear_active_scene()
             previous = clear_result.get("previous")
@@ -754,6 +1168,105 @@ class AgentCore:
             yield reply
             return
 
+        direct_arduino = self._parse_direct_arduino_command(_clean)
+        if direct_arduino:
+            reply = await self._run_direct_arduino_command(direct_arduino)
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
+        if re.search(r"\b(chiudi|chiudere)\b", _clean) and re.search(r"\bporta\b", _clean):
+            action = {"tool": "arduino", "op": "SET", "target": "servo", "value": 0}
+            result = await self.tool_manager.execute(action)
+            reply = (
+                "Porta chiusa."
+                if result.get("status") == "ok"
+                else "Non riesco a chiudere la porta: Arduino non e' connesso."
+            )
+            st = result.get("state", {})
+            if self.socket_manager and st:
+                await self.socket_manager.broadcast(
+                    {
+                        "type": "state",
+                        "led": "on" if st.get("light") else "off",
+                        "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                        "servo2": st.get("servo2", 0),
+                        "rgb1": st.get("rgb1", [0, 0, 0]),
+                        "rgb2": st.get("rgb2", [0, 0, 0]),
+                        "rgb3": st.get("rgb3", [0, 0, 0]),
+                        "buzzer": st.get("buzzer", False),
+                        "buzz2_playing": st.get("buzz2_playing", False),
+                    }
+                )
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
+        if re.search(r"\b(chiudi|chiudere)\b", _clean) and re.search(r"\b(cancello|cancellino)\b", _clean):
+            action = {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0}
+            result = await self.tool_manager.execute(action)
+            reply = (
+                "Cancellino chiuso."
+                if result.get("status") == "ok"
+                else "Non riesco a chiudere il cancellino: Arduino non e' connesso."
+            )
+            st = result.get("state", {})
+            if self.socket_manager and st:
+                await self.socket_manager.broadcast(
+                    {
+                        "type": "state",
+                        "led": "on" if st.get("light") else "off",
+                        "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                        "servo2": st.get("servo2", 0),
+                        "rgb1": st.get("rgb1", [0, 0, 0]),
+                        "rgb2": st.get("rgb2", [0, 0, 0]),
+                        "rgb3": st.get("rgb3", [0, 0, 0]),
+                        "buzzer": st.get("buzzer", False),
+                        "buzz2_playing": st.get("buzz2_playing", False),
+                    }
+                )
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
+        if re.search(r"\bspegni\b", _clean) and re.search(r"\b(luce|luci|led|lampad[ae]|illuminazione)\b", _clean):
+            action = {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "light", "value": 0},
+                    {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
+                    {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
+                ],
+            }
+            result = await self.tool_manager.execute(action)
+            if result.get("status") == "ok":
+                reply = "Luci spente."
+                st = result.get("state", {})
+                if self.socket_manager and st:
+                    await self.socket_manager.broadcast(
+                        {
+                            "type": "state",
+                            "led": "on" if st.get("light") else "off",
+                            "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                            "servo2": st.get("servo2", 0),
+                            "rgb1": st.get("rgb1", [0, 0, 0]),
+                            "rgb2": st.get("rgb2", [0, 0, 0]),
+                            "rgb3": st.get("rgb3", [0, 0, 0]),
+                            "buzzer": st.get("buzzer", False),
+                            "buzz2_playing": st.get("buzz2_playing", False),
+                        }
+                    )
+            else:
+                reply = "Non riesco a spegnere le luci: Arduino non e' connesso."
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
         # 1. Controlla automazioni (fast path)
         auto_result = self._check_automation(user_input)
         if auto_result is not None:
@@ -763,6 +1276,7 @@ class AgentCore:
 
             if status == "ok":
                 reply = f"Scena '{scene_name}' eseguita."
+                self._last_reversible_command = {"type": "scene", "scene": scene_name}
             elif status == "skipped":
                 reason = exec_result.get("reason", "")
                 if reason == "cooldown":
@@ -912,7 +1426,7 @@ class AgentCore:
                     # Streamma la frase "pre" (es. "Controllo il meteo...")
                     # come primo token visibile all'utente
                     if reply:
-                        yield reply + "\n"
+                        yield reply + " "
                         if progress_cb:
                             await progress_cb(reply)
 

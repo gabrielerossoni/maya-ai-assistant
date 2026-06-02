@@ -224,7 +224,7 @@ class TestSceneControls:
             "Audio",
             "Soggiorno",
             "Camera",
-            "Studio",
+            "Giardino",
         ]:
             assert label in html
 

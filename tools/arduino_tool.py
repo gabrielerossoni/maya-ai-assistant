@@ -189,6 +189,13 @@ class ArduinoTool:
         op = action.get("op", "SET")
         extra = {k: action[k] for k in ("effect", "melody") if k in action}
 
+        # Auto-reconnection logic for simulated state
+        if self.simulated and SERIAL_AVAILABLE:
+            _now = time.time()
+            if not hasattr(self, "_last_reconnect_attempt") or _now - self._last_reconnect_attempt > 8.0:
+                self._last_reconnect_attempt = _now
+                if self._reconnect():
+                    print("[ARDUINO] Connessione fisica ripristinata con successo!")
         if str(op).upper() == "BATCH":
             return self._execute_batch(action.get("actions", []))
 
@@ -282,7 +289,7 @@ class ArduinoTool:
             self._msg_id += 1
             return self._msg_id
 
-    def _send_sync(self, op: str, target: str, value, timeout=1.0, **extra) -> dict:
+    def _send_sync(self, op: str, target: str, value, timeout=2.5, **extra) -> dict:
         msg_id = self._next_id()
         payload = {"id": msg_id, "cmd": op, "target": target}
         if value is not None:
@@ -354,12 +361,15 @@ class ArduinoTool:
 
         return {"status": "error", "message": "failed after retries", "state": self.sim_state.copy()}
 
-    def _send_batch_sync(self, actions: list, timeout=3.0) -> dict:
+    def _send_batch_sync(self, actions: list, timeout=4.0) -> dict:
         msg_id = self._next_id()
         payload_actions = []
         for item in actions:
             cmd = str(item.get("op", "SET")).upper()
-            payload = {"cmd": cmd, "target": item["target"]}
+            target = item["target"]
+            if target == "speaker":
+                target = "buzzer2"
+            payload = {"cmd": cmd, "target": target}
             if "value" in item:
                 payload["value"] = item["value"]
             for key in ("effect", "melody"):
@@ -431,6 +441,24 @@ class ArduinoTool:
     def _simulate(self, op: str, target: str, value, **extra) -> dict:
         # Minimal, coherent simulation for offline/dev usage
         try:
+            if op == "BATCH":
+                results = []
+                errors = []
+                for item in value or []:
+                    sub_op = str(item.get("op", "SET")).upper()
+                    sub_target = item.get("target", "")
+                    sub_value = item.get("value", None)
+                    sub_extra = {k: item[k] for k in ("effect", "melody") if k in item}
+                    if sub_target == "speaker":
+                        sub_target = "buzzer2"
+                    result = self._simulate(sub_op, sub_target, sub_value, **sub_extra)
+                    results.append(result)
+                    if result.get("status") == "error":
+                        errors.append({"action": item, "message": result.get("message", "errore Arduino")})
+                if errors:
+                    return {"status": "partial", "errors": errors, "results": results, "state": self.sim_state.copy()}
+                return {"status": "ok", "results": results, "state": self.sim_state.copy()}
+
             if op == "GET" and target == "status":
                 return {"status": "ok", "state": self.sim_state.copy()}
             if op == "SET":
@@ -484,7 +512,7 @@ class ArduinoTool:
         return {"status": "error", "message": "arduino non connesso"}
 
     def get_sensor_data(self) -> dict:
-        if self.simulated:
+        if self.simulated or self.connection is None or not getattr(self.connection, "is_open", False):
             return None
 
         msg_id = self._next_id()
@@ -529,11 +557,16 @@ class ArduinoTool:
             return None
         for p in serial.tools.list_ports.comports():
             desc = (p.description or "").lower()
-            if any(k in desc for k in ["arduino", "ch340", "atmega", "usb serial", "cp210"]):
+            if any(
+                k in desc
+                for k in ["arduino", "ch340", "atmega", "usb serial", "cp210", "seriale usb", "serial", "usb", "r4"]
+            ):
                 return p.device
         return None
 
     def _reconnect(self):
+        self.simulated = True
+        self._telemetry = {}
         if self.connection:
             try:
                 self.connection.close()

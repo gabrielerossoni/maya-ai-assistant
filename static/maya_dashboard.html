@@ -2340,6 +2340,14 @@
            - Work: header fisso top + panel scrollabile + bottom nav
            ============================================= */
         @media (max-width: 768px) {
+            html, body {
+                position: fixed !important;
+                width: 100% !important;
+                height: 100% !important;
+                overflow: hidden !important;
+                -webkit-tap-highlight-color: transparent !important;
+                -webkit-font-smoothing: antialiased !important;
+            }
 
             /* ══════════════════════════════════════════
                IDLE SCREEN
@@ -2441,6 +2449,9 @@
             /* Header mobile fisso: striscia sottile con titolo panel */
             #mobile-panel-header {
                 display: flex !important;
+                height: calc(72px + env(safe-area-inset-top)) !important;
+                padding-top: env(safe-area-inset-top) !important;
+                box-sizing: border-box !important;
             }
 
             /* ══════════════════════════════════════════
@@ -3156,7 +3167,7 @@
                                     </div>
                                     <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb2" aria-label="Intensità Camera" style="width:100%; margin-top:6px;" />
                                 </div>
-                                <!-- RGB Studio -->
+                                <!-- RGB Giardino -->
                                 <div class="dom-card" id="dev-rgb3" onclick="toggleDevice('rgb3')">
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">🌈</span>
@@ -3164,7 +3175,7 @@
                                             style="flex:1; margin-left:12px; align-self:center;"></div>
                                     </div>
                                     <div>
-                                        <div class="dom-card-name">Studio</div>
+                                        <div class="dom-card-name">Giardino</div>
                                         <div class="dom-card-state" id="dev-rgb3-state">OFF</div>
                                     </div>
                                     <div class="rgb-swatches" aria-hidden="false">
@@ -3173,7 +3184,7 @@
                                         <span class="sw" data-idx="5" style="background:#ffaa00"></span>
                                         <span class="sw" data-idx="6" style="background:#ffffff"></span>
                                     </div>
-                                    <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb3" aria-label="Intensità Studio" style="width:100%; margin-top:6px;" />
+                                    <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb3" aria-label="Intensità Giardino" style="width:100%; margin-top:6px;" />
                                 </div>
                             </div>
                         </div>
@@ -3279,16 +3290,6 @@
     <div id="debug-controls"></div>
     <!-- RIGHT NAV RAIL -->
     <nav id="nav-rail">
-        <!-- Home / Idle -->
-        <div class="nav-item" id="nav-idle" onclick="exitWorkMode(); setLayout('orb'); setActiveNav('idle')">
-            <svg viewBox="0 0 24 24">
-                <path d="M3 12L12 3l9 9" />
-                <path d="M9 21V12h6v9" />
-                <path d="M3 12v9h18V12" />
-            </svg>
-            <span class="nav-tooltip">HOME</span>
-        </div>
-        <div class="nav-sep"></div>
         <!-- Meteo -->
         <div class="nav-item" id="nav-weather" onclick="enterWorkMode(); setLayout('weather'); setActiveNav('weather')">
             <svg viewBox="0 0 24 24">
@@ -3408,7 +3409,6 @@
             }
         }
         function exitWorkMode() {
-            if (!isWorkMode) return;
             isWorkMode = false;
             document.body.classList.remove('work-mode', 'content-open');
             // Ripristina orb al centro
@@ -3424,10 +3424,14 @@
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             smoothResize();
         }
+        function showOrbOnly(params = {}) {
+            setLayout('orb', params);
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        }
         function startInactivityTimer(ms) {
             clearInactivityTimer();
             inactivityTimer = setTimeout(() => {
-                exitWorkMode();
+                showOrbOnly();
                 setOrbState('idle');
             }, ms);
         }
@@ -3918,15 +3922,18 @@
             ws = new WebSocket(`${proto}//${location.host}/ws`);
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
+                if (d.type === 'history' && d.turns) {
+                    const body = document.getElementById('chat-log-body');
+                    if (body) body.innerHTML = '';
+                    d.turns.forEach(turn => {
+                        const role = turn.role === 'user' ? 'USER' : 'MAYA';
+                        const kind = turn.role === 'user' ? 'chat user' : 'chat reply';
+                        appendConsoleEntry(kind, turn.text, role);
+                    });
+                }
                 if (d.type === 'layout') {
-                    if (d.layout === 'orb') {
-                        const now = Date.now();
-                        if (currentLayout !== 'orb' && (now - lastLayoutChangeTs) < 1200) {
-                            // Ignora un push a orb immediatamente dopo una scelta utente
-                            return;
-                        }
-                        setLayout('orb', d.params || {});
-                        setActiveNav('idle');
+                    if (d.layout === 'orb' || d.layout === 'current' || !d.layout) {
+                        showOrbOnly(d.params || {});
                     } else {
                         enterWorkMode();
                         setLayout(d.layout, d.params);
@@ -3942,6 +3949,7 @@
                 if (d.type === 'calendar_data' && d.events) updateCalendar(d.events);
                 if (d.type === 'state') updateArduino(d);
                 if (d.type === 'arduino_event' && d.telemetry) {
+                    if (!domArduinoOnline) return;
                     const t = d.telemetry;
                     if (t.temp !== undefined) {
                         const el = document.getElementById('casa-temp-val');
@@ -4047,15 +4055,15 @@
             currentLayout = layout;
             lastLayoutChangeTs = Date.now();
             if (layout === 'orb') {
-                // Chiude i panel ma NON esce da work-mode (lo fa solo il timer)
-                orb.classList.remove('corner');
-                content.classList.remove('open');
-                cmd.classList.remove('corner');
-                document.body.classList.remove('content-open');
-                cmdInput.placeholder = "Comando neurale...";
+                exitWorkMode();
+                currentLayout = 'orb';
                 smoothResize();
                 if (params && (params.exitAfter === true || params.exitAfter === '1' || params.exitAfter === 1)) {
-                    setTimeout(() => { try { exitWorkMode(); } catch(_) {} }, 150);
+                    setTimeout(() => {
+                        try {
+                            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                        } catch(_) {}
+                    }, 150);
                 }
                 return;
             }
@@ -4069,7 +4077,11 @@
             smoothResize();
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             const target = document.getElementById(`panel-${layout}`);
-            if (target) target.classList.add('active');
+            if (!target) {
+                showOrbOnly();
+                return;
+            }
+            target.classList.add('active');
             if (layout === 'map' && params.location) updateMap(params.location);
             if (layout === 'browser' && params.url) {
                 try {
@@ -4098,9 +4110,7 @@
         }
         function handleOrbClick() {
             if (document.getElementById('maya-orb-container').classList.contains('corner')) {
-                exitWorkMode();
-                setLayout('orb');
-                setActiveNav('idle');
+                showOrbOnly();
             }
         }
         function sendCmd() {
@@ -4610,6 +4620,21 @@
             alarm: false, buzz2: false,
             rgb1: false, rgb2: false, rgb3: false
         };
+        let domArduinoOnline = true;
+        function resetDomSensorUI() {
+            const tempEl = document.getElementById('casa-temp-val');
+            if (tempEl) tempEl.textContent = '--';
+            const tempFill = document.getElementById('dom-temp-fill');
+            if (tempFill) tempFill.style.width = '0%';
+            const tempKpi = document.getElementById('kpi-temp');
+            if (tempKpi) tempKpi.textContent = '--';
+            const humEl = document.getElementById('casa-humidity-val');
+            if (humEl) humEl.textContent = '--';
+            const humFill = document.getElementById('dom-humidity-fill');
+            if (humFill) humFill.style.width = '0%';
+            const humKpi = document.getElementById('kpi-hum');
+            if (humKpi) humKpi.textContent = '--';
+        }
         const RGB_CYCLE = [
             { label: 'OFF',   rgb: { r: 0,   g: 0,   b: 0   }, hex: '#0f1115' },
             { label: 'ROSSO', rgb: { r: 255, g: 30,  b: 30  }, hex: '#ff1e1e' },
@@ -4692,6 +4717,22 @@
         }
         const rgbHoldState = { rgb1: null, rgb2: null, rgb3: null };
         const rgbSuppressClick = { rgb1: false, rgb2: false, rgb3: false };
+        let alarmPulseTimer = null;
+        function pulseAlarmCard(durationMs = 900) {
+            clearTimeout(alarmPulseTimer);
+            domState.alarm = true;
+            domState.buzz2 = true;
+            const dot = document.getElementById('casa-buzzer-dot');
+            if (dot) dot.className = 'casa-dot on-red';
+            refreshDomUI();
+            alarmPulseTimer = setTimeout(() => {
+                domState.alarm = false;
+                domState.buzz2 = false;
+                const offDot = document.getElementById('casa-buzzer-dot');
+                if (offDot) offDot.className = 'casa-dot';
+                refreshDomUI();
+            }, durationMs);
+        }
         function turnRgbOff(dev) {
             sendArduinoAction({ op: 'SET', target: dev, value: 0 });
             setRgbCardState(dev, 0);
@@ -4728,7 +4769,7 @@
                 servo: () => ({ op: 'SET', target: 'servo', value: domState.servo ? 0 : 90 }),
                 servo2: () => ({ op: 'SET', target: 'servo2', value: domState.servo2 ? 0 : 90 }),
                 buzz2:  () => ({ op: 'SET', target: 'buzzer2', melody: 'beep' }),
-                alarm: () => ({ op: 'SET', target: 'buzzer', value: 1 }),
+                alarm: () => ({ op: 'SET', target: 'speaker', melody: 'beep' }),
                 rgb1: () => { const a = nextRgbAction('rgb1'); const s=document.getElementById('slider-rgb1'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb1', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
                 rgb2: () => { const a = nextRgbAction('rgb2'); const s=document.getElementById('slider-rgb2'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb2', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
                 rgb3: () => { const a = nextRgbAction('rgb3'); const s=document.getElementById('slider-rgb3'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb3', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
@@ -4737,6 +4778,10 @@
             if (!action) return;
             const { _rgbIndex, _baseVal, ...arduinoAction } = action;
             sendArduinoAction(arduinoAction);
+            if (dev === 'alarm') {
+                pulseAlarmCard();
+                return;
+            }
             if (dev !== 'alarm') {
                 if (dev in domRgbIndex) {
                     setRgbCardState(dev, action._rgbIndex);
@@ -4825,23 +4870,36 @@
             }
             const pill = document.getElementById('dom-arduino-pill');
             if (d.arduino_connected === false) {
+                domArduinoOnline = false;
                 // Arduino non connesso: azzera tutto e mostra —
                 ['light','servo','servo2','rgb1','rgb2','rgb3','buzz2','alarm'].forEach(k => { domState[k] = null; });
                 const dot = document.getElementById('casa-buzzer-dot');
                 if (dot) dot.className = 'casa-dot';
+                resetDomSensorUI();
                 if (pill) pill.classList.remove('online');
                 refreshDomUI();
                 return;
             }
+            domArduinoOnline = true;
             if (d.led !== null && d.led !== undefined) domState.light = (d.led === 'on');
             if (d.servo !== null && d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90' || parseInt(d.servo) > 0);
             if (d.servo2 !== null && d.servo2 !== undefined) domState.servo2 = (d.servo2 === 'open' || d.servo2 === '90' || parseInt(d.servo2) > 0);
             _rgb1Update(d);
             _rgb2Update(d);
             _rgb3Update(d);
+            if (d.buzz2_playing !== null && d.buzz2_playing !== undefined) {
+                if (d.buzz2_playing) {
+                    pulseAlarmCard();
+                } else {
+                    clearTimeout(alarmPulseTimer);
+                    domState.alarm = false;
+                    domState.buzz2 = false;
+                }
+            }
             if (d.buzzer !== null && d.buzzer !== undefined) {
                 const dot = document.getElementById('casa-buzzer-dot');
-                if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
+                const pin3Active = d.buzz2_playing !== null && d.buzz2_playing !== undefined ? !!d.buzz2_playing : false;
+                if (dot && !pin3Active) dot.className = 'casa-dot';
             }
             // (Rimosso) brightness UI sync
             if (pill && (d.system || d.led || d.servo)) pill.classList.add('online');

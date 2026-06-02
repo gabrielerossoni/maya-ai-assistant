@@ -256,15 +256,20 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, buonanotte"*, *"Maya, 
 
 - **Agentic ReAct Loop** — ciclo asincrono Ragiona → Agisci → Osserva con routing ibrido dell'intent
 - **Automation Engine OO** — 11 scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno, scheduler asincrono
+- **Connessione Seriale Self-Healing** — rilevamento automatico delle disconnessioni fisiche o dei timeout della seriale con ripristino silente e trasparente in background della porta `COM` reale, senza mai bloccare l'interfaccia utente.
+- **Riconoscimento Hardware Universale** — algoritmo di auto-discovery aggiornato per supportare nativamente descrizioni di sistema sia in Inglese che in Italiano (es. `"Dispositivo seriale USB"` su Windows), assicurando la connessione automatica all'avvio.
+- **Servo-Controllo Zero-Blocking** — lettura dello stato precedente da cache in memoria locale (`sim_state`) anziché tramite query seriali bloccanti (`GET status`), azzerando i ritardi e le collisioni di comandi fisici sul servo.
+- **Sincronizzazione della Cronologia** — memorizzazione persistente dei turni di chat sul server e recupero automatico con rendering istantaneo dei log e dei messaggi all'avvio del WebSocket o al refresh della dashboard.
+- **Effetti Speciali RGB** — supporto a livello firmware e di parsing diretto per triggerare effetti avanzati sulla striscia LED (Rainbow cangiante, Pulsazione/Respiro rilassante, Allerta lampeggiante rosso) sia per singole zone che globalmente.
 - **Context Manager** — stato globale casa thread-safe e persistente: time slot, presenza, meteo, attività, scena attiva, flag custom
 - **Device Registry** — memoria persistente dei dispositivi con tracciamento `last_set_by` e conflict detection tra scene
 - **Voice I/O Integrato** — STT via `faster-whisper` (small) e TTS via `Piper` (voce Paola) con VAD adattivo
 - **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window
-- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 11 chip scene più controllo OFF con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify
+- **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 11 chip scene più controllo OFF con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify, ottimizzata graficamente in modalità PWA per iPhone 13 (notches, safe-areas e tap highlight rimossi).
 - **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`
 - **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout
 - **Stato Casa Live** — pannello aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
-- **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` pubblica ai client ogni 30 s
+- **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` publishes ai client ogni 30 s
 - **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline
 - **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente i card della dashboard via WebSocket
 
@@ -989,6 +994,21 @@ python -c "from faster_whisper import WhisperModel; WhisperModel('small')"
 ```
 
 Assicurati che `MAYA_WHISPER_MODEL=small` nel `.env`.
+
+#### Errore `Library cublas64_12.dll is not found or cannot be loaded` (Windows + CUDA GPU)
+
+**Cause:**
+L'agente vocale usa `faster-whisper` (basato sull'engine `ctranslate2`). Su Windows, per girare su GPU, richiede le librerie dynamic runtime di NVIDIA CUDA 12. Se non sono installate o se Python 3.8+ non riesce a localizzarle (a causa delle restrizioni di sicurezza di Windows sul caricamento delle DLL nei percorsi di sistema), il sistema segnala questo errore ed effettua un fallback automatico su CPU.
+
+**Fix (Programmatico, già integrato in MAYA):**
+MAYA è ora equipaggiato con un meccanismo di auto-discovery automatico. Se le librerie CUDA di NVIDIA sono installate nel tuo ambiente virtuale Python o a livello globale, MAYA le rileva a runtime e le registra correttamente tramite `os.add_dll_directory`.
+
+Per risolvere ed eseguire MAYA su GPU con tempi di inferenza fulminei:
+1. Installa i pacchetti runtime NVIDIA CUDA via pip nel tuo ambiente:
+   ```bash
+   pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+   ```
+2. Riavvia MAYA. Il sistema rileverà automaticamente le DLL e caricherà il modello Whisper su GPU (CUDA) con successo!
 
 #### Dashboard non aggiorna stato Arduino
 
