@@ -140,7 +140,7 @@ async def sensor_broadcaster(agent, manager):
     while True:
         try:
             arduino_tool = agent.tool_manager.tools.get("arduino")
-            if arduino_tool:
+            if arduino_tool and not getattr(arduino_tool, "simulated", True):
                 result = await asyncio.to_thread(arduino_tool.get_sensor_data)
                 if result is not None:
                     await manager.broadcast(
@@ -253,7 +253,12 @@ async def broadcast_state(agent, manager, MODELS):
 
     _debug_reset_client = os.environ.get("MAYA_DEBUG_RESET_CLIENT", "").strip().lower() in ("1", "true", "yes")
 
-    arduino_connected = arduino_tool and not arduino_tool.simulated
+    arduino_connected = (
+        bool(arduino_tool)
+        and not arduino_tool.simulated
+        and arduino_tool.connection is not None
+        and getattr(arduino_tool.connection, "is_open", False)
+    )
     state_payload = {
         "type": "state",
         "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, "memory") else 0,
@@ -288,6 +293,7 @@ async def broadcast_state(agent, manager, MODELS):
         "rgb2": list(arduino_tool.sim_state.get("rgb2", [0, 0, 0])) if arduino_connected else None,
         "rgb3": list(arduino_tool.sim_state.get("rgb3", [0, 0, 0])) if arduino_connected else None,
         "buzzer": bool(arduino_tool.sim_state.get("buzzer", False)) if arduino_connected else None,
+        "buzz2_playing": bool(arduino_tool.sim_state.get("buzz2_playing", False)) if arduino_connected else None,
         "system": {
             "model": MODELS.get("router", "llama3.2").upper(),
             "name": os.getenv("ASSISTANT_NAME", "MAYA"),

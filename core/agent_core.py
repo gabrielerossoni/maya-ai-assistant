@@ -557,12 +557,30 @@ class AgentCore:
         actions = []
         reply = "Comando eseguito."
 
-        if "accendi" in lower and ("luce" in lower or "led" in lower):
+        light_words = ("luce", "luci", "led", "lampada", "lampade", "illuminazione")
+
+        if "accendi" in lower and any(word in lower for word in light_words):
             actions.append({"tool": "arduino", "command": "LIGHT_ON"})
             reply = "Luce accesa!"
-        elif "spegni" in lower and ("luce" in lower or "led" in lower):
-            actions.append({"tool": "arduino", "command": "LIGHT_OFF"})
-            reply = "Luce spenta!"
+        elif "spegni" in lower and any(word in lower for word in light_words):
+            actions.append(
+                {
+                    "tool": "arduino",
+                    "op": "BATCH",
+                    "actions": [
+                        {"op": "SET", "target": "light", "value": 0},
+                        {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
+                        {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
+                    ],
+                }
+            )
+            reply = "Luci spente!"
+        elif ("chiudi" in lower or "chiudere" in lower) and "porta" in lower:
+            actions.append({"tool": "arduino", "op": "SET", "target": "servo", "value": 0})
+            reply = "Porta chiusa!"
+        elif ("chiudi" in lower or "chiudere" in lower) and any(word in lower for word in ("cancello", "cancellino")):
+            actions.append({"tool": "arduino", "op": "SET", "target": "servo2", "value": 0})
+            reply = "Cancellino chiuso!"
         elif "apri" in lower and "servo" in lower:
             actions.append({"tool": "arduino", "command": "SERVO_OPEN"})
             reply = "Servo aperto!"
@@ -749,6 +767,93 @@ class AgentCore:
                 reply = "Nessuna scena attiva. Dispositivi spenti."
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
+        if re.search(r"\b(chiudi|chiudere)\b", _clean) and re.search(r"\bporta\b", _clean):
+            action = {"tool": "arduino", "op": "SET", "target": "servo", "value": 0}
+            result = await self.tool_manager.execute(action)
+            reply = "Porta chiusa." if result.get("status") == "ok" else "Non riesco a chiudere la porta: Arduino non e' connesso."
+            st = result.get("state", {})
+            if self.socket_manager and st:
+                await self.socket_manager.broadcast(
+                    {
+                        "type": "state",
+                        "led": "on" if st.get("light") else "off",
+                        "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                        "servo2": st.get("servo2", 0),
+                        "rgb1": st.get("rgb1", [0, 0, 0]),
+                        "rgb2": st.get("rgb2", [0, 0, 0]),
+                        "rgb3": st.get("rgb3", [0, 0, 0]),
+                        "buzzer": st.get("buzzer", False),
+                        "buzz2_playing": st.get("buzz2_playing", False),
+                    }
+                )
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
+        if re.search(r"\b(chiudi|chiudere)\b", _clean) and re.search(r"\b(cancello|cancellino)\b", _clean):
+            action = {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0}
+            result = await self.tool_manager.execute(action)
+            reply = (
+                "Cancellino chiuso."
+                if result.get("status") == "ok"
+                else "Non riesco a chiudere il cancellino: Arduino non e' connesso."
+            )
+            st = result.get("state", {})
+            if self.socket_manager and st:
+                await self.socket_manager.broadcast(
+                    {
+                        "type": "state",
+                        "led": "on" if st.get("light") else "off",
+                        "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                        "servo2": st.get("servo2", 0),
+                        "rgb1": st.get("rgb1", [0, 0, 0]),
+                        "rgb2": st.get("rgb2", [0, 0, 0]),
+                        "rgb3": st.get("rgb3", [0, 0, 0]),
+                        "buzzer": st.get("buzzer", False),
+                        "buzz2_playing": st.get("buzz2_playing", False),
+                    }
+                )
+            await self.memory.add_turn("jarvis", reply)
+            self._set_final_layout(reply, {"type": "current", "params": {}})
+            yield reply
+            return
+
+        if re.search(r"\bspegni\b", _clean) and re.search(r"\b(luce|luci|led|lampad[ae]|illuminazione)\b", _clean):
+            action = {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "light", "value": 0},
+                    {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
+                    {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
+                ],
+            }
+            result = await self.tool_manager.execute(action)
+            if result.get("status") == "ok":
+                reply = "Luci spente."
+                st = result.get("state", {})
+                if self.socket_manager and st:
+                    await self.socket_manager.broadcast(
+                        {
+                            "type": "state",
+                            "led": "on" if st.get("light") else "off",
+                            "servo": "open" if (st.get("servo") or 0) > 0 else "0",
+                            "servo2": st.get("servo2", 0),
+                            "rgb1": st.get("rgb1", [0, 0, 0]),
+                            "rgb2": st.get("rgb2", [0, 0, 0]),
+                            "rgb3": st.get("rgb3", [0, 0, 0]),
+                            "buzzer": st.get("buzzer", False),
+                            "buzz2_playing": st.get("buzz2_playing", False),
+                        }
+                    )
+            else:
+                reply = "Non riesco a spegnere le luci: Arduino non e' connesso."
             await self.memory.add_turn("jarvis", reply)
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply

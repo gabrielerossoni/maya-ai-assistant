@@ -72,6 +72,10 @@ unsigned long alertEffectUntilMs = 0;
 bool lightOn = false;
 int servoPos = 0;
 int servo2Pos = 0;
+int servoTargetPos = 0;
+int servo2TargetPos = 0;
+int servoPhysicalPos = 0;
+int servo2PhysicalPos = 0;
 bool buzzerOn = false;
 
 // ── Buzzer 2 Melodies State ───────────────────
@@ -86,6 +90,8 @@ unsigned long lastTelemetryMs = 0;
 unsigned long lastMqttConnectAttempt = 0;
 unsigned long lastServo1AttachMs = 0;
 unsigned long lastServo2AttachMs = 0;
+unsigned long lastServo1StepMs = 0;
+unsigned long lastServo2StepMs = 0;
 unsigned long servo1HoldDurationMs = 0;
 unsigned long servo2HoldDurationMs = 0;
 
@@ -110,6 +116,10 @@ const unsigned long BUZZ_DURATION_MS = 200;
 const unsigned long TELEMETRY_INTERVAL = 5000;
 const unsigned long MQTT_CONNECT_INTERVAL = 10000;
 const unsigned long SERVO_DETACH_DELAY = 1000;
+const unsigned long SERVO_STEP_INTERVAL_MS = 20;
+const unsigned long SERVO_SETTLE_MS = 900;
+const int SERVO_STEP_DEGREES = 2;
+const int SERVO_DEADBAND_DEGREES = 1;
 
 // ── Quake detection tuning ─────────────────────
 #define QUAKE_THRESHOLD_G      0.15f   // soglia in g (valori più alti = meno sensibile)
@@ -144,6 +154,7 @@ void applyRGBInt(uint8_t &r, uint8_t &g, uint8_t &b, long color);
 void startMelody(const char *name);
 void updateMelody();
 void updateNeoPixels();
+void updateServoMotion();
 
 // ── Setup ─────────────────────────────────────
 void setup() {
@@ -239,12 +250,13 @@ void loop() {
     }
   }
 
-  // 6. Servo auto-detach logic
-  if (servo1Attached && (millis() - lastServo1AttachMs >= (servo1HoldDurationMs ? servo1HoldDurationMs : SERVO_DETACH_DELAY))) {
+  // 6. Servo smooth motion + auto-detach after the target is reached
+  updateServoMotion();
+  if (servo1Attached && servoPhysicalPos == servoTargetPos && (millis() - lastServo1AttachMs >= SERVO_SETTLE_MS)) {
     myServo.detach();
     servo1Attached = false;
   }
-  if (servo2Attached && (millis() - lastServo2AttachMs >= (servo2HoldDurationMs ? servo2HoldDurationMs : SERVO_DETACH_DELAY))) {
+  if (servo2Attached && servo2PhysicalPos == servo2TargetPos && (millis() - lastServo2AttachMs >= SERVO_SETTLE_MS)) {
     myServo2.detach();
     servo2Attached = false;
   }
@@ -475,30 +487,46 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
   } else if (strcmp(target, "servo") == 0) {
     if (isSET) {
       int newPos = constrain(doc["value"].as<int>(), 0, 180);
-      int delta = abs(newPos - servoPos);
+      if (abs(newPos - servoTargetPos) <= SERVO_DEADBAND_DEGREES && abs(servoPhysicalPos - servoTargetPos) <= SERVO_DEADBAND_DEGREES) {
+        servoPos = servoTargetPos;
+        if (!quiet) sendResponse(id, true);
+        return;
+      }
       servoPos = newPos;
-      myServo.attach(SERVO_PIN);
-      myServo.write(servoPos);
+      servoTargetPos = newPos;
+      if (!servo1Attached) {
+        myServo.attach(SERVO_PIN);
+        servo1Attached = true;
+      }
       lastServo1AttachMs = millis();
-      servo1Attached = true;
-      // Hold duration proportional to movement: base 120ms + 4ms per degree (cap 600ms)
-      servo1HoldDurationMs = 120 + (unsigned long)(4 * delta);
-      if (servo1HoldDurationMs > 600) servo1HoldDurationMs = 600;
+      servo1HoldDurationMs = 0;
+      lastServo1StepMs = 0;
+      if (servoPhysicalPos == servoTargetPos) {
+        myServo.write(servoPhysicalPos);
+      }
     }
     if (!quiet) sendResponse(id, true);
 
   } else if (strcmp(target, "servo2") == 0) {
     if (isSET) {
       int newPos2 = constrain(doc["value"].as<int>(), 0, 180);
-      int delta2 = abs(newPos2 - servo2Pos);
+      if (abs(newPos2 - servo2TargetPos) <= SERVO_DEADBAND_DEGREES && abs(servo2PhysicalPos - servo2TargetPos) <= SERVO_DEADBAND_DEGREES) {
+        servo2Pos = servo2TargetPos;
+        if (!quiet) sendResponse(id, true);
+        return;
+      }
       servo2Pos = newPos2;
-      myServo2.attach(SERVO2_PIN);
-      myServo2.write(servo2Pos);
+      servo2TargetPos = newPos2;
+      if (!servo2Attached) {
+        myServo2.attach(SERVO2_PIN);
+        servo2Attached = true;
+      }
       lastServo2AttachMs = millis();
-      servo2Attached = true;
-      // Hold duration proportional to movement: base 120ms + 4ms per degree (cap 600ms)
-      servo2HoldDurationMs = 120 + (unsigned long)(4 * delta2);
-      if (servo2HoldDurationMs > 600) servo2HoldDurationMs = 600;
+      servo2HoldDurationMs = 0;
+      lastServo2StepMs = 0;
+      if (servo2PhysicalPos == servo2TargetPos) {
+        myServo2.write(servo2PhysicalPos);
+      }
     }
     if (!quiet) sendResponse(id, true);
 
@@ -643,6 +671,28 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
 }
 
 // ── Helpers ───────────────────────────────────
+
+void updateServoMotion() {
+  unsigned long nowMs = millis();
+
+  if (servo1Attached && servoPhysicalPos != servoTargetPos && (nowMs - lastServo1StepMs >= SERVO_STEP_INTERVAL_MS)) {
+    int diff = servoTargetPos - servoPhysicalPos;
+    int step = constrain(diff, -SERVO_STEP_DEGREES, SERVO_STEP_DEGREES);
+    servoPhysicalPos += step;
+    myServo.write(servoPhysicalPos);
+    lastServo1StepMs = nowMs;
+    lastServo1AttachMs = nowMs;
+  }
+
+  if (servo2Attached && servo2PhysicalPos != servo2TargetPos && (nowMs - lastServo2StepMs >= SERVO_STEP_INTERVAL_MS)) {
+    int diff2 = servo2TargetPos - servo2PhysicalPos;
+    int step2 = constrain(diff2, -SERVO_STEP_DEGREES, SERVO_STEP_DEGREES);
+    servo2PhysicalPos += step2;
+    myServo2.write(servo2PhysicalPos);
+    lastServo2StepMs = nowMs;
+    lastServo2AttachMs = nowMs;
+  }
+}
 
 void buildState(JsonObject state) {
   state["light"] = lightOn;

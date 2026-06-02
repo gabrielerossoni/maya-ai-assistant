@@ -484,7 +484,7 @@ class ArduinoTool:
         return {"status": "error", "message": "arduino non connesso"}
 
     def get_sensor_data(self) -> dict:
-        if self.simulated:
+        if self.simulated or self.connection is None or not getattr(self.connection, "is_open", False):
             return None
 
         msg_id = self._next_id()
@@ -534,6 +534,8 @@ class ArduinoTool:
         return None
 
     def _reconnect(self):
+        self.simulated = True
+        self._telemetry = {}
         if self.connection:
             try:
                 self.connection.close()

@@ -3942,6 +3942,7 @@
                 if (d.type === 'calendar_data' && d.events) updateCalendar(d.events);
                 if (d.type === 'state') updateArduino(d);
                 if (d.type === 'arduino_event' && d.telemetry) {
+                    if (!domArduinoOnline) return;
                     const t = d.telemetry;
                     if (t.temp !== undefined) {
                         const el = document.getElementById('casa-temp-val');
@@ -4610,6 +4611,21 @@
             alarm: false, buzz2: false,
             rgb1: false, rgb2: false, rgb3: false
         };
+        let domArduinoOnline = true;
+        function resetDomSensorUI() {
+            const tempEl = document.getElementById('casa-temp-val');
+            if (tempEl) tempEl.textContent = '--';
+            const tempFill = document.getElementById('dom-temp-fill');
+            if (tempFill) tempFill.style.width = '0%';
+            const tempKpi = document.getElementById('kpi-temp');
+            if (tempKpi) tempKpi.textContent = '--';
+            const humEl = document.getElementById('casa-humidity-val');
+            if (humEl) humEl.textContent = '--';
+            const humFill = document.getElementById('dom-humidity-fill');
+            if (humFill) humFill.style.width = '0%';
+            const humKpi = document.getElementById('kpi-hum');
+            if (humKpi) humKpi.textContent = '--';
+        }
         const RGB_CYCLE = [
             { label: 'OFF',   rgb: { r: 0,   g: 0,   b: 0   }, hex: '#0f1115' },
             { label: 'ROSSO', rgb: { r: 255, g: 30,  b: 30  }, hex: '#ff1e1e' },
@@ -4692,6 +4708,22 @@
         }
         const rgbHoldState = { rgb1: null, rgb2: null, rgb3: null };
         const rgbSuppressClick = { rgb1: false, rgb2: false, rgb3: false };
+        let alarmPulseTimer = null;
+        function pulseAlarmCard(durationMs = 900) {
+            clearTimeout(alarmPulseTimer);
+            domState.alarm = true;
+            domState.buzz2 = true;
+            const dot = document.getElementById('casa-buzzer-dot');
+            if (dot) dot.className = 'casa-dot on-red';
+            refreshDomUI();
+            alarmPulseTimer = setTimeout(() => {
+                domState.alarm = false;
+                domState.buzz2 = false;
+                const offDot = document.getElementById('casa-buzzer-dot');
+                if (offDot) offDot.className = 'casa-dot';
+                refreshDomUI();
+            }, durationMs);
+        }
         function turnRgbOff(dev) {
             sendArduinoAction({ op: 'SET', target: dev, value: 0 });
             setRgbCardState(dev, 0);
@@ -4728,7 +4760,7 @@
                 servo: () => ({ op: 'SET', target: 'servo', value: domState.servo ? 0 : 90 }),
                 servo2: () => ({ op: 'SET', target: 'servo2', value: domState.servo2 ? 0 : 90 }),
                 buzz2:  () => ({ op: 'SET', target: 'buzzer2', melody: 'beep' }),
-                alarm: () => ({ op: 'SET', target: 'buzzer', value: 1 }),
+                alarm: () => ({ op: 'SET', target: 'speaker', melody: 'beep' }),
                 rgb1: () => { const a = nextRgbAction('rgb1'); const s=document.getElementById('slider-rgb1'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb1', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
                 rgb2: () => { const a = nextRgbAction('rgb2'); const s=document.getElementById('slider-rgb2'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb2', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
                 rgb3: () => { const a = nextRgbAction('rgb3'); const s=document.getElementById('slider-rgb3'); const pct=s?parseInt(s.value||'100',10):100; return { op:'SET', target:'rgb3', value:_scaleColor(a.value, pct), _rgbIndex:a._rgbIndex, _baseVal:a.value }; },
@@ -4737,6 +4769,10 @@
             if (!action) return;
             const { _rgbIndex, _baseVal, ...arduinoAction } = action;
             sendArduinoAction(arduinoAction);
+            if (dev === 'alarm') {
+                pulseAlarmCard();
+                return;
+            }
             if (dev !== 'alarm') {
                 if (dev in domRgbIndex) {
                     setRgbCardState(dev, action._rgbIndex);
@@ -4825,23 +4861,36 @@
             }
             const pill = document.getElementById('dom-arduino-pill');
             if (d.arduino_connected === false) {
+                domArduinoOnline = false;
                 // Arduino non connesso: azzera tutto e mostra —
                 ['light','servo','servo2','rgb1','rgb2','rgb3','buzz2','alarm'].forEach(k => { domState[k] = null; });
                 const dot = document.getElementById('casa-buzzer-dot');
                 if (dot) dot.className = 'casa-dot';
+                resetDomSensorUI();
                 if (pill) pill.classList.remove('online');
                 refreshDomUI();
                 return;
             }
+            domArduinoOnline = true;
             if (d.led !== null && d.led !== undefined) domState.light = (d.led === 'on');
             if (d.servo !== null && d.servo !== undefined) domState.servo = (d.servo === 'open' || d.servo === '90' || parseInt(d.servo) > 0);
             if (d.servo2 !== null && d.servo2 !== undefined) domState.servo2 = (d.servo2 === 'open' || d.servo2 === '90' || parseInt(d.servo2) > 0);
             _rgb1Update(d);
             _rgb2Update(d);
             _rgb3Update(d);
+            if (d.buzz2_playing !== null && d.buzz2_playing !== undefined) {
+                if (d.buzz2_playing) {
+                    pulseAlarmCard();
+                } else {
+                    clearTimeout(alarmPulseTimer);
+                    domState.alarm = false;
+                    domState.buzz2 = false;
+                }
+            }
             if (d.buzzer !== null && d.buzzer !== undefined) {
                 const dot = document.getElementById('casa-buzzer-dot');
-                if (dot) dot.className = 'casa-dot' + (d.buzzer ? ' on-red' : '');
+                const pin3Active = d.buzz2_playing !== null && d.buzz2_playing !== undefined ? !!d.buzz2_playing : false;
+                if (dot && !pin3Active) dot.className = 'casa-dot';
             }
             // (Rimosso) brightness UI sync
             if (pill && (d.system || d.led || d.servo)) pill.classList.add('online');
