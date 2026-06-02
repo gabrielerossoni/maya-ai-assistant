@@ -124,10 +124,6 @@ class VoiceManager:
             err_msg = str(e)
             if "cublas" in err_msg.lower() or "cuda" in err_msg.lower():
                 print(f"[VOICE] CUDA/cuBLAS non disponibile ({err_msg}). Fallback su CPU...")
-                if device_pref == "auto":
-                    print(
-                        "[VOICE] Suggerimento: imposta MAYA_WHISPER_DEVICE=cpu nel .env per evitare questo controllo."
-                    )
             else:
                 print(f"[VOICE] GPU non disponibile ({e}). Uso della CPU in corso...")
             try:
@@ -332,12 +328,16 @@ class VoiceManager:
                 try:
                     f.result()
                 except Exception as e:
+                    import traceback
                     sv = getattr(self, "_dashboard_voice_status", status)
                     print(f"[VOICE] Invio stato '{sv}' alla dashboard fallito: {e}")
+                    traceback.print_exc()
 
             fut.add_done_callback(_log_err)
         except Exception as e:
+            import traceback
             print(f"[VOICE] _broadcast scheduling fallito: {e}")
+            traceback.print_exc()
 
     def start(self):
         self.is_running = True

@@ -35,7 +35,7 @@ def _read_nvidia_smi() -> dict[str, Any] | None:
                 ],
                 capture_output=True,
                 text=True,
-                timeout=1.5,
+                timeout=3.0,
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired):
@@ -45,6 +45,9 @@ def _read_nvidia_smi() -> dict[str, Any] | None:
             continue
 
         line = next((item.strip() for item in completed.stdout.splitlines() if item.strip()), "")
+        if not line:
+            continue
+
         parts = [part.strip() for part in line.split(",")]
         if len(parts) < 4:
             continue
@@ -85,11 +88,16 @@ def _read_gputil() -> dict[str, Any] | None:
 def get_gpu_stats() -> dict[str, Any]:
     """
     Return GPU usage if available.
-
-    GPUtil is kept as the first path for existing behavior; direct nvidia-smi is
-    the fallback because GPUtil can fail when nvidia-smi is not on PATH.
+    Prioritizes direct nvidia-smi for speed and reliability, then GPUtil.
     """
-    stats = _read_gputil() or _read_nvidia_smi()
+    # 1. Prova prima nvidia-smi direttamente (più veloce se abbiamo il path o siamo su Windows)
+    stats = _read_nvidia_smi()
     if stats:
         return {"gpu_available": True, **stats}
+
+    # 2. Fallback su GPUtil se nvidia-smi diretto fallisce
+    stats = _read_gputil()
+    if stats:
+        return {"gpu_available": True, **stats}
+
     return {"gpu_available": False}
