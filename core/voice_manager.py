@@ -20,6 +20,9 @@ if sys.platform == "win32":
             if os.path.isdir(bin_path):
                 try:
                     os.add_dll_directory(bin_path)
+                    # ctranslate2 richiede anche che siano nel PATH su Windows per alcune configurazioni
+                    if bin_path not in os.environ["PATH"]:
+                        os.environ["PATH"] = bin_path + os.pathsep + os.environ["PATH"]
                 except Exception:
                     pass
 
@@ -94,6 +97,19 @@ class VoiceManager:
     def _initialize_models(self):
         # STT: faster-whisper (small per accuratezza italiano)
         model_size = os.environ.get("MAYA_WHISPER_MODEL", "large-v3-turbo")
+        device_pref = os.environ.get("MAYA_WHISPER_DEVICE", "auto").lower()
+
+        # Forza CPU se richiesto esplicitamente
+        if device_pref == "cpu":
+            try:
+                self.stt_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+                self._stt_device = "cpu"
+                print(f"[VOICE] Whisper caricato su CPU (modello: {model_size}) per scelta utente.")
+                return
+            except Exception as e_cpu:
+                print(f"[VOICE] Errore critico durante il caricamento di Whisper su CPU: {e_cpu}")
+                return
+
         try:
             # Caricamento silenzioso su GPU (CUDA)
             self.stt_model = WhisperModel(model_size, device="cuda", compute_type="float16")
@@ -108,7 +124,8 @@ class VoiceManager:
             err_msg = str(e)
             if "cublas" in err_msg.lower() or "cuda" in err_msg.lower():
                 print(f"[VOICE] CUDA/cuBLAS non disponibile ({err_msg}). Fallback su CPU...")
-                print("[VOICE] Per risolvere: installa CUDA Toolkit 12.x o imposta MAYA_WHISPER_DEVICE=cpu")
+                if device_pref == "auto":
+                    print("[VOICE] Suggerimento: imposta MAYA_WHISPER_DEVICE=cpu nel .env per evitare questo controllo.")
             else:
                 print(f"[VOICE] GPU non disponibile ({e}). Uso della CPU in corso...")
             try:

@@ -2376,7 +2376,7 @@
             /* Clock spostato più in basso, sopra la bottom nav */
             #idle-clock {
                 top: auto;
-                bottom: 80px;
+                bottom: calc(180px + env(safe-area-inset-bottom));
                 left: 50%;
                 transform: translateX(-50%);
             }
@@ -2394,7 +2394,7 @@
 
             /* Input centrato sopra la bottom nav, visibile anche in idle */
             #cmd-container {
-                bottom: 70px;
+                bottom: calc(76px + env(safe-area-inset-bottom));
                 width: 88%;
                 left: 50%;
                 transform: translateX(-50%);
@@ -2524,7 +2524,7 @@
                ══════════════════════════════════════════ */
             #cmd-container.corner {
                 top: auto;
-                bottom: calc(56px + env(safe-area-inset-bottom));
+                bottom: calc(76px + env(safe-area-inset-bottom));
                 left: 50%;
                 transform: translateX(-50%);
                 width: 92%;
@@ -2609,12 +2609,12 @@
                 align-self: center;
             }
 
-            /* Wind + feels su riga intera */
+            /* Wind e Feels affiancati simmetricamente su riga 2 */
             .wx-wind {
-                grid-column: 1 / -1;
+                grid-column: 1;
                 grid-row: 2;
                 display: flex;
-                gap: 24px;
+                gap: 12px;
                 border-left: none;
                 border-top: 1px solid rgba(255, 255, 255, 0.06);
                 padding: 12px 0 0 0;
@@ -2622,8 +2622,14 @@
             }
 
             .wx-feels {
+                grid-column: 2;
+                grid-row: 2;
                 margin-left: auto;
                 text-align: right;
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+                padding: 12px 0 0 0;
+                margin-top: 12px;
+                width: 100%;
             }
 
             .wx-city {
@@ -2734,6 +2740,7 @@
 
             .dom-devices-area {
                 padding: 12px 12px 0;
+                overflow: visible;
             }
 
             /* Grid 2 colonne per i device */
@@ -2752,7 +2759,8 @@
                 font-size: 12px !important;
             }
 
-            /* RGB span full width */
+            /* RGB span full width su mobile per fare spazio ai presets e allo slider */
+            #dev-rgb1, #dev-rgb2, #dev-rgb3,
             .dom-card[style*="span 2"] {
                 grid-column: span 2;
             }
@@ -2818,33 +2826,63 @@
                 font-size: 12px;
             }
 
+            /* Celle calendario perfette come quadrati nativi e testo centrato */
+            .cal-day {
+                aspect-ratio: 1 / 1;
+                min-height: 40px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding-top: 0 !important;
+            }
+
             /* ══════════════════════════════════════════
                SPOTIFY
                ══════════════════════════════════════════ */
             #spotify-widget {
                 top: auto;
-                bottom: 140px;
+                bottom: calc(132px + env(safe-area-inset-bottom));
                 left: 12px;
                 right: 12px;
                 width: auto;
+                z-index: 1002;
             }
 
             .chat-log-toggle {
-                top: auto;
-                bottom: 514px;
-                left: 12px;
-                right: 12px;
+                top: calc(12px + env(safe-area-inset-top));
+                bottom: auto;
+                left: 50%;
+                transform: translateX(-50%);
                 min-width: 0;
-                width: calc(100vw - 24px);
+                width: 90%;
+                max-width: 400px;
+                height: 38px;
+                border-radius: 19px;
+                border: 1px solid rgba(255, 30, 30, 0.22);
+                background: rgba(10, 10, 12, 0.85);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                z-index: 1000;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
             }
 
             #chat-log-widget {
                 top: auto;
-                bottom: 124px;
+                bottom: calc(132px + env(safe-area-inset-bottom));
                 left: 12px;
                 right: 12px;
                 width: auto;
                 height: 360px;
+                z-index: 1002;
+            }
+
+            /* Mappa e Browser a schermo intero bloccato per evitare scroll esterni fastidiosi */
+            #panel-map.active,
+            #panel-browser.active {
+                height: calc(100vh - 72px - 50px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+                padding-bottom: 0 !important;
+                overflow: hidden !important;
             }
         }
 
@@ -2859,11 +2897,11 @@
 
                 #cmd-container,
                 #cmd-container.corner {
-                    bottom: calc(56px + env(safe-area-inset-bottom));
+                    bottom: calc(76px + env(safe-area-inset-bottom));
                 }
 
                 .panel.active {
-                    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+                    padding-bottom: calc(134px + env(safe-area-inset-bottom));
                 }
             }
         }
