@@ -125,7 +125,9 @@ class VoiceManager:
             if "cublas" in err_msg.lower() or "cuda" in err_msg.lower():
                 print(f"[VOICE] CUDA/cuBLAS non disponibile ({err_msg}). Fallback su CPU...")
                 if device_pref == "auto":
-                    print("[VOICE] Suggerimento: imposta MAYA_WHISPER_DEVICE=cpu nel .env per evitare questo controllo.")
+                    print(
+                        "[VOICE] Suggerimento: imposta MAYA_WHISPER_DEVICE=cpu nel .env per evitare questo controllo."
+                    )
             else:
                 print(f"[VOICE] GPU non disponibile ({e}). Uso della CPU in corso...")
             try:
