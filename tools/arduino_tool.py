@@ -557,7 +557,10 @@ class ArduinoTool:
             return None
         for p in serial.tools.list_ports.comports():
             desc = (p.description or "").lower()
-            if any(k in desc for k in ["arduino", "ch340", "atmega", "usb serial", "cp210", "seriale usb", "serial", "usb", "r4"]):
+            if any(
+                k in desc
+                for k in ["arduino", "ch340", "atmega", "usb serial", "cp210", "seriale usb", "serial", "usb", "r4"]
+            ):
                 return p.device
         return None
 

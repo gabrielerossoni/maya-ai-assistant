@@ -995,6 +995,21 @@ python -c "from faster_whisper import WhisperModel; WhisperModel('small')"
 
 Assicurati che `MAYA_WHISPER_MODEL=small` nel `.env`.
 
+#### Errore `Library cublas64_12.dll is not found or cannot be loaded` (Windows + CUDA GPU)
+
+**Cause:**
+L'agente vocale usa `faster-whisper` (basato sull'engine `ctranslate2`). Su Windows, per girare su GPU, richiede le librerie dynamic runtime di NVIDIA CUDA 12. Se non sono installate o se Python 3.8+ non riesce a localizzarle (a causa delle restrizioni di sicurezza di Windows sul caricamento delle DLL nei percorsi di sistema), il sistema segnala questo errore ed effettua un fallback automatico su CPU.
+
+**Fix (Programmatico, già integrato in MAYA):**
+MAYA è ora equipaggiato con un meccanismo di auto-discovery automatico. Se le librerie CUDA di NVIDIA sono installate nel tuo ambiente virtuale Python o a livello globale, MAYA le rileva a runtime e le registra correttamente tramite `os.add_dll_directory`.
+
+Per risolvere ed eseguire MAYA su GPU con tempi di inferenza fulminei:
+1. Installa i pacchetti runtime NVIDIA CUDA via pip nel tuo ambiente:
+   ```bash
+   pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+   ```
+2. Riavvia MAYA. Il sistema rileverà automaticamente le DLL e caricherà il modello Whisper su GPU (CUDA) con successo!
+
 #### Dashboard non aggiorna stato Arduino
 
 ```

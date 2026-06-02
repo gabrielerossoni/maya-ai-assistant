@@ -12,6 +12,7 @@ import threading
 _stdin_queue = None
 _stdin_thread = None
 
+
 def _start_stdin_thread(loop):
     global _stdin_queue, _stdin_thread
     if _stdin_queue is not None:
@@ -32,9 +33,12 @@ def _start_stdin_thread(loop):
     _stdin_thread = threading.Thread(target=read_target, daemon=True)
     _stdin_thread.start()
 
+
 async def get_stdin_line(loop):
     _start_stdin_thread(loop)
     return await _stdin_queue.get()
+
+
 import os
 import random
 import signal

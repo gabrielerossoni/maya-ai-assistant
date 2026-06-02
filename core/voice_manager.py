@@ -10,6 +10,19 @@ import threading
 import time
 import wave
 
+# Su Windows, aggiunge i percorsi delle DLL di nvidia (cublas e cudnn) se installate via pip
+if sys.platform == "win32":
+    import site
+
+    for site_pkg in site.getsitepackages():
+        for lib in ["cublas", "cudnn"]:
+            bin_path = os.path.join(site_pkg, "nvidia", lib, "bin")
+            if os.path.isdir(bin_path):
+                try:
+                    os.add_dll_directory(bin_path)
+                except Exception:
+                    pass
+
 import numpy as np
 import pyaudio
 from faster_whisper import WhisperModel
@@ -88,6 +101,7 @@ class VoiceManager:
             # Test rapido per verificare che cuBLAS sia funzionante
             # (il modello si carica, ma cuBLAS potrebbe fallire alla prima inferenza)
             import numpy as _np
+
             _test = _np.zeros(16000, dtype=_np.float32)
             list(self.stt_model.transcribe(_test, language="it", beam_size=1, vad_filter=False)[0])
         except Exception as e:

@@ -779,7 +779,11 @@ class AgentCore:
         off_words = r"(spegni|disattiva|stop|ferma)"
 
         if re.search(r"\b(stato|status)\b", text) and re.search(r"\b(arduino|casa|domotica|dispositivi)\b", text):
-            return ({"tool": "arduino", "op": "GET", "target": "status"}, "Stato casa aggiornato.", "Arduino non e' connesso.")
+            return (
+                {"tool": "arduino", "op": "GET", "target": "status"},
+                "Stato casa aggiornato.",
+                "Arduino non e' connesso.",
+            )
 
         if re.search(r"\b(sensor[ei]|temperatura casa|umidit[àa])\b", text):
             return (
@@ -820,14 +824,30 @@ class AgentCore:
             )
 
         if re.search(rf"\b{open_words}\b", text) and re.search(r"\b(porta|servo)\b", text):
-            return ({"tool": "arduino", "op": "SET", "target": "servo", "value": 90}, "Porta aperta.", "Non riesco ad aprire la porta: Arduino non e' connesso.")
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},
+                "Porta aperta.",
+                "Non riesco ad aprire la porta: Arduino non e' connesso.",
+            )
         if re.search(rf"\b{close_words}\b", text) and re.search(r"\b(porta|servo)\b", text):
-            return ({"tool": "arduino", "op": "SET", "target": "servo", "value": 0}, "Porta chiusa.", "Non riesco a chiudere la porta: Arduino non e' connesso.")
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
+                "Porta chiusa.",
+                "Non riesco a chiudere la porta: Arduino non e' connesso.",
+            )
 
         if re.search(rf"\b{open_words}\b", text) and re.search(r"\b(cancello|cancellino|servo2)\b", text):
-            return ({"tool": "arduino", "op": "SET", "target": "servo2", "value": 90}, "Cancellino aperto.", "Non riesco ad aprire il cancellino: Arduino non e' connesso.")
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo2", "value": 90},
+                "Cancellino aperto.",
+                "Non riesco ad aprire il cancellino: Arduino non e' connesso.",
+            )
         if re.search(rf"\b{close_words}\b", text) and re.search(r"\b(cancello|cancellino|servo2)\b", text):
-            return ({"tool": "arduino", "op": "SET", "target": "servo2", "value": 0}, "Cancellino chiuso.", "Non riesco a chiudere il cancellino: Arduino non e' connesso.")
+            return (
+                {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0},
+                "Cancellino chiuso.",
+                "Non riesco a chiudere il cancellino: Arduino non e' connesso.",
+            )
 
         zone = None
         if re.search(r"\bsoggiorno\b", text):
@@ -836,7 +856,9 @@ class AgentCore:
             zone = "rgb2"
         elif re.search(r"\b(giardino|studio)\b", text):
             zone = "rgb3"
-        elif re.search(r"\b(rgb|neopixel|colore|colori|luce|luci|led|lampad[ae]|illuminazione|effetto|effetti)\b", text):
+        elif re.search(
+            r"\b(rgb|neopixel|colore|colori|luce|luci|led|lampad[ae]|illuminazione|effetto|effetti)\b", text
+        ):
             zone = "rgb"
 
         if zone and re.search(rf"\b{off_words}\b", text):
@@ -846,7 +868,13 @@ class AgentCore:
                 f"{label} spento.",
                 f"Non riesco a spegnere {label}: Arduino non e' connesso.",
             )
-        if zone and (re.search(rf"\b{on_words}\b", text) or re.search(r"\b(rosso|verde|blu|azzurro|viola|arancio|arancione|giallo|rosa|bianco|caldo|arcobaleno|rainbow|pulse|pulsa|respiro|alert|allerta|sfumatura)\b", text)):
+        if zone and (
+            re.search(rf"\b{on_words}\b", text)
+            or re.search(
+                r"\b(rosso|verde|blu|azzurro|viola|arancio|arancione|giallo|rosa|bianco|caldo|arcobaleno|rainbow|pulse|pulsa|respiro|alert|allerta|sfumatura)\b",
+                text,
+            )
+        ):
             effect = 0
             if re.search(r"\b(pulse|pulsa|respiro)\b", text):
                 effect = 1
@@ -855,7 +883,13 @@ class AgentCore:
             elif re.search(r"\b(alert|allerta)\b", text):
                 effect = 3
             return (
-                {"tool": "arduino", "op": "SET", "target": zone, "value": self._rgb_value_from_text(text), "effect": effect},
+                {
+                    "tool": "arduino",
+                    "op": "SET",
+                    "target": zone,
+                    "value": self._rgb_value_from_text(text),
+                    "effect": effect,
+                },
                 f"{self._zone_label(zone)} aggiornato.",
                 f"Non riesco ad aggiornare {self._zone_label(zone)}: Arduino non e' connesso.",
             )
@@ -872,14 +906,22 @@ class AgentCore:
                 )
 
         if re.search(rf"\b{off_words}\b", text) and re.search(r"\b(buzzer|speaker|audio|suono|campanello)\b", text):
-            return ({"tool": "arduino", "op": "SET", "target": "speaker", "melody": "off"}, "Buzzer spento.", "Non riesco a spegnere il buzzer: Arduino non e' connesso.")
+            return (
+                {"tool": "arduino", "op": "SET", "target": "speaker", "melody": "off"},
+                "Buzzer spento.",
+                "Non riesco a spegnere il buzzer: Arduino non e' connesso.",
+            )
         if re.search(r"\b(suona|beep|campanello|buzzer|speaker|audio|suono)\b", text):
             melody = "beep"
             for name in ("notify", "error", "welcome", "ok", "startup", "alarm", "wake_radar"):
                 if name in text:
                     melody = name
                     break
-            return ({"tool": "arduino", "op": "SET", "target": "speaker", "melody": melody}, "Buzzer attivato.", "Non riesco ad attivare il buzzer: Arduino non e' connesso.")
+            return (
+                {"tool": "arduino", "op": "SET", "target": "speaker", "melody": melody},
+                "Buzzer attivato.",
+                "Non riesco ad attivare il buzzer: Arduino non e' connesso.",
+            )
 
         return None
 
@@ -997,7 +1039,11 @@ class AgentCore:
             result = await self.tool_manager.execute(item["action"])
             await self._broadcast_arduino_state(result.get("state", {}))
             label = item.get("label", "servo")
-            return f"Ultimo comando {label} annullato." if result.get("status") == "ok" else f"Non riesco ad annullare {label}: Arduino non e' connesso."
+            return (
+                f"Ultimo comando {label} annullato."
+                if result.get("status") == "ok"
+                else f"Non riesco ad annullare {label}: Arduino non e' connesso."
+            )
         return "Nessun comando annullabile."
 
     # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
@@ -1133,7 +1179,11 @@ class AgentCore:
         if re.search(r"\b(chiudi|chiudere)\b", _clean) and re.search(r"\bporta\b", _clean):
             action = {"tool": "arduino", "op": "SET", "target": "servo", "value": 0}
             result = await self.tool_manager.execute(action)
-            reply = "Porta chiusa." if result.get("status") == "ok" else "Non riesco a chiudere la porta: Arduino non e' connesso."
+            reply = (
+                "Porta chiusa."
+                if result.get("status") == "ok"
+                else "Non riesco a chiudere la porta: Arduino non e' connesso."
+            )
             st = result.get("state", {})
             if self.socket_manager and st:
                 await self.socket_manager.broadcast(
@@ -1376,7 +1426,7 @@ class AgentCore:
                     # Streamma la frase "pre" (es. "Controllo il meteo...")
                     # come primo token visibile all'utente
                     if reply:
-                        pass
+                        yield reply + " "
                         if progress_cb:
                             await progress_cb(reply)
 

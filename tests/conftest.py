@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Segnala che siamo in ambiente CI/test
 os.environ["MAYA_CI"] = "true"
 os.environ["OLLAMA_ENABLED"] = "false"
+os.environ["SPOTIFY_ENABLED"] = "false"
 
 
 @pytest.fixture
