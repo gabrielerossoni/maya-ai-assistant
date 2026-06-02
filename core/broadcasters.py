@@ -6,6 +6,35 @@ Tutte le funzioni ricevono le dipendenze come parametro per evitare import circo
 """
 
 import asyncio
+import sys
+import threading
+
+_stdin_queue = None
+_stdin_thread = None
+
+def _start_stdin_thread(loop):
+    global _stdin_queue, _stdin_thread
+    if _stdin_queue is not None:
+        return
+    _stdin_queue = asyncio.Queue()
+
+    def read_target():
+        while True:
+            try:
+                line = sys.stdin.readline()
+                if not line:
+                    loop.call_soon_threadsafe(_stdin_queue.put_nowait, None)
+                    break
+                loop.call_soon_threadsafe(_stdin_queue.put_nowait, line)
+            except Exception:
+                break
+
+    _stdin_thread = threading.Thread(target=read_target, daemon=True)
+    _stdin_thread.start()
+
+async def get_stdin_line(loop):
+    _start_stdin_thread(loop)
+    return await _stdin_queue.get()
 import os
 import random
 import signal
@@ -320,7 +349,9 @@ async def interactive_console(agent, manager):
 
             _sys.stdout.write("MAYA > ")
             _sys.stdout.flush()
-            user_input = await loop.run_in_executor(None, _sys.stdin.readline)
+            user_input = await get_stdin_line(loop)
+            if user_input is None:
+                break
             user_input = user_input.strip()
             if not user_input:
                 continue

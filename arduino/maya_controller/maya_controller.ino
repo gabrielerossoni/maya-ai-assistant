@@ -495,6 +495,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       }
       servoPos = newPos;
       servoTargetPos = newPos;
+      servoPhysicalPos = newPos;
       if (!servo1Attached) {
         myServo.attach(SERVO_PIN);
         servo1Attached = true;
@@ -502,9 +503,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       lastServo1AttachMs = millis();
       servo1HoldDurationMs = 0;
       lastServo1StepMs = 0;
-      if (servoPhysicalPos == servoTargetPos) {
-        myServo.write(servoPhysicalPos);
-      }
+      myServo.write(servoTargetPos);
     }
     if (!quiet) sendResponse(id, true);
 
@@ -518,6 +517,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       }
       servo2Pos = newPos2;
       servo2TargetPos = newPos2;
+      servo2PhysicalPos = newPos2;
       if (!servo2Attached) {
         myServo2.attach(SERVO2_PIN);
         servo2Attached = true;
@@ -525,9 +525,7 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       lastServo2AttachMs = millis();
       servo2HoldDurationMs = 0;
       lastServo2StepMs = 0;
-      if (servo2PhysicalPos == servo2TargetPos) {
-        myServo2.write(servo2PhysicalPos);
-      }
+      myServo2.write(servo2TargetPos);
     }
     if (!quiet) sendResponse(id, true);
 

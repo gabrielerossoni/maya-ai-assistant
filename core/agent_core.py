@@ -1376,7 +1376,7 @@ class AgentCore:
                     # Streamma la frase "pre" (es. "Controllo il meteo...")
                     # come primo token visibile all'utente
                     if reply:
-                        yield reply + "\n"
+                        pass
                         if progress_cb:
                             await progress_cb(reply)
 
