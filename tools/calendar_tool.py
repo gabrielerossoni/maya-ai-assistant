@@ -177,6 +177,7 @@ class CalendarTool:
                     dt_g = datetime.fromisoformat(start.replace("Z", "+00:00"))
                     all_events.append(
                         {
+                            "id": ge.get("id"),
                             "title": ge.get("summary", "Senza titolo"),
                             "time": dt_g.strftime("%Y-%m-%d %H:%M"),
                             "source": "google",
@@ -220,12 +221,36 @@ class CalendarTool:
         before = len(events)
 
         if event_id:
-            events = [e for e in events if e["id"] != event_id]
+            events = [e for e in events if str(e["id"]) != str(event_id)]
         elif title:
             events = [e for e in events if title not in e["title"].lower()]
 
         self._save(events)
         removed = before - len(events)
+
+        if self.google_service and (event_id or title):
+            try:
+                cal_id = _get_calendar_id()
+                now_iso = datetime.now().astimezone().isoformat()
+                g_events = (
+                    self.google_service.events()
+                    .list(calendarId=cal_id, timeMin=now_iso, maxResults=50, singleEvents=True, orderBy="startTime")
+                    .execute()
+                    .get("items", [])
+                )
+                for ge in g_events:
+                    ge_id = ge.get("id")
+                    ge_title = ge.get("summary", "").lower()
+                    matches_id = event_id and str(ge_id) == str(event_id)
+                    matches_title = title and title in ge_title
+                    if ge_id and (matches_id or matches_title):
+                        self.google_service.events().delete(calendarId=cal_id, eventId=ge_id).execute()
+                        removed += 1
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": f"{removed} evento/i locali rimossi, errore cancellazione Google: {e}",
+                }
         return {"status": "ok", "message": f"{removed} evento/i rimosso/i"}
 
     def _next_event(self) -> dict:

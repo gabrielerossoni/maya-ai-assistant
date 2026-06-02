@@ -8,6 +8,7 @@ Tutte le funzioni ricevono le dipendenze come parametro per evitare import circo
 import asyncio
 import os
 import random
+import signal
 import time
 
 import ollama
@@ -326,7 +327,8 @@ async def interactive_console(agent, manager):
 
             if user_input.lower() in ["exit", "quit", "esci"]:
                 print("[MAYA] Spegnimento in corso...")
-                os._exit(0)
+                os.kill(os.getpid(), signal.SIGINT)
+                return
 
             # Invia il comando dal terminale come se venisse dalla dashboard
             print(f"Richiesta: {user_input}")

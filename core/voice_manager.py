@@ -417,6 +417,7 @@ class VoiceManager:
             sentence_buf = ""
             full_reply = ""
             spoke_something = False
+            spoken_sentences: set[str] = set()
 
             # Coda per frasi pronte → thread TTS le riproduce in pipeline
             tts_queue: queue.Queue = queue.Queue()
@@ -432,7 +433,10 @@ class VoiceManager:
                     if first:
                         self.is_speaking = True
                         first = False
-                    self._speak_raw(sentence)
+                    normalized = re.sub(r"\s+", " ", sentence.strip().lower())
+                    if normalized and normalized not in spoken_sentences:
+                        spoken_sentences.add(normalized)
+                        self._speak_raw(sentence)
                     if is_news_request:
                         time.sleep(0.8)
                 tts_done.set()

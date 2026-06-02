@@ -82,6 +82,7 @@ bool buzzerOn = false;
 char currentMelody[16] = "";
 int melodyNoteIndex = -1;
 unsigned long noteStartMs = 0;
+unsigned long melodyStopAtMs = 0;
 int noteDuration = 0;
 
 // ── Timing ────────────────────────────────────
@@ -801,6 +802,7 @@ void startMelody(const char *name) {
     currentMelody[0] = '\0';
     melodyNoteIndex = -1;
     noteStartMs = 0;
+    melodyStopAtMs = 0;
     noteDuration = 0;
     return;
   }
@@ -808,6 +810,7 @@ void startMelody(const char *name) {
   currentMelody[sizeof(currentMelody) - 1] = '\0';
   melodyNoteIndex = 0;
   noteStartMs = 0;
+  melodyStopAtMs = strcmp(name, "alarm") == 0 ? millis() + 20000 : 0;
   noteDuration = 0;
 }
 
@@ -816,6 +819,15 @@ void updateMelody() {
     return;
 
   unsigned long now = millis();
+  if (melodyStopAtMs > 0 && now >= melodyStopAtMs) {
+    noTone(SPEAKER_PIN);
+    currentMelody[0] = '\0';
+    melodyNoteIndex = -1;
+    melodyStopAtMs = 0;
+    noteStartMs = 0;
+    noteDuration = 0;
+    return;
+  }
   if (now - noteStartMs < noteDuration)
     return;
 
@@ -845,7 +857,13 @@ void updateMelody() {
       noteStartMs = now;
       melodyNoteIndex++;
     } else {
-      melodyNoteIndex = -1;
+      if (melodyStopAtMs > 0) {
+        melodyNoteIndex = 0;
+        noteStartMs = 0;
+        noteDuration = 0;
+      } else {
+        melodyNoteIndex = -1;
+      }
     }
   } else if (strcmp(currentMelody, "wake_radar") == 0) {
     int freqs[] = {880, 1175, 1760, 1175, 988, 1319, 1976, 1319, 1047, 1397, 2093, 1397};

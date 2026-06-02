@@ -359,7 +359,10 @@ class ArduinoTool:
         payload_actions = []
         for item in actions:
             cmd = str(item.get("op", "SET")).upper()
-            payload = {"cmd": cmd, "target": item["target"]}
+            target = item["target"]
+            if target == "speaker":
+                target = "buzzer2"
+            payload = {"cmd": cmd, "target": target}
             if "value" in item:
                 payload["value"] = item["value"]
             for key in ("effect", "melody"):
@@ -431,6 +434,24 @@ class ArduinoTool:
     def _simulate(self, op: str, target: str, value, **extra) -> dict:
         # Minimal, coherent simulation for offline/dev usage
         try:
+            if op == "BATCH":
+                results = []
+                errors = []
+                for item in value or []:
+                    sub_op = str(item.get("op", "SET")).upper()
+                    sub_target = item.get("target", "")
+                    sub_value = item.get("value", None)
+                    sub_extra = {k: item[k] for k in ("effect", "melody") if k in item}
+                    if sub_target == "speaker":
+                        sub_target = "buzzer2"
+                    result = self._simulate(sub_op, sub_target, sub_value, **sub_extra)
+                    results.append(result)
+                    if result.get("status") == "error":
+                        errors.append({"action": item, "message": result.get("message", "errore Arduino")})
+                if errors:
+                    return {"status": "partial", "errors": errors, "results": results, "state": self.sim_state.copy()}
+                return {"status": "ok", "results": results, "state": self.sim_state.copy()}
+
             if op == "GET" and target == "status":
                 return {"status": "ok", "state": self.sim_state.copy()}
             if op == "SET":

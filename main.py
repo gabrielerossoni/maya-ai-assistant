@@ -9,6 +9,7 @@ La logica è nei moduli core/*.py.
 
 import asyncio
 import os
+import signal
 import sys
 import threading
 import time
@@ -20,6 +21,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 
 from core.agent_core import MODELS, AgentCore
+from core.automation_engine import arduino_all_off
 from core.broadcasters import (
     broadcast_state,
     interactive_console,
@@ -49,6 +51,53 @@ from tools.display_tool import DisplayTool
 # Variabili globali per i task in background
 # ---------------------------------------------------------------------------
 _bg_tasks = []
+_shutdown_started = False
+
+
+async def shutdown_hardware(reason: str = "shutdown"):
+    """Porta gli attuatori in stato sicuro prima di chiudere il processo."""
+    global _shutdown_started
+    if _shutdown_started:
+        return
+    _shutdown_started = True
+    print(f"[SHUTDOWN] Spegnimento dispositivi ({reason})...")
+
+    try:
+        voice_manager.stop()
+    except Exception as e:
+        print(f"[SHUTDOWN] Errore stop voce: {e}")
+
+    try:
+        agent.automation_engine._cancel_background_tasks()
+        agent.automation_engine._cancel_background_tasks("allarme")
+    except Exception:
+        pass
+
+    try:
+        action = arduino_all_off()
+        result = await agent.tool_manager.execute({"tool": "arduino", **action.params})
+        status = result.get("status", "error")
+        if status == "ok":
+            print("[SHUTDOWN] Dispositivi spenti.")
+        else:
+            print(f"[SHUTDOWN] Spegnimento dispositivi con avvisi: {result.get('message', status)}")
+        state = result.get("state")
+        if state:
+            await manager.broadcast(
+                {
+                    "type": "state",
+                    "led": "on" if state.get("light") else "off",
+                    "servo": "open" if (state.get("servo") or 0) > 0 else "0",
+                    "servo2": state.get("servo2", 0),
+                    "rgb1": state.get("rgb1", [0, 0, 0]),
+                    "rgb2": state.get("rgb2", [0, 0, 0]),
+                    "rgb3": state.get("rgb3", [0, 0, 0]),
+                    "buzzer": state.get("buzzer", False),
+                    "buzz2_playing": state.get("buzz2_playing", False),
+                }
+            )
+    except Exception as e:
+        print(f"[SHUTDOWN] Errore spegnimento dispositivi: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +309,7 @@ async def lifespan(app: FastAPI):
     finally:
         # Shutdown
         print("\n[SYSTEM] Spegnimento in corso...")
+        await shutdown_hardware("lifespan")
         display.stop()
         # Cancella i task in background al termine
         for task in _bg_tasks:
@@ -306,6 +356,23 @@ async def _manifest():
 @app.get("/health")
 async def _health():
     return await health_check()
+
+
+@app.post("/shutdown")
+async def _shutdown(pid: int | None = None):
+    if pid is not None and pid != os.getpid():
+        return {"status": "wrong_pid", "pid": os.getpid()}
+    await shutdown_hardware("http_shutdown")
+
+    def _stop_process():
+        time.sleep(0.2)
+        try:
+            os.kill(os.getpid(), signal.SIGINT)
+        except Exception:
+            os._exit(0)
+
+    threading.Thread(target=_stop_process, daemon=True).start()
+    return {"status": "ok", "message": "shutdown avviato"}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

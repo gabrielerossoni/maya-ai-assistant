@@ -3156,7 +3156,7 @@
                                     </div>
                                     <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb2" aria-label="Intensità Camera" style="width:100%; margin-top:6px;" />
                                 </div>
-                                <!-- RGB Studio -->
+                                <!-- RGB Giardino -->
                                 <div class="dom-card" id="dev-rgb3" onclick="toggleDevice('rgb3')">
                                     <div class="dom-card-top">
                                         <span class="dom-card-icon">🌈</span>
@@ -3164,7 +3164,7 @@
                                             style="flex:1; margin-left:12px; align-self:center;"></div>
                                     </div>
                                     <div>
-                                        <div class="dom-card-name">Studio</div>
+                                        <div class="dom-card-name">Giardino</div>
                                         <div class="dom-card-state" id="dev-rgb3-state">OFF</div>
                                     </div>
                                     <div class="rgb-swatches" aria-hidden="false">
@@ -3173,7 +3173,7 @@
                                         <span class="sw" data-idx="5" style="background:#ffaa00"></span>
                                         <span class="sw" data-idx="6" style="background:#ffffff"></span>
                                     </div>
-                                    <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb3" aria-label="Intensità Studio" style="width:100%; margin-top:6px;" />
+                                    <input type="range" min="0" max="100" value="100" class="zone-slider" id="slider-rgb3" aria-label="Intensità Giardino" style="width:100%; margin-top:6px;" />
                                 </div>
                             </div>
                         </div>
@@ -3279,16 +3279,6 @@
     <div id="debug-controls"></div>
     <!-- RIGHT NAV RAIL -->
     <nav id="nav-rail">
-        <!-- Home / Idle -->
-        <div class="nav-item" id="nav-idle" onclick="exitWorkMode(); setLayout('orb'); setActiveNav('idle')">
-            <svg viewBox="0 0 24 24">
-                <path d="M3 12L12 3l9 9" />
-                <path d="M9 21V12h6v9" />
-                <path d="M3 12v9h18V12" />
-            </svg>
-            <span class="nav-tooltip">HOME</span>
-        </div>
-        <div class="nav-sep"></div>
         <!-- Meteo -->
         <div class="nav-item" id="nav-weather" onclick="enterWorkMode(); setLayout('weather'); setActiveNav('weather')">
             <svg viewBox="0 0 24 24">
@@ -3408,7 +3398,6 @@
             }
         }
         function exitWorkMode() {
-            if (!isWorkMode) return;
             isWorkMode = false;
             document.body.classList.remove('work-mode', 'content-open');
             // Ripristina orb al centro
@@ -3424,10 +3413,14 @@
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             smoothResize();
         }
+        function showOrbOnly(params = {}) {
+            setLayout('orb', params);
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        }
         function startInactivityTimer(ms) {
             clearInactivityTimer();
             inactivityTimer = setTimeout(() => {
-                exitWorkMode();
+                showOrbOnly();
                 setOrbState('idle');
             }, ms);
         }
@@ -3919,14 +3912,8 @@
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
                 if (d.type === 'layout') {
-                    if (d.layout === 'orb') {
-                        const now = Date.now();
-                        if (currentLayout !== 'orb' && (now - lastLayoutChangeTs) < 1200) {
-                            // Ignora un push a orb immediatamente dopo una scelta utente
-                            return;
-                        }
-                        setLayout('orb', d.params || {});
-                        setActiveNav('idle');
+                    if (d.layout === 'orb' || d.layout === 'current' || !d.layout) {
+                        showOrbOnly(d.params || {});
                     } else {
                         enterWorkMode();
                         setLayout(d.layout, d.params);
@@ -4048,15 +4035,15 @@
             currentLayout = layout;
             lastLayoutChangeTs = Date.now();
             if (layout === 'orb') {
-                // Chiude i panel ma NON esce da work-mode (lo fa solo il timer)
-                orb.classList.remove('corner');
-                content.classList.remove('open');
-                cmd.classList.remove('corner');
-                document.body.classList.remove('content-open');
-                cmdInput.placeholder = "Comando neurale...";
+                exitWorkMode();
+                currentLayout = 'orb';
                 smoothResize();
                 if (params && (params.exitAfter === true || params.exitAfter === '1' || params.exitAfter === 1)) {
-                    setTimeout(() => { try { exitWorkMode(); } catch(_) {} }, 150);
+                    setTimeout(() => {
+                        try {
+                            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                        } catch(_) {}
+                    }, 150);
                 }
                 return;
             }
@@ -4070,7 +4057,11 @@
             smoothResize();
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             const target = document.getElementById(`panel-${layout}`);
-            if (target) target.classList.add('active');
+            if (!target) {
+                showOrbOnly();
+                return;
+            }
+            target.classList.add('active');
             if (layout === 'map' && params.location) updateMap(params.location);
             if (layout === 'browser' && params.url) {
                 try {
@@ -4099,9 +4090,7 @@
         }
         function handleOrbClick() {
             if (document.getElementById('maya-orb-container').classList.contains('corner')) {
-                exitWorkMode();
-                setLayout('orb');
-                setActiveNav('idle');
+                showOrbOnly();
             }
         }
         function sendCmd() {
