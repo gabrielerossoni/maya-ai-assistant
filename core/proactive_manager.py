@@ -302,7 +302,8 @@ class ProactiveManager:
                     if alert:
                         print(f"[PROACTIVE] Trigger attivato ({checker.name}): {alert}")
                         await self._broadcast_alert(checker, alert)
-                        await self._speak_alert(alert)
+                        if not isinstance(checker, SysMonitorChecker):
+                            await self._speak_alert(alert)
                 await asyncio.sleep(self.interval)
             except Exception as e:
                 print(f"[PROACTIVE] Errore nel loop: {e}")

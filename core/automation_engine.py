@@ -360,6 +360,11 @@ class AutomationEngine:
     - Esporre l'event bus per integrazioni esterne
     """
 
+    # Secondi di grazia dopo l'avvio: i trigger automatici (time/context)
+    # vengono ignorati per evitare attivazioni spurie prima che il sistema
+    # si sia stabilizzato (es. "piove" che parte subito all'accensione).
+    STARTUP_GRACE_SECONDS = float(os.getenv("AUTOMATION_STARTUP_GRACE", "60"))
+
     def __init__(self, tool_manager=None, memory=None, socket_manager=None, voice_manager=None):
         self._tool_manager = tool_manager
         self.memory = memory
@@ -374,6 +379,7 @@ class AutomationEngine:
         self._event_subscriptions: dict[tuple[str, str], Callable] = {}
         self.scheduler_interval = float(os.getenv("AUTOMATION_SCHEDULER_INTERVAL", "5"))
         self._scene_lock = asyncio.Lock()
+        self._boot_ts: float = time.time()  # timestamp di avvio per grace period
 
     # ── Registrazione ─────────────────────────────────────────────────────────
 
@@ -976,11 +982,24 @@ class AutomationEngine:
 
     # ── Scheduler temporale ───────────────────────────────────────────────────
 
+    def _in_startup_grace(self) -> bool:
+        """True se siamo ancora nel periodo di grazia post-avvio."""
+        return time.time() - self._boot_ts < self.STARTUP_GRACE_SECONDS
+
     async def start_scheduler(self):
         """Loop asincrono che controlla trigger temporali e di contesto."""
         logger.info("[ENGINE] Scheduler avviato")
+        if self.STARTUP_GRACE_SECONDS > 0:
+            logger.info(
+                f"[ENGINE] Grace period attivo: trigger automatici sospesi per {self.STARTUP_GRACE_SECONDS:.0f}s"
+            )
         while True:
             try:
+                # Grace period: salta trigger automatici subito dopo l'avvio
+                if self._in_startup_grace():
+                    await asyncio.sleep(self.scheduler_interval)
+                    continue
+
                 now = datetime.now().strftime("%H:%M")
 
                 for automation in list(self._automations.values()):

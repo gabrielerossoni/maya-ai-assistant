@@ -836,7 +836,7 @@ class AgentCore:
             zone = "rgb2"
         elif re.search(r"\b(giardino|studio)\b", text):
             zone = "rgb3"
-        elif re.search(r"\b(rgb|neopixel|colore|colori)\b", text):
+        elif re.search(r"\b(rgb|neopixel|colore|colori|luce|luci|led|lampad[ae]|illuminazione|effetto|effetti)\b", text):
             zone = "rgb"
 
         if zone and re.search(rf"\b{off_words}\b", text):
@@ -846,7 +846,7 @@ class AgentCore:
                 f"{label} spento.",
                 f"Non riesco a spegnere {label}: Arduino non e' connesso.",
             )
-        if zone and (re.search(rf"\b{on_words}\b", text) or re.search(r"\b(rosso|verde|blu|azzurro|viola|arancio|arancione|giallo|rosa|bianco|caldo)\b", text)):
+        if zone and (re.search(rf"\b{on_words}\b", text) or re.search(r"\b(rosso|verde|blu|azzurro|viola|arancio|arancione|giallo|rosa|bianco|caldo|arcobaleno|rainbow|pulse|pulsa|respiro|alert|allerta|sfumatura)\b", text)):
             effect = 0
             if re.search(r"\b(pulse|pulsa|respiro)\b", text):
                 effect = 1
@@ -921,8 +921,8 @@ class AgentCore:
         action, ok_reply, error_reply = parsed
         undo_action = None
         if action.get("op") == "SET" and action.get("target") in {"servo", "servo2"}:
-            before = await self.tool_manager.execute({"tool": "arduino", "op": "GET", "target": "status"})
-            state = before.get("state", {}) if before.get("status") == "ok" else {}
+            arduino_tool = self.tool_manager.tools.get("arduino")
+            state = arduino_tool.sim_state if arduino_tool else {}
             if action["target"] in state:
                 undo_action = {
                     "tool": "arduino",

@@ -80,8 +80,29 @@ class VoiceManager:
 
     def _initialize_models(self):
         # STT: faster-whisper (small per accuratezza italiano)
-        model_size = os.environ.get("MAYA_WHISPER_MODEL", "small")
-        self.stt_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        model_size = os.environ.get("MAYA_WHISPER_MODEL", "large-v3-turbo")
+        try:
+            # Caricamento silenzioso su GPU (CUDA)
+            self.stt_model = WhisperModel(model_size, device="cuda", compute_type="float16")
+            self._stt_device = "cuda"
+            # Test rapido per verificare che cuBLAS sia funzionante
+            # (il modello si carica, ma cuBLAS potrebbe fallire alla prima inferenza)
+            import numpy as _np
+            _test = _np.zeros(16000, dtype=_np.float32)
+            list(self.stt_model.transcribe(_test, language="it", beam_size=1, vad_filter=False)[0])
+        except Exception as e:
+            err_msg = str(e)
+            if "cublas" in err_msg.lower() or "cuda" in err_msg.lower():
+                print(f"[VOICE] CUDA/cuBLAS non disponibile ({err_msg}). Fallback su CPU...")
+                print("[VOICE] Per risolvere: installa CUDA Toolkit 12.x o imposta MAYA_WHISPER_DEVICE=cpu")
+            else:
+                print(f"[VOICE] GPU non disponibile ({e}). Uso della CPU in corso...")
+            try:
+                self.stt_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+                self._stt_device = "cpu"
+                print(f"[VOICE] Whisper caricato su CPU (modello: {model_size})")
+            except Exception as e_cpu:
+                print(f"[VOICE] Errore critico durante il caricamento di Whisper su CPU: {e_cpu}")
 
     def get_dashboard_voice_status(self) -> str:
         """Stato voce da propagare sulla dashboard (WebSocket reconnect / piggyback)."""

@@ -189,6 +189,13 @@ class ArduinoTool:
         op = action.get("op", "SET")
         extra = {k: action[k] for k in ("effect", "melody") if k in action}
 
+        # Auto-reconnection logic for simulated state
+        if self.simulated and SERIAL_AVAILABLE:
+            _now = time.time()
+            if not hasattr(self, "_last_reconnect_attempt") or _now - self._last_reconnect_attempt > 8.0:
+                self._last_reconnect_attempt = _now
+                if self._reconnect():
+                    print("[ARDUINO] Connessione fisica ripristinata con successo!")
         if str(op).upper() == "BATCH":
             return self._execute_batch(action.get("actions", []))
 
@@ -282,7 +289,7 @@ class ArduinoTool:
             self._msg_id += 1
             return self._msg_id
 
-    def _send_sync(self, op: str, target: str, value, timeout=1.0, **extra) -> dict:
+    def _send_sync(self, op: str, target: str, value, timeout=2.5, **extra) -> dict:
         msg_id = self._next_id()
         payload = {"id": msg_id, "cmd": op, "target": target}
         if value is not None:
@@ -354,7 +361,7 @@ class ArduinoTool:
 
         return {"status": "error", "message": "failed after retries", "state": self.sim_state.copy()}
 
-    def _send_batch_sync(self, actions: list, timeout=3.0) -> dict:
+    def _send_batch_sync(self, actions: list, timeout=4.0) -> dict:
         msg_id = self._next_id()
         payload_actions = []
         for item in actions:
@@ -550,7 +557,7 @@ class ArduinoTool:
             return None
         for p in serial.tools.list_ports.comports():
             desc = (p.description or "").lower()
-            if any(k in desc for k in ["arduino", "ch340", "atmega", "usb serial", "cp210"]):
+            if any(k in desc for k in ["arduino", "ch340", "atmega", "usb serial", "cp210", "seriale usb", "serial", "usb", "r4"]):
                 return p.device
         return None
 

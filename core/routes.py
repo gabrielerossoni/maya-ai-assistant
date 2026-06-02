@@ -131,6 +131,15 @@ async def websocket_endpoint(websocket: WebSocket, agent, manager, voice_manager
             _log_filter_applied = True
 
         await broadcast_state(agent, manager, MODELS)
+
+        # Send initial chat log history
+        turns = await agent.memory.get_all()
+        if turns:
+            try:
+                await websocket.send_json({"type": "history", "turns": turns})
+            except Exception:
+                pass
+
         try:
             await websocket.send_json(voice_manager.voice_status_message())
         except Exception:
