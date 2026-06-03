@@ -46,6 +46,7 @@ import time
 
 import ollama
 
+from core.gpu_stats import get_gpu_stats
 from core.ollama_manager import _ollama_api_reachable
 
 # ---------------------------------------------------------------------------
@@ -160,9 +161,11 @@ async def stats_broadcaster(manager, voice_manager):
                 # Allinea widget voce anche se alcuni broadcast si perdono
                 "voice_status": voice_manager.get_dashboard_voice_status(),
             }
-            stats.update(get_gpu_stats())
+            stats.update(await asyncio.to_thread(get_gpu_stats))
             await manager.broadcast(stats)
-        except Exception:
+        except Exception as e:
+            if os.environ.get("MAYA_DEBUG"):
+                print(f"[BROADCASTER] Stats error: {e}")
             pass
         await asyncio.sleep(2)
 
@@ -293,6 +296,7 @@ async def broadcast_state(agent, manager, MODELS):
         and arduino_tool.connection is not None
         and getattr(arduino_tool.connection, "is_open", False)
     )
+    gpu_stats = get_gpu_stats()
     state_payload = {
         "type": "state",
         "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, "memory") else 0,
@@ -300,6 +304,7 @@ async def broadcast_state(agent, manager, MODELS):
         "ollama": "ONLINE" if ollama_online else "OFFLINE",
         "models": models_status,
         "arduino_connected": arduino_connected,
+        **gpu_stats,
         "led": (
             (
                 arduino_tool.sim_state.get("light", "OFF")

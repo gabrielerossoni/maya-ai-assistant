@@ -524,14 +524,14 @@ class AgentCore:
 
         print(f"[LLM] {model_key.upper()} → {model_name}")
 
-        # Feedback all'utente se il modello è pesante
-        if intent == "REASONING" and progress_cb:
-            await progress_cb(random.choice(FILLER_MESSAGES))
-
         # 3. Chiamata allo Specialista
         try:
-            # Aspetta che il contesto sia pronto (potrebbe essere già finito)
-            context = await context_task
+            # Se è CHITCHAT, limitiamo il contesto per velocità estrema
+            if intent == "CHITCHAT":
+                context = await self.memory.get_context(query=None, top_k=2) # No embedding search for chitchat
+            else:
+                context = await context_task
+
             prompt = f"{context}\nUtente: {user_input}"
 
             messages = [
@@ -722,7 +722,8 @@ class AgentCore:
             self._last_final_data = final_data
 
     async def _reply_fast(self, reply: str, layout: dict | None = None):
-        await self.memory.add_turn("jarvis", reply)
+        await self.memory.add_turn("jarvis", reply, persist_db=False)
+        asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
         self._set_final_layout(reply, layout or {"type": "current", "params": {}})
         return reply
 
@@ -1057,8 +1058,8 @@ class AgentCore:
             if t.done():
                 self._current_task_final_data.pop(t, None)
 
-        # Salva input nella memoria
-        await self.memory.add_turn("user", user_input)
+        # Salva input nella memoria (senza bloccare per embedding/database)
+        await self.memory.add_turn("user", user_input, persist_db=False)
 
         # 0. Fast path: comandi Spotify diretti (bypass routing)
         lower_input = user_input.strip().lower()
@@ -1141,7 +1142,8 @@ class AgentCore:
             reply = result.get("message", str(result))
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "spotify", "data": result})
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1149,7 +1151,8 @@ class AgentCore:
         direct_calendar = self._parse_direct_calendar_command(_clean)
         if direct_calendar:
             reply = await self._run_direct_calendar_command(direct_calendar)
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1163,7 +1166,8 @@ class AgentCore:
                 reply = "Nessuna scena attiva. Dispositivi spenti."
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1171,7 +1175,8 @@ class AgentCore:
         direct_arduino = self._parse_direct_arduino_command(_clean)
         if direct_arduino:
             reply = await self._run_direct_arduino_command(direct_arduino)
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1199,7 +1204,8 @@ class AgentCore:
                         "buzz2_playing": st.get("buzz2_playing", False),
                     }
                 )
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1227,7 +1233,8 @@ class AgentCore:
                         "buzz2_playing": st.get("buzz2_playing", False),
                     }
                 )
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1262,7 +1269,8 @@ class AgentCore:
                     )
             else:
                 reply = "Non riesco a spegnere le luci: Arduino non e' connesso."
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1290,7 +1298,8 @@ class AgentCore:
 
             if self.socket_manager:
                 await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
-            await self.memory.add_turn("jarvis", reply)
+            await self.memory.add_turn("jarvis", reply, persist_db=False)
+            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
             self._set_final_layout(reply, {"type": "current", "params": {}})
             yield reply
             return
@@ -1337,7 +1346,8 @@ class AgentCore:
             if final_reply:
                 for token in (w + " " for w in final_reply.split()):
                     yield token
-                await self.memory.add_turn("jarvis", final_reply)
+                await self.memory.add_turn("jarvis", final_reply, persist_db=False)
+                asyncio.create_task(self.memory.add_turn("jarvis", final_reply, persist_db=True))
                 return
 
         context = await self.memory.get_context(query=user_input, top_k=5)
@@ -1487,8 +1497,9 @@ class AgentCore:
             final_reply = "Mi dispiace, il ragionamento ha richiesto troppi passaggi."
             yield final_reply
 
-        # Salva risposta nella memoria
-        await self.memory.add_turn("jarvis", final_reply)
+        # Salva risposta nella memoria (non-blocking)
+        await self.memory.add_turn("jarvis", final_reply, persist_db=False)
+        asyncio.create_task(self.memory.add_turn("jarvis", final_reply, persist_db=True))
 
         # In un async generator non si può usare 'return value' prima di Python 3.10
         # o in contesti specifici. Usiamo un attributo per passare il layout finale.
