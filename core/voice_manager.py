@@ -329,6 +329,7 @@ class VoiceManager:
                     f.result()
                 except Exception as e:
                     import traceback
+
                     sv = getattr(self, "_dashboard_voice_status", status)
                     print(f"[VOICE] Invio stato '{sv}' alla dashboard fallito: {e}")
                     traceback.print_exc()
@@ -336,6 +337,7 @@ class VoiceManager:
             fut.add_done_callback(_log_err)
         except Exception as e:
             import traceback
+
             print(f"[VOICE] _broadcast scheduling fallito: {e}")
             traceback.print_exc()
 

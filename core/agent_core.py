@@ -528,7 +528,7 @@ class AgentCore:
         try:
             # Se è CHITCHAT, limitiamo il contesto per velocità estrema
             if intent == "CHITCHAT":
-                context = await self.memory.get_context(query=None, top_k=2) # No embedding search for chitchat
+                context = await self.memory.get_context(query=None, top_k=2)  # No embedding search for chitchat
             else:
                 context = await context_task
 

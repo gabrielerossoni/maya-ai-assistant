@@ -11,10 +11,10 @@
 ![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
 ![CI](https://img.shields.io/github/actions/workflow/status/gabrielerossoni/maya-ai-assistant/ci.yml?style=for-the-badge&label=CI&logo=githubactions&logoColor=white)
 
-**Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servo, RGB, buzzer e sensori.  
+**Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servomotori, strisce LED NeoPixel, buzzer, speaker e sensori di telemetria.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** 30 Maggio 2026 — **PR Ready (EventiArduino)**, completamento **ArduinoTool** (auto-discovery, sync physical states, batch operations) e suite di test completa (132/132 passati), linting `ruff` fixato, **Monitoraggio GPU** (GPUtil), **Refinement orb animations**, **XSS Security Fixes**, **Sync Audio/Orb**, **Refactoring `main.py`**, **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione automazioni statiche legacy**, velocizzazione risposte IA, Speaker Gikfun 8Ω 2W, Google Calendar OAuth2, MQTT multi-room, dashboard calendario HUD, Electron desktop.
+> **Ultimo aggiornamento:** 3 Giugno 2026 — **EventiArduino e Quake Detection completati**, integrazione firmware **Arduino Uno R4 WiFi** con supporto **NeoPixel a 3 zone**, gestione sincrona ed efficiente del doppio servo (**Porta e Cancello**), allarmi sismici automatizzati basati su accelerometro fisico (**MPU6050/LSM6DSOX**) con sintesi vocale e suite di test unitari completa (132/132 passati), **Monitoraggio GPU** (GPUtil), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione relè e attuatori statici legacy**, risposte IA ultra-rapide e streaming vocale.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -23,15 +23,16 @@ Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Ex
 ## Idea Centrale
 
 M.A.Y.A. non è un chatbot generico: è il **cervello unico che orchestra la casa**.  
-Una casa intelligente in miniatura dove il PC fa i calcoli pesanti e Arduino gestisce il mondo fisico — luci, porte, sensori, RGB, buzzer.
+Una casa intelligente in miniatura dove il PC esegue i calcoli pesanti e i modelli linguistici, e Arduino gestisce il mondo fisico — luci, porte, cancelli, sensori, strisce RGB e speaker di segnalazione.
 
 La differenza rispetto ai sistemi già esistenti:
 
-- **Controllo locale e privacy** — il cuore del sistema funziona offline, senza cloud
-- **Gestione multi-scenario** — non un singolo dispositivo acceso/spento, ma un ambiente coordinato
-- **Dashboard HUD dinamica** — pannello "STATO CASA // LIVE" con stato real-time di ogni dispositivo
-- **Linguaggio naturale in italiano** — comandi normali, senza formule rigide
-- **11 scene OO** — film, relax, allarme + scene giornaliere (buongiorno, buonanotte/notte, sveglia, cena, piove, ospiti in arrivo, vado fuori, sono rientrato) con priorità, cooldown e trigger automatici
+- **Controllo locale e privacy** — il cuore del sistema funziona offline, senza cloud obbligatori.
+- **Gestione multi-scenario** — non un singolo dispositivo acceso/spento, ma un ambiente coordinato tramite scene.
+- **Dashboard HUD dinamica** — pannello "STATO CASA // LIVE" con stato real-time di ogni dispositivo.
+- **Rilevamento sismico integrato** — accelerometro fisico che attiva allarmi e notifiche vocali in tempo reale in caso di scosse.
+- **Linguaggio naturale in italiano** — comandi normali, senza formule rigide.
+- **11 scene OO** — film, relax, allarme + scene giornaliere (buongiorno, buonanotte, sveglia, cena, piove, ospiti in arrivo, vado fuori, sono rientrato) con priorità, cooldown e trigger automatici.
 
 ---
 
@@ -51,7 +52,7 @@ flowchart TD
     subgraph CORE["🧠 AgentCore — Cervello del sistema"]
         direction TB
         ROUTER["🔀 Intent Router\nkeyword · LLM · scene · chitchat"]
-        PLANNER["📋 Planner ReAct\nGroq llama-3.3-70b / Ollama\n(chain-of-thought)"]
+        PLANNER["📋 Planner ReAct\nMulti-Model Ollama/Groq\n(router, domotic, reasoning, chitchat)"]
         EXEC["⚙️ Executor\nesegue il piano step-by-step"]
         VALID["✅ Validator\nverifica risultato atteso"]
         ROUTER --> PLANNER --> EXEC --> VALID
@@ -82,15 +83,16 @@ flowchart TD
     subgraph ARD["⚡ Arduino R4 WiFi — Unità Fisica"]
         direction LR
         subgraph ATTUATORI["Attuatori"]
-            LED["💡 LED\npin 13"]
-            RELAY["⚡ Relè\npin 7"]
-            SERVO["🚪 Servo SG90\npin 9"]
-            RGB["🌈 RGB\npin 5·6 (R·G)"]
+            LED["💡 LED Indicatore\npin 13"]
+            SERVO["🚪 Servo 1 (Porta)\npin 9"]
+            SERVO2["🚧 Servo 2 (Cancello)\npin 10"]
+            NEOPIXEL["🌈 NeoPixel strip\npin 2\n3 zone (24 LED)"]
             SPK["🔊 Speaker 8Ω\npin 3"]
-            BUZZ["🔔 Buzzer\npin 8"]
+            BUZZ["🔔 Buzzer 1\npin 8"]
         end
         subgraph SENSORI["Sensori"]
             DHT["🌡️ DHT11\npin 4\ntemp + umidità"]
+            IMU["🫨 Accelerometro\nI2C (MPU6050/LSM6DSOX)\nQuake detection"]
         end
     end
 
@@ -114,7 +116,7 @@ flowchart TD
     VALID -->|"tool action"| TM
 
     TM -->|"JSON 115200 baud seriale/MQTT"| ARD
-    ARD -->|"telemetria DHT11 ogni 5s"| WSM
+    ARD -->|"telemetria DHT11 + scosse"| WSM
 
     CORE <-->|"snapshot contesto"| CTX
     CORE <-->|"memoria conversazioni"| MEM
@@ -132,7 +134,7 @@ flowchart TD
 |---|---|---|
 | **Ruolo** | Unità intelligente | Unità fisica |
 | **Fa** | Interpreta comandi, gestisce logica, LLM | Accende, muove, legge, risponde |
-| **Comunicazione** | Seriale USB (JSON 115200 baud) | Seriale USB (JSON 115200 baud) |
+| **Comunicazione** | Seriale USB / MQTT WiFi (JSON) | Seriale USB / MQTT WiFi (JSON) |
 
 ---
 
@@ -141,44 +143,48 @@ flowchart TD
 ### Schema di collegamento
 
 ```
-Arduino Uno / Nano
-├── Pin 13  →  LED             (luce principale — digitale)
-├── Pin  7  →  Relè            (attuatore generico — digitale)
-├── Pin  9  →  Servo SG90      (porta / accesso — PWM)
-├── Pin  5  →  RGB canale R    (PWM analogWrite)
-├── Pin  6  →  RGB canale G    (PWM analogWrite)
-├── Pin  3  →  Speaker 8Ω 2W  (Gikfun — melodie via tone(), ex buzzer2)
-├── Pin  8  →  Buzzer          (allarme — digitale, auto-off 200 ms)
-├── Pin  4  →  DHT11           (temperatura e umidità — OneWire)
-└── USB     →  Seriale PC      (115200 baud)
+Arduino Uno R4 WiFi (o Arduino Uno/Nano + moduli compatibili)
+├── Pin 13  →  LED Indicator         (stato/alimentazione — digitale)
+├── Pin  2  →  NeoPixel strip WS2812  (Led RGB, 24 LED totali — 3 zone logiche)
+├── Pin  9  →  Servo 1 (Porta SG90)  (controllo accesso porta — PWM)
+├── Pin 10  →  Servo 2 (Cancello)    (controllo cancello d'ingresso — PWM)
+├── Pin  3  →  Speaker Gikfun 8Ω 2W  (melodie via tone(), ex buzzer2 — PWM)
+├── Pin  8  →  Buzzer 1 (Allarme)     (cicalino di allarme — digitale, auto-off 200 ms)
+├── Pin  4  →  DHT11                 (temperatura e umidità — OneWire)
+├── I2C Bus →  MPU6050 / LSM6DSOX    (accelerometro/giroscopio sismico — I2C SDA/SCL)
+└── USB/WiFi → Seriale / MQTT Broker (comunicazione bidirezionale, 115200 baud / WiFi)
 ```
 
 ### Tabella componenti
 
-| Dispositivo | Pin | Tipo segnale | Note |
+| Dispositivo | Pin / Interfaccia | Tipo segnale | Note |
 |---|---|---|---|
-| LED (luce principale) | 13 | Digitale OUT | HIGH = acceso |
-| Relè | 7 | Digitale OUT | HIGH = attivato |
-| Servo SG90 (porta) | 9 | PWM / Servo | 0° = chiusa, 90° = aperta |
-| RGB — canale R | 5 | PWM (analogWrite) | 0–255 |
-| RGB — canale G | 6 | PWM (analogWrite) | 0–255 |
-| Speaker 8Ω 2W (Gikfun) | 3 | PWM (tone) | Melodie: beep, alarm, startup, ok, notify, error, welcome |
-| Buzzer | 8 | Digitale OUT | Cicalino, auto-off dopo 200 ms |
-| DHT11 | 4 | OneWire | Temp. + umidità; telemetria ogni 5 s |
+| LED Indicatore | 13 | Digitale OUT | HIGH = acceso |
+| NeoPixel WS2812B | 2 | Digitale OUT | 24 LED totali, divisi in: Zone 1 (0-7, rgb1), Zone 2 (8-15, rgb2), Zone 3 (16-23, rgb3) |
+| Servo 1 (Porta) | 9 | PWM / Servo | 0° = chiusa, 90° = aperta |
+| Servo 2 (Cancello) | 10 | PWM / Servo | 0° = chiuso, 90° = aperto |
+| Speaker Gikfun 8Ω | 3 | PWM (tone) | Melodie di sistema (`startup`, `welcome`, `ok`, `notify`, `error`, `alarm`, `wake_radar`) |
+| Buzzer 1 | 8 | Digitale OUT | Sirena allarme continuo con auto-off 200 ms |
+| DHT11 | 4 | OneWire | Temperatura e umidità; telemetria inviata ad ogni richiesta o ogni 5 s |
+| Accelerometro | I2C (SDA/SCL) | I2C Protocol | MPU6050 esterno o LSM6DSOX integrato; rileva scosse sismiche > `0.15g` |
 
 ### Dipendenze firmware
 
-```
-ArduinoJson  6.x   (parsing JSON)
-Servo.h             (libreria built-in)
-DHT.h               (Adafruit DHT sensor library)
+```cpp
+ArduinoJson        6.x   (parsing dei comandi JSON)
+Adafruit_NeoPixel  1.x   (controllo striscia LED RGB indirizzabile)
+Servo.h                  (controllo dei servomotori)
+DHT.h                    (lettura sensore Adafruit DHT11)
+PubSubClient       2.x   (client MQTT per connessione WiFi)
+WiFiS3                   (gestione scheda WiFi integrata su Uno R4)
+Adafruit_MPU6050         (gestione accelerometro esterno via I2C)
 ```
 
 ---
 
 ## Protocollo Arduino
 
-Comunicazione seriale **115200 baud**, una riga JSON per messaggio, terminata con `\n`.
+Comunicazione seriale **115200 baud** o **MQTT (WiFi)**, una riga JSON per messaggio, terminata con `\n`.
 
 ### Richiesta (PC → Arduino)
 
@@ -188,9 +194,11 @@ Comunicazione seriale **115200 baud**, una riga JSON per messaggio, terminata co
 
 | Campo | Valori |
 |---|---|
-| `cmd` | `"SET"` oppure `"GET"` |
-| `target` | `"light"` · `"relay"` · `"servo"` · `"rgb"` · `"buzzer"` · `"buzzer2"`/`"speaker"` · `"sensor_read"` |
-| `value` | `0`/`1` per digitali · `0–180` per servo · intero `0xRRGGBB` o oggetto `{"r":R,"g":G,"b":B}` per RGB |
+| `cmd` | `"SET"`, `"GET"`, oppure `"BATCH"` |
+| `target` | `"light"`, `"servo"`, `"servo2"`, `"rgb"`, `"rgb1"`, `"rgb2"`, `"rgb3"`, `"neopixel"`, `"brightness"`, `"buzzer"`, `"buzzer2"`/`"speaker"`, `"sensor_read"`, `"status"` |
+| `value` | `0`/`1` per digitali · `0–180` per servo · intero `0xRRGGBB` o oggetto `{"r":R,"g":G,"b":B}` per RGB. |
+| `effect` | *Opzionale per RGB:* `0` (solido), `1` (pulse), `2` (rainbow), `3` (alert) |
+| `melody` | *Opzionale per speaker:* nome melodia (es. `startup`, `alarm`, `wake_radar`, `welcome`, `ok`, `notify`, `error`) |
 
 ### Risposta (Arduino → PC)
 
@@ -200,78 +208,87 @@ Comunicazione seriale **115200 baud**, una riga JSON per messaggio, terminata co
   "status": "ok",
   "state": {
     "light": true,
-    "relay": false,
     "servo": 90,
-    "rgb": [255, 238, 153],
-    "buzzer": false
+    "servo2": 0,
+    "rgb1": [255, 238, 153],
+    "rgb2": [0, 0, 0],
+    "rgb3": [0, 0, 0],
+    "neo_effect": 0,
+    "buzzer": false,
+    "buzz2_playing": false
   }
 }
 ```
 
-### Telemetria (non richiesta, ogni 5 s)
+### Telemetria (Arduino → PC, automatica ogni 5 s)
 
 ```json
 {"telemetry": {"temp": 22.4, "humidity": 58.1, "uptime_ms": 12000}}
 ```
 
-### Risposta errore
+Se si verifica un evento sismico rilevato dall'accelerometro (superamento della soglia `0.15g` per almeno 500ms):
 
 ```json
-{"id": -1, "status": "error", "msg": "parse_fail"}
+{"event": "quake", "magnitude": 4.2, "peak_g": 0.18}
 ```
-
-Senza Arduino connesso i comandi hardware ritornano errore e la dashboard mostra `—` su tutti i dispositivi — nessun dato fittizio.
 
 ---
 
 ## Scene e Automazioni
 
-Le scene sono attivabili via linguaggio naturale (*"Maya, buonanotte"*, *"Maya, buongiorno"*), pulsanti dashboard o voce.
+Le scene sono attivabili via linguaggio naturale (*"Maya, buonanotte"*, *"Maya, allarme"*), pulsanti dashboard o vocalmente.
 
-**Scene ambiente:**
+### Scene Ambiente
 
-| Scena | Luci | Relay | Servo | RGB | Buzzer | Altro |
+| Scena | Luci (Pin 13) | Servo 1 (Porta) | Servo 2 (Cancello) | RGB NeoPixel | Buzzer/Speaker | Altro |
 |---|---|---|---|---|---|---|
-| `buonanotte` / `notte` | ❌ | ❌ | 0° | `#000008` blu notte | — | Spotify pause + calendario |
-| `modalità film` | ❌ | ✅ | — | `#220000` rosso tenue | — | — |
-| `modalità relax` | ❌ | ✅ | — | `#440055` viola | — | — |
-| `allarme` | — | — | — | `#FF0000` rosso | ✅ melody alarm | — |
+| `buonanotte` / `notte` | ❌ | 0° | 0° | `#000010` (blue, all zones) | — | Spotify pause, luminosità 32, sync calendario |
+| `modalità film` | ❌ | — | — | `#220000` (red on rgb1/rgb2) | — | — |
+| `modalità relax` | ❌ | — | — | `#440055` (purple on rgb1/rgb2) | — | — |
+| `allarme` | — | — | — | `#FF0000` Lampeggiante (effect 3) | ✅ Melodia alarm + Buzzer 1 | Avvio sequenza visiva sismica |
 
-**Scene giornaliere:**
+### Scene Giornaliere
 
 | Scena | Azione principale | Extra |
 |---|---|---|
-| `buongiorno` | Luce + RGB alba `#FFD580` | Meteo, notizie, calendario, Spotify mattina |
-| `sveglia` | Buzzer + luce piena + RGB bianco | Spotify energetico |
-| `buonanotte` | Tutto spento, RGB blu notte `#000008` | Spotify pause, calendario domani |
-| `cena` | RGB arancio `#FF4400`, tutto soffuso | Spotify cena romantica |
-| `ospiti in arrivo` | Luce + relay ON, RGB bianco `#FFFFFF`, porta + cancello 90°, melody startup | — |
-| `vado fuori` | Tutto spento, servo + cancello chiusi, melody ok | Spotify pause, meteo |
-| `sono rientrato` | Luce + porta 90° + RGB `#FF8C42` | Timer 5min chiudi porta, notizie |
-| `piove` | Porta chiusa, luce + RGB blu `#4488FF` | Spotify lofi, meteo |
+| `buongiorno` | Luce + NeoPixel alba `#FFD580` | Lettura vocale meteo, notizie, eventi calendario, Spotify mattina |
+| `sveglia` | Buzzer 1 + luce + RGB alba pulsante | Speaker melody `wake_radar`, Spotify energetico |
+| `cena` | NeoPixel arancione `#FF8C42` soffuso (rgb1/rgb2) | Spotify cena romantica |
+| `ospiti in arrivo` | Luce indicatore + NeoPixel bianco `#FFFFFF`, Porta + Cancello a 90° | Speaker melody `startup` |
+| `vado fuori` | Tutto spento (luce, NeoPixel, Servo 1 e 2 chiusi) | Speaker melody `ok`, Spotify pause, meteo |
+| `sono rientrato` | Luce indicatore + Porta aperta (90°) + NeoPixel `#FF8C42` | Avvio timer 5 minuti per richiudere la porta, Spotify relax |
+| `piove` | Porta chiusa (0°), luce indicatore + NeoPixel blu `#4488FF` | Spotify lofi study playlist, meteo |
+
+### Rilevamento Terremoti (Quake Detection)
+
+MAYA include un meccanismo di sicurezza basato su accelerometro fisico (LSM6DSOX o MPU6050).
+1. Quando l'accelerometro rileva una vibrazione superiore a `0.15g` per almeno `500 ms`, la scheda Arduino pubblica un evento `"event": "quake"`.
+2. Il server `main.py` intercetta l'evento ed esegue istantaneamente in background lo scenario di **allarme** sismico.
+3. Il sistema attiva l'allarme acustico e fa lampeggiare i NeoPixel in rosso, mentre `VoiceManager` effettua un annuncio vocale prioritario: *"Attenzione: rilevata scossa di magnitudo X sulla scala Richter"* o *"Attenzione: rilevata scossa sismica"*.
+4. Dopo 20 secondi, se non si registrano ulteriori scosse, lo scenario viene automaticamente azzerato.
 
 ---
 
 ## Caratteristiche
 
-- **Agentic ReAct Loop** — ciclo asincrono Ragiona → Agisci → Osserva con routing ibrido dell'intent
-- **Automation Engine OO** — 11 scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno, scheduler asincrono
+- **Agentic ReAct Loop** — ciclo asincrono Ragiona → Agisci → Osserva con routing ibrido dell'intent (LLM per compiti complessi, keyword router per compiti immediati).
+- **Automation Engine OO** — 11 scene con priorità, cooldown, condizioni contestuali, trigger temporali/evento, retry e timeout per azione, event bus interno e scheduler asincrono.
 - **Connessione Seriale Self-Healing** — rilevamento automatico delle disconnessioni fisiche o dei timeout della seriale con ripristino silente e trasparente in background della porta `COM` reale, senza mai bloccare l'interfaccia utente.
 - **Riconoscimento Hardware Universale** — algoritmo di auto-discovery aggiornato per supportare nativamente descrizioni di sistema sia in Inglese che in Italiano (es. `"Dispositivo seriale USB"` su Windows), assicurando la connessione automatica all'avvio.
 - **Servo-Controllo Zero-Blocking** — lettura dello stato precedente da cache in memoria locale (`sim_state`) anziché tramite query seriali bloccanti (`GET status`), azzerando i ritardi e le collisioni di comandi fisici sul servo.
 - **Sincronizzazione della Cronologia** — memorizzazione persistente dei turni di chat sul server e recupero automatico con rendering istantaneo dei log e dei messaggi all'avvio del WebSocket o al refresh della dashboard.
 - **Effetti Speciali RGB** — supporto a livello firmware e di parsing diretto per triggerare effetti avanzati sulla striscia LED (Rainbow cangiante, Pulsazione/Respiro rilassante, Allerta lampeggiante rosso) sia per singole zone che globalmente.
-- **Context Manager** — stato globale casa thread-safe e persistente: time slot, presenza, meteo, attività, scena attiva, flag custom
-- **Device Registry** — memoria persistente dei dispositivi con tracciamento `last_set_by` e conflict detection tra scene
-- **Voice I/O Integrato** — STT via `faster-whisper` (small) e TTS via `Piper` (voce Paola) con VAD adattivo
-- **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window
+- **Context Manager** — stato globale casa thread-safe e persistente: time slot, presenza, meteo, attività, scena attiva, flag custom.
+- **Device Registry** — memoria persistente dei dispositivi con tracciamento `last_set_by` e conflict detection tra scene.
+- **Voice I/O Integrato** — STT via `faster-whisper` (small) e TTS via `Piper` (voce Paola) con VAD adattivo.
+- **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window.
 - **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 11 chip scene più controllo OFF con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify, ottimizzata graficamente in modalità PWA per iPhone 13 (notches, safe-areas e tap highlight rimossi).
-- **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`
-- **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout
-- **Stato Casa Live** — pannello aggiornato in tempo reale: luci, relay, servo, RGB swatch, buzzer, temperatura, umidità
-- **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` publishes ai client ogni 30 s
-- **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline
-- **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente i card della dashboard via WebSocket
+- **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`.
+- **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout.
+- **Stato Casa Live** — pannello aggiornato in tempo reale: luci, servos, strisce NeoPixel RGB, buzzer, speaker, temperatura, umidità.
+- **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` publishes ai client ogni 30 s.
+- **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline.
+- **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente le card della dashboard via WebSocket.
 
 ---
 
@@ -279,21 +296,21 @@ Le scene sono attivabili via linguaggio naturale (*"Maya, buonanotte"*, *"Maya, 
 
 | Livello | Tecnologia |
 |---|---|
-| Modelli LLM | Ollama (llama3.2, phi4, mistral-small) |
+| Modelli LLM | Ollama (llama3.2:1b, phi4, mistral-small, llama3.2) o Groq Cloud |
 | API Backend | FastAPI + Uvicorn |
 | Tempo reale | WebSockets (nativo FastAPI) |
-| Hardware | PySerial + Arduino Uno (C++) |
+| Hardware | PySerial + Arduino Uno R4 WiFi (C++) |
 | Finanza | CoinGecko API + yfinance |
 | Meteo | Open-Meteo API (geocoding + forecast) |
-| Notizie | feedparser (RSS ANSA) |
+| Notizie | feedparser (RSS Feed ANSA) |
 | Ricerca | DuckDuckGo Search |
-| Traduzione | deep-translator (Google backend) |
-| Monitoraggio | psutil + GPUtil |
-| Media | Spotify API (opzionale) |
-| Interfaccia | Three.js (orb 3D) + Leaflet.js (mappe) + TradingView Widget |
+| Traduzione | deep-translator (Google Translate backend) |
+| Monitoraggio | psutil + GPUtil (monitoraggio CPU/RAM/GPU) |
+| Media | Spotify API (attraverso `spotipy`) |
+| Interfaccia | Three.js (orb 3D) + Leaflet.js (mappe meteo) + TradingView Widget |
 | Persistenza | ChromaDB (vettoriale) + JSON locale |
 | Voce | Faster-Whisper (STT) + Piper TTS |
-| Multi-stanza | MQTT — paho-mqtt (opzionale) |
+| Multi-stanza | MQTT — paho-mqtt (opzionale per comunicazioni WiFi wireless) |
 
 > **Opzionale:** Groq API (fallback cloud LLM), Electron (wrapper desktop — avvia con `MAYA_DESKTOP.bat`), Ngrok (tunnel remoto), Spotify API, Google Calendar API.
 
@@ -312,6 +329,8 @@ maya/
 │   ├── automation_engine.py   # AutomationEngine OO: scene, trigger, priorità, event bus
 │   ├── context_manager.py     # ContextManager: stato globale casa (presenza, meteo, orario)
 │   ├── device_registry.py     # DeviceRegistry: memoria persistente stato dispositivi
+│   ├── gpu_stats.py           # GPUtil / nvidia-smi helpers per le statistiche GPU
+│   ├── token_juice.py         # TokenJuice: compressione output tool per salvare token LLM
 │   ├── tool_manager.py        # Registry e dispatcher di tutti i tool
 │   ├── memory_manager.py      # Memoria semantica ChromaDB + sliding window
 │   ├── voice_manager.py       # Voice I/O: Whisper STT + Piper TTS + VAD
@@ -322,7 +341,7 @@ maya/
 │   ├── ngrok_manager.py       # Tunnel ngrok
 │   ├── server_utils.py        # Selezione porta HTTP + banner ASCII
 │   ├── plugin_loader.py       # Caricamento dinamico plugin
-│   ├── proactive_manager.py   # Monitor proattivo CPU/RAM/calendario
+│   ├── proactive_manager.py   # Monitor proattivo CPU/RAM/calendario e sensori
 │   ├── instance_guard.py      # Lock single-instance
 │   └── log_utils.py           # Filtro log per dashboard
 │
@@ -347,7 +366,8 @@ maya/
 │
 ├── arduino/
 │   └── maya_controller/
-│       └── maya_controller.ino  # Firmware: LED, relay, servo, RGB, buzzer, DHT11
+│       ├── secrets.h            # Credenziali WiFi (escluso da git)
+│       └── maya_controller.ino  # Firmware: LED, NeoPixel (3 zone), 2 Servo, Buzzer, DHT11, LSM6DSOX/MPU6050
 │
 ├── static/
 │   ├── maya_dashboard.html    # SPA dashboard HUD — slider, Three.js orb, pannelli live
@@ -357,7 +377,8 @@ maya/
 │
 ├── voice/
 │   ├── piper.exe              # TTS engine
-│   ├── it_IT-paola-medium.onnx
+│   ├── espeak-ng-data/        # Dati fonetici per Piper
+│   ├── it_IT-paola-medium.onnx # Modello vocale TTS
 │   └── hey_maya.onnx          # Wake word model
 │
 ├── data/                      # Runtime data (gitignored)
@@ -374,10 +395,10 @@ maya/
 │   ├── main.js                # Electron main process
 │   └── preload.js
 │
-├── tests/
-├── plugins/
-├── requirements.txt
-├── .env.example
+├── tests/                     # Test di integrazione e unitari (pytest)
+├── plugins/                   # Patch generate a runtime dal SelfHealer
+├── requirements.txt           # Dipendenze Python
+├── .env.example               # Template configurazione ambiente
 └── .gitignore
 ```
 
@@ -387,9 +408,9 @@ maya/
 
 ### Prerequisiti
 
-- Python **3.10+**
+- Python **3.10+** (consigliato Python 3.11/3.12)
 - [Ollama](https://ollama.com/) installato e avviato (`ollama serve`)
-- Arduino Uno/Nano con firmware caricato *(opzionale — degrada in simulazione automaticamente)*
+- Arduino Uno R4 WiFi con firmware caricato *(opzionale — degrada in modalità simulazione automaticamente)*
 
 ### 1. Clone e dipendenze
 
@@ -405,7 +426,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Variabili **essenziali**:
+Variabili **essenziali** nel `.env`:
 
 ```env
 OLLAMA_ENABLED=true         # false per disabilitare Ollama (usa solo Groq/keyword fallback)
@@ -421,11 +442,13 @@ Variabili **opzionali**:
 ```env
 SPOTIFY_ENABLED=false       # true solo se hai credenziali Spotify
 GROQ_API_KEY=               # LLM cloud: primario se OLLAMA_ENABLED=false, altrimenti fallback
-GROQ_MODEL=llama-3.3-70b-versatile
-GROQ_ROUTER_MODEL=llama-3.1-8b-instant
+MODEL_ROUTER=llama3.2:1b
+MODEL_DOMOTIC=phi4
+MODEL_REASONING=mistral-small
+MODEL_CHITCHAT=llama3.2
  
 # Presentazioni su schermi grandi (Dashboard)
-# Scala UI e disposizione card anche in Electron (valori propagati come query al frontend)
+# Scala UI e disposizione card anche in Electron
 DASHBOARD_UI_SCALE=1.0      # es. 1.25 o 1.5 per ingrandire l'interfaccia
 DASHBOARD_COLUMNS=4         # numero colonne card domotiche (default 3)
 DASHBOARD_DENSITY=compact   # oppure numero px (es. 8) per il gap tra card
@@ -434,50 +457,55 @@ DASHBOARD_DENSITY=compact   # oppure numero px (es. 8) per il gap tra card
 ### 3. Download modelli Ollama
 
 ```bash
-ollama pull llama3.2
-ollama pull phi4
-ollama pull mistral-small
-ollama pull nomic-embed-text   # per memoria semantica
+ollama pull llama3.2:1b        # Modello Router leggero
+ollama pull phi4               # Modello Domotica primario
+ollama pull mistral-small      # Modello per ragionamento complesso (Reasoning)
+ollama pull llama3.2           # Modello Chitchat standard
+ollama pull nomic-embed-text   # Per la memoria semantica (ChromaDB)
 ```
 
 ### 4. Firmware Arduino — Classico o MQTT?
 
 **Versione Classica (Seriale):**
-- Un solo Arduino su cavo USB
-- Comunicazione 115200 baud JSON
-- ✅ Semplice, niente dipendenze esterne
-- ❌ Distanza limitata, una sola stanza
+- Un solo Arduino su cavo USB.
+- Comunicazione 115200 baud JSON.
+- ✅ Semplice, nessuna dipendenza di rete.
+- ❌ Distanza limitata dal cavo USB.
 
 **Versione MQTT (WiFi) — CONSIGLIATA:**
-- Arduino R4 WiFi con WiFi integrato
-- Comunicazione via MQTT Broker
-- ✅ Multi-room, scalabile, wireless
-- ⚠️ Richiede WiFi e Mosquitto locale
-- **Consigliato per casa intelligente**, fallback a seriale sempre disponibile
+- Arduino R4 WiFi con connessione alla rete LAN locale.
+- Comunicazione tramite MQTT Broker locale (es. Mosquitto).
+- ✅ Multi-room wireless, scalabile e posizionabile ovunque.
+- ⚠️ Richiede WiFi e Mosquitto locale avviato sul PC.
 
-**Come scegliere?**
+*Il firmware MQTT mantiene il path seriale attivo: se WiFi/MQTT fallisce, continua a funzionare via USB!*
+
+#### Configurazione WiFi per Arduino
+
+Prima di caricare lo sketch, crea un file `secrets.h` nella cartella `arduino/maya_controller/`:
+
+```cpp
+// arduino/maya_controller/secrets.h  ← NON committare questo file!
+#define WIFI_HOTSPOT_SSID "TuoSSIDWiFi"
+#define WIFI_HOTSPOT_PASS "TuaPasswordWiFi"
+```
+
+Configura i parametri del Broker MQTT nel `.env`:
+
+```env
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+MQTT_DEFAULT_ROOM=studio
+```
+
+Carica lo sketch `arduino/maya_controller/maya_controller.ino` tramite Arduino IDE. Aprendo il Serial Monitor (115200 baud), dovresti vedere:
 
 ```
-Ho un Arduino Uno classico?        → Usa versione Seriale (original)
-Ho un Arduino Uno R4 WiFi?         → Usa versione MQTT (nuovo firmware)
-Voglio entrambi disponibili?       → Usa MQTT, Seriale rimane fallback
+[WiFi] Connessione a TuoSSIDWiFi
+[WiFi] Connesso! IP: 192.168.1.X
+[MQTT] Connesso a localhost:1883
+[MQTT] Sottoscritto a: maya/rooms/studio/cmd
 ```
-
-Il firmware MQTT mantiene il path seriale attivo — se WiFi/MQTT fallisce, continua a funzionare via USB!
-
-### 4b. Aggiornamento da Seriale a MQTT
-
-Se hai già caricato il firmware classico:
-
-1. Apri `arduino/maya_controller/maya_controller.ino` (versione attuale nel repo)
-2. Sostituisci con il **nuovo firmware che include MQTT**
-3. Configura le 4 costanti WiFi/MQTT (vedi sezione sopra)
-4. Carica di nuovo il sketch
-5. **Seriale rimane disponibile** — zero perdita di funzionalità
-
-Niente codice Python da modificare — MAYA rileva automaticamente se Arduino risponde via MQTT o Seriale.
-
-
 
 ### 5. Avvio
 
@@ -489,28 +517,20 @@ La dashboard si apre automaticamente su `http://127.0.0.1:8000`.
 
 > **Wrapper desktop (opzionale):** installa Node.js, esegui `npm install` nella root, poi avvia con `MAYA_DESKTOP.bat`.
 
-### Schermi Grandi — Consigli Rapidi
-
-- Imposta nel `.env`:
-  - `DASHBOARD_UI_SCALE=1.25` (o 1.5) per aumentare la scala UI.
-  - `DASHBOARD_COLUMNS=4` (o 5/6) per più card affiancate.
-  - `DASHBOARD_DENSITY=compact` per ridurre lo spazio tra card (oppure un numero in px, es. 8).
-- Queste variabili sono applicate sia all'apertura automatica del browser sia a Electron (URL con query `?scale=..&cols=..&density=..`).
-
 ---
 
 ## WebSocket API
 
 Il frontend si connette a `ws://127.0.0.1:8000/ws`.
 
-### Messaggi server → client
+### Messaggi server → client (in tempo reale)
 
 ```json
 { "type": "log",           "text": "...", "level": "ok|info|warn" }
 { "type": "stream",        "token": "...", "full_text": "..." }
 { "type": "stats",         "neural_load": 12.4, "memory": 45.2 }
-{ "type": "state",         "led": "on", "relay": "off", "servo": "0",
-                            "rgb": [255, 238, 153], "buzzer": false }
+{ "type": "state",         "led": "on", "servo": "open", "servo2": "0",
+                            "rgb1": [255, 238, 153], "rgb2": [0,0,0], "rgb3": [0,0,0], "buzzer": false }
 { "type": "arduino_event", "telemetry": { "temp": 22.4, "humidity": 58.1, "uptime_ms": 12000 } }
 { "type": "scene_executed", "scene": "buongiorno", "status": "ok|partial", "elapsed": 1.23 }
 { "type": "weather",       "data": { ... } }
@@ -519,7 +539,6 @@ Il frontend si connette a `ws://127.0.0.1:8000/ws`.
 { "type": "calendar_data", "events": [ ... ] }
 { "type": "spotify",       "track": "...", "artist": "...", "is_playing": true }
 { "type": "voice_status",  "status": "listening|speaking|idle" }
-{ "type": "layout",        "layout": "orb|weather|news|dashboard", "params": { ... } }
 ```
 
 ### Messaggi client → server
@@ -532,37 +551,19 @@ Il frontend si connette a `ws://127.0.0.1:8000/ws`.
 
 ---
 
-## MQTT — Controllo Multi-Room (Novo)
+## MQTT — Controllo Multi-Room
 
-A partire dalla versione 2.0, MAYA supporta il **controllo multi-stanza via MQTT** per scalare l'architettura oltre un singolo Arduino.
-
-### Cos'è MQTT? (Spiegazione semplice)
-
-**MQTT** = *Message Queuing Telemetry Transport* — è come una **centralina postale intelligente**:
-
-```
-Arduino Studio (pubblica):  "Ho acceso la luce" → BROKER (Mosquitto)
-                                                        ↓
-Dashboard (legge):  "Mi interessa le notizie dalla stanza studio" ← riceve in real-time
-```
-
-**Perché MQTT anziché Seriale?**
-
-| Seriale USB | MQTT |
-|---|---|
-| 1 Arduino ↔ 1 PC (cavo) | N Arduino ↔ 1 Broker (WiFi) |
-| Distanza: < 5 m | Distanza: illimitata (locale o cloud) |
-| Sinceramente: ogni casa | **Casa intelligente: più stanze** |
+MAYA supporta il **controllo multi-stanza via MQTT** per scalare l'architettura oltre un singolo Arduino.
 
 ### Schema di funzionamento
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   Arduino R4 WiFi                       │
-│  Studio: luce accesa → pubblica su topic               │
-│  "maya/rooms/studio/state"                             │
+│  Studio: pubblica telemetria e stato su topic           │
+│  "maya/rooms/studio/state"                              │
 │                                                         │
-│  {"state": {"light": true, "relay": false, ...}}       │
+│  {"state": {"light": true, "servo": 90, ...}}           │
 └────────────────────┬────────────────────────────────────┘
                      │ WiFi
                      ↓
@@ -572,16 +573,14 @@ Dashboard (legge):  "Mi interessa le notizie dalla stanza studio" ← riceve in 
         │  localhost:1883        │
         └────────────┬───────────┘
                      │
-      ┌──────────────┴──────────────┐
-      ↓                              ↓
-PC (MAYA Core)              WebSocket → Dashboard
-riceve state, applica          (client browser)
-comandi → ripubblica           mostra UI aggiornata
+       ┌─────────────┴──────────────┐
+       ↓                            ↓
+PC (MAYA Core)             WebSocket → Dashboard
+riceve state, applica         (client browser)
+comandi → ripubblica          mostra UI aggiornata
 ```
 
 ### Topic Schema
-
-Tutte le comunicazioni MQTT seguono questo pattern:
 
 ```
 maya/rooms/<room>/<message_type>
@@ -590,55 +589,17 @@ maya/rooms/<room>/<message_type>
 | Topic | Direzione | Payload | Frequenza | Esempio |
 |---|---|---|---|---|
 | `maya/rooms/studio/cmd` | Arduino ← PC | `{"cmd":"SET","target":"light","value":1}` | On-demand | Comando da dashboard |
-| `maya/rooms/studio/state` | Arduino → PC | `{"state":{"light":true,"relay":false,...}}` | After cmd | Dopo esecuzione comando |
+| `maya/rooms/studio/state` | Arduino → PC | `{"state":{"light":true,"servo":0,...}}` | After cmd | Dopo esecuzione comando |
 | `maya/rooms/studio/telemetry` | Arduino → PC | `{"telemetry":{"temp":22.4,"humidity":58.1}}` | Ogni 5s | Sensori DHT11 periodici |
-
-**Spiegazione:**
-- **cmd**: comandi *in ingresso* → Arduino esegue
-- **state**: stato *in uscita* → cosa ha fatto Arduino
-- **telemetry**: misure *in uscita* → sensori DHT11
-
-### Workflow: "Accendi la luce da dashboard"
-
-```
-1. User click "Toggle LED" on dashboard
-                    ↓
-2. WebSocket → PC (MAYA):  { "tool": "mqtt", "op": "SET", "target": "light", "value": 1 }
-                    ↓
-3. MAYA mqtt_tool.execute():
-   Pubblica su MQTT:  "maya/rooms/studio/cmd"
-   Payload:          {"cmd":"SET","target":"light","value":1}
-                    ↓
-4. Arduino riceve su topic "maya/rooms/studio/cmd":
-   Parsing JSON → esegue → digitalWrite(LED_PIN, HIGH)
-                    ↓
-5. Arduino pubblica risposta su:  "maya/rooms/studio/state"
-   Payload:  {"state":{"light":true,"relay":false,...}}
-                    ↓
-6. MQTT Broker → PC riceve su topic con `on_message` callback
-   mqtt_tool._on_message() → estrae stato
-                    ↓
-7. Broadcast via WebSocket al client browser:
-   { "type": "arduino_state", "room": "studio", "led": "on", ... }
-                    ↓
-8. Dashboard UI aggiorna il LED indicator in tempo reale ✅
-```
 
 ### Setup: Installazione Mosquitto (Broker MQTT)
 
 #### Windows
-
-1. Scarica installer da [mosquitto.org](https://mosquitto.org/download/#windows)
-2. Esegui installer → installa come **Windows Service**
-3. Verifica: apri PowerShell:
-   ```powershell
-   Get-Service mosquitto
-   # Dovresti vedere: Status=Running
-   ```
-4. Default: `localhost:1883`
+1. Scarica l'installer da [mosquitto.org](https://mosquitto.org/download/#windows).
+2. Esegui l'installer → seleziona di installarlo come **Windows Service**.
+3. Verifica da PowerShell: `Get-Service mosquitto` (deve essere *Running*).
 
 #### Linux (Ubuntu/Debian)
-
 ```bash
 sudo apt install mosquitto mosquitto-clients
 sudo systemctl enable mosquitto
@@ -646,169 +607,40 @@ sudo systemctl start mosquitto
 ```
 
 #### macOS
-
 ```bash
 brew install mosquitto
 brew services start mosquitto
 ```
 
-### Test della connessione MQTT
-
-#### Terminal 1: Monitor tutti i topic
-
-```bash
-mosquitto_sub -h localhost -t "maya/rooms/#" -v
-```
-
-Dovresti vedere messaggi in tempo reale mentre Arduino invia comandi.
-
-#### Terminal 2: Simula un comando manualmente
-
-```bash
-mosquitto_pub -h localhost \
-  -t "maya/rooms/studio/cmd" \
-  -m '{"cmd":"SET","target":"light","value":1}'
-```
-
-Arduino dovrebbe ricevere e rispondere con:
-```
-maya/rooms/studio/state {"state":{"light":true,...}}
-```
-
-### Configurazione firmware Arduino
-
-Le credenziali WiFi vanno in un file `secrets.h` separato (gitignored) nella stessa cartella dello sketch:
-
-```cpp
-// arduino/maya_controller/secrets.h  ← NON committare questo file
-#define WIFI_CASA_SSID "TuoSSID"
-#define WIFI_CASA_PASS "TuaPassword"
-```
-
-Il broker e la stanza si configurano nel `.env`:
-
-```env
-MQTT_BROKER=localhost
-MQTT_PORT=1883
-MQTT_DEFAULT_ROOM=studio
-```
-
-Dopo la configurazione:
-1. Salva il file
-2. Carica sketch su Arduino via Arduino IDE
-3. Apri Serial Monitor (115200 baud) → dovresti vedere:
-   ```
-   [WiFi] Connessione a MioSSID
-   [WiFi] Connesso! IP: 192.168.1.X
-   [MQTT] Connesso a localhost:1883
-   [MQTT] Sottoscritto a: maya/rooms/studio/cmd
-   ```
-
-### Variabili d'Ambiente MQTT
-
-Nel `.env`:
-
-```env
-# MQTT Broker (default: localhost per setup locale)
-MQTT_BROKER=localhost
-MQTT_PORT=1883
-MQTT_DEFAULT_ROOM=studio    # Stanza di default se non specificata
-
-# Archivio dati locale (fallback se MQTT down)
-ARCHIVE_INTERVAL=600        # Salva stato ogni 10 min
-```
-
-### Python: mqtt_tool.py
-
-La classe `MqttTool` gestisce:
-
-1. **Inizializzazione**: connessione al broker e registrazione callback
-2. **Ricezione**: callback `_on_message()` riceve state/telemetry
-3. **Broadcast**: trasforma messaggi MQTT in WebSocket per dashboard
-4. **Comando**: `execute()` pubblica su `maya/rooms/<room>/cmd`
-
-Flusso asincrono thread-safe:
-
-```python
-def _on_message(self, client, userdata, msg):
-    # Eseguito in thread MQTT (non l'event loop principale)
-    payload = json.loads(msg.payload)
-    
-    # Invia al loop asincrono in modo thread-safe:
-    asyncio.run_coroutine_threadsafe(
-        self._ws_manager.broadcast(payload),  # Broadcast a tutti i client WS
-        self._loop
-    )
-```
-
-Questo evita deadlock tra il thread MQTT e il loop FastAPI.
-
-### Multi-room: Aggiungere una seconda Arduino
-
-1. Crea una copia del firmware con stanza diversa:
-   ```cpp
-   const char* MQTT_ROOM = "cucina";  // Anziché "studio"
-   ```
-2. Carica su secondo Arduino R4 WiFi
-3. Dashboard riceve automaticamente da entrambe:
-   - `maya/rooms/studio/state` → card Studio
-   - `maya/rooms/cucina/state` → card Cucina
-4. Comandi vanno a stanza giusta: `maya/rooms/<room>/cmd`
-
-### Fallback se MQTT broker è down
-
-Se Mosquitto non è avviato:
-
-1. Arduino continua a ricevere via **Seriale** (fallback sempre attivo)
-2. Python mqtt_tool ritorna errore ma sistema non crasha
-3. Dashboard mostra "MQTT: Disconnected" ma funziona in modalità locale
-
-### Limitazioni e Notes
-
-- **QoS 1** su comandi (garantito almeno una volta)
-- **QoS 0** su telemetria (best effort, non critico)
-- **Retain**: disabilitato per stato (aggiornamenti costanti)
-- **Broker**: localhost (LAN). Per remoto/cloud usare certificate TLS (out-of-scope MVP)
-
 ---
 
 ## Aggiungere un Tool Custom
 
-1. Creare `tools/my_tool.py` con classe `MyTool` che implementa `initialize()` e `execute()`
+1. Creare `tools/my_tool.py` con una classe `MyTool` che implementa `initialize()` e `execute(self, action: dict) -> dict`.
 2. Registrarlo in `core/tool_manager.py`:
    ```python
    from tools.my_tool import MyTool
    # in initialize():
-   "my_tool": MyTool(),
+   self.tools["my_tool"] = MyTool()
    ```
-3. Aggiungerlo al `SYSTEM_PROMPT` in `core/agent_core.py` nella sezione "Tool disponibili"
+3. Aggiungerlo alla sezione "Tool disponibili" del prompt di sistema in `core/agent_core.py`.
 
-### Interfaccia Tool
-
-```python
-class MyTool:
-    def initialize(self) -> None: ...
-    def execute(self, action: dict) -> dict: ...
-    # Per tool asincroni:
-    async def execute(self, action: dict) -> dict: ...
-```
-
-Contratto di risposta:
+Contratto di risposta del tool:
 
 ```json
-{ "status": "ok" | "error" | "warning", "message": "..." }
+{ "status": "ok" | "error" | "warning", "message": "Risultato testuale compresso da TokenJuice" }
 ```
 
 ---
 
 ## Formato JSON LLM
 
-Il system prompt forza l'LLM a rispondere in questo schema:
+Il system prompt forza l'LLM a rispondere con questo schema:
 
 ```json
 {
   "intent": "descrizione breve del task",
-  "layout": "orb | weather | map | browser | news | dashboard",
+  "layout": "orb | weather | map | browser | news | dashboard | chat",
   "layout_params": {},
   "actions": [
     { "tool": "weather", "location": "Roma" },
@@ -818,19 +650,19 @@ Il system prompt forza l'LLM a rispondere in questo schema:
 }
 ```
 
-In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le keyword più comuni senza LLM.
+In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le keyword più comuni offline.
 
 ---
 
 ## Note Tecniche
 
-- Il **routing dell'intent** usa logica ibrida: instradamento diretto per task comuni, router LLM per quelli complessi
-- Il **ReAct Loop** evita il doppio routing: l'intent viene determinato una sola volta fuori dal ciclo
-- **Uscita anticipata**: se il tool produce un risultato sufficiente al primo step, il sistema non riformula
-- `VoiceManager` include calibrazione VAD automatica per adattarsi al rumore ambientale
-- `ChromaDB` garantisce che l'agente ricordi fatti avvenuti giorni o settimane prima
-- Catena di fallback: **Ollama (locale) → Groq (cloud) → Parser keyword (offline)**
-- `sensor_broadcaster` chiama `get_sensor_data()` in thread separato ogni 30 s per non bloccare l'event loop
+- **Routing dell'intent** usa logica ibrida: instradamento diretto per task comuni, router LLM per quelli complessi.
+- **ReAct Loop** evita il doppio routing: l'intent viene determinato una sola volta fuori dal ciclo.
+- **Uscita anticipata**: se il tool produce un risultato sufficiente al primo step, il sistema non riformula.
+- `VoiceManager` include calibrazione VAD automatica per adattarsi al rumore ambientale.
+- `ChromaDB` garantisce che l'agente ricordi fatti avvenuti giorni o settimane prima.
+- Catena di fallback: **Ollama (locale) → Groq (cloud) → Parser keyword (offline)**.
+- `sensor_broadcaster` chiama `get_sensor_data()` in thread separato ogni 30 s per non bloccare l'event loop.
 
 ---
 
@@ -840,10 +672,10 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 |---|---|---|---|
 | 16/05/2026 | Verifica 1 | Schema scelto, hardware collegato, dashboard aperta, ≥ 1 dispositivo risponde | ✅ |
 | 23/05/2026 | Verifica 2 | Flusso completo: comando → LLM → Arduino → feedback real-time sulla dashboard | ✅ |
-| 30/05/2026 | Verifica 3 | Demo stabile, correzione bug, prova con pubblico interno, video di backup pronto | 🔲 |
-| 04/06/2026 | Arduino Day | Solo rifinitura e presentazione. **Niente nuove funzioni** | 🔲 |
+| 30/05/2026 | Verifica 3 | Demo stabile, correzione bug, prova con pubblico interno, video di backup pronto | ✅ |
+| 04/06/2026 | Arduino Day | Presentazione finale, rifinitura ed esposizione del plastico. **Niente nuove funzioni** | 🚀 (Pronto) |
 
-> **Verifica 2 completata** ✅ — flusso end-to-end funzionante, CI verde, 62/62 test passati.
+> **Milestone Completate** ✅ — Allarmi sismici e interazione vocale testati, 132/132 test passati con successo.
 
 ---
 
@@ -852,16 +684,17 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 ### ✅ Completati
 
 - [x] **Architettura agentica ReAct con routing ibrido** — agenti e pianificazione locale basati su modelli LLM offline.
-- [x] **Voce bidirezionale (Whisper STT locale + Piper TTS)** — trascrizione e sintesi vocale ad altissima velocità.
+- [x] **Voce bidirezionale (Whisper STT locale + Piper TTS)** — trascrizione e sintesi vocale ad alta velocità con streaming.
 - [x] **Memoria semantica (ChromaDB + embedding Ollama)** — conservazione e richiamo intelligente dei turni passati.
 - [x] **Monitoraggio proattivo (CPU/RAM/calendario)** — agenti attivi che segnalano promemoria o eventi di sistema.
 - [x] **Dashboard HUD bimodale con orb 3D e slider animato** — interfaccia grafica responsive e animata per l'utente.
 - [x] **Panoramica trading live (CoinGecko + yfinance)** — tracciamento real-time di stock e crypto preferite.
 - [x] **Meteo HUD con mappa Leaflet e previsioni** — widget meteo interattivo e geolocalizzato.
 - [x] **Notizie HUD con articolo in evidenza + ticker** — feed aggregator con riepilogo vocale intelligente.
-- [x] **Firmware Arduino JSON 115200 baud** — controllo completo di LED, relay, servo, RGB, buzzer, DHT11.
+- [x] **Firmware Arduino JSON 115200 baud** — controllo completo di LED, NeoPixel, 2 Servomotori, Buzzer, DHT11.
+- [x] **Integrazione Accelerometro & Quake Detection** — rilevamento automatico sismico e attivazione allarmi dedicati.
 - [x] **Protocollo telemetria automatica da DHT11** — invio automatico dei dati sensore ogni 5 s.
-- [x] **Pannello "STATO CASA // LIVE"** — visualizzazione istantanea del funzionamento di ogni dispositivo.
+- [x] **Pannello "STATO CASA // LIVE"** — visualizzazione istantanea del funzionamento di ogni dispositivo (no relè).
 - [x] **11 scene OO configurate** — scenari domotici pronti all'uso con priorità, cooldown, condizioni contestuali e trigger automatici.
 - [x] **`sensor_broadcaster`** — aggiornamento automatico temperatura/umidità ogni 30 s.
 - [x] **`SPOTIFY_ENABLED` flag** — abilitazione e disattivazione dinamica del controllo Spotify.
@@ -869,7 +702,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Broadcast stato Arduino da comandi vocali** — aggiornamento asincrono dello stato della casa.
 - [x] **Coroutine broadcast thread-safe** — impiego di `call_soon_threadsafe` + `create_task` per evitare RuntimeWarning.
 - [x] **Log cleanup** — eliminazione del rumore in console e log puliti per l'HUD.
-- [x] **MQTT multi-room support** — supporto nativo per Arduino R4 WiFi + PubSubClient + broker Mosquitto.
+- [x] **MQTT multi-room support** — supporto nativo per Arduino R4 WiFi + broker Mosquitto.
 - [x] **mqtt_tool bidirectional** — ricezione di state/telemetry e inoltro diretto via WebSocket.
 - [x] **Voice model upgrade** — utilizzo del modello Whisper `small` per un'accuratezza vocale italiana eccellente.
 - [x] **Font dashboard fix** — miglioramento del contrasto e del peso dei caratteri per display LCD consumer.
@@ -877,7 +710,6 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Weather broadcaster location** — localizzazione basata sulla variabile `DEFAULT_WEATHER_LOCATION` in `.env`.
 - [x] **News broadcaster jitter** — tempo di caricamento iniziale asimmetrico per evitare spike di CPU e memoria.
 - [x] **Instance Guard Linux fix** — integrazione di SO_REUSEPORT=0 per una stabilità cross-platform totale.
-
 - [x] **Google Calendar sync** — integrazione completa OAuth2 con token memorizzato e sincronizzazione bidirezionale.
 - [x] **Dashboard calendario HUD** — visualizzazione grafica mensile degli eventi e notifica dei prossimi appuntamenti.
 - [x] **Electron desktop wrapper** — pacchettizzazione nativa desktop con scorciatoie dedicate (F12, Escape) e avvio rapido.
@@ -885,35 +717,17 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **`broadcast_state` throttle** — limitazione della frequenza dei controlli Ollama a 30s per preservare le prestazioni.
 - [x] **`mqtt_tool` non-blocking** — pubblicazione dei messaggi MQTT in thread paralleli non bloccanti.
 - [x] **News streams paralleli** — caricamento asincrono concorrente delle fonti di notizie per dimezzare la latenza.
-- [x] **Firmware `.ino` deduplicato** — rimozione del codice seriale legacy per un firmware R4 pulito ed efficiente.
 - [x] **WiFi secrets** — spostamento delle credenziali Wi-Fi sensibili in un file `secrets.h` dedicato ed escluso da git.
 - [x] **Struttura root pulita** — refactoring e riorganizzazione dei file per rispettare il design architetturale del progetto.
-- [x] **Self-Healing automatico (`self_healer.py`)** — modulo di auto-riparazione dei tool via LLM Groq (`llama-3.3-70b-versatile`) che scrive patch hot-reload in `plugins/` in caso di errori consecutivi senza fermare il sistema.
-- [x] **Proattività contestuale avanzata (`proactive_manager.py`)** — rilevamento attivo e suggerimenti intelligenti (LLM Groq `llama-3.1-8b-instant`) basati su anomalie fisiche dei sensori, promemoria, orario e memoria storica, controllati da filtri di cooldown a 10 minuti.
-- [x] **Apprendimento statistico delle preferenze utente (`preference_learner.py`)** — monitoraggio delle abitudini (frequenza scene, orari di maggiore attività, tool usati) con persistenza in `data/user_preferences.json` e iniezione automatica delle preferenze del profilo utente nel prompt di sistema di MAYA.
-- [x] **Risoluzione blocco asincrono Voice Manager (`voice_manager.py`)** — conversione della lettura vocale delle notizie da `time.sleep` sincrono e bloccante ad `await asyncio.sleep` asincrono non-bloccante, garantendo la fluidità della dashboard HUD.
-- [x] **Monitoraggio GPU (`broadcasters.py`)** — integrazione di `GPUtil` per il tracciamento del carico GPU real-time, visualizzato nelle statistiche della dashboard.
-- [x] **Sicurezza XSS Dashboard** — refactoring dei widget (meteo, news) per utilizzare le API DOM native (`textContent`, `createElement`) invece di `innerHTML`, eliminando vulnerabilità da injection.
-- [x] **Sync Audio/Orb** — ottimizzazione del broadcast dello stato `SPEAKING` post-sintesi Piper per una perfetta sincronia tra animazione dell'orb e output audio.
-- [x] **Refinement UI/UX** — ottimizzazione transizioni orb via CSS scale, eliminazione jitter al cambio tab e integrazione della barra di stato console nel layout HUD.
-
-### ✅ Recenti
-
-- [x] **Completamento ArduinoTool (Branch EventiArduino)** — implementazione finale del tool Arduino con gestione sincrona degli stati, operazioni batch ottimizzate e auto-discovery della porta seriale.
-- [x] **Suite di Test Completa** — 132 test unitari e di integrazione passati (verificati via `pytest`), inclusa la copertura per il nuovo engine di automazione e i tool hardware.
-- [x] **Automation Engine OO** — refactoring completo del sistema automazioni: classi `Action`, `Condition`, `Trigger`, `Scene`, `Automation`, `AutomationEngine`, `EventBus`. Supporto priorità, cooldown, conflict detection, retry, timeout, scheduler asincrono, event log strutturato, automazioni temporanee con scadenza.
-- [x] **ContextManager** — singleton thread-safe con persistenza JSON: traccia time slot, presenza, meteo, attività, scena attiva, flag. Metodo `matches()` per condizioni complesse (valore singolo, lista OR, negazione).
-- [x] **DeviceRegistry** — singleton con persistenza JSON: ogni dispositivo ha stato, `last_set_by` e timestamp. Conflict detection tra scene, sync automatico dallo stato Arduino.
-- [x] **Dashboard scene chips** — 11 chip scene più OFF con feedback visivo live: il chip attivo si evidenzia verde/arancio al completamento via `scene_executed` WebSocket; pill header mostra la scena corrente.
-- [x] **Velocizzazione risposte IA** — TTS streaming frase-per-frase (parla mentre genera), timeout Groq ridotti (15→8s), early exit più permissivo, cache intent pre-popolata, eliminazione sleep tra token yield, max_tokens CHITCHAT ridotto.
-- [x] **Speaker Gikfun 8Ω 2W** — Sostituisce buzzer2 su pin 3 con speaker di qualità superiore. Nuove melodie: `notify`, `error`, `welcome`. Alias `speaker` nel tool Python e nel prompt LLM.
-- [x] **Refactoring `main.py`** — Riduzione da 894 a ~230 righe. Logica estratta in moduli dedicati: `core/ollama_manager.py`, `core/ngrok_manager.py`, `core/server_utils.py`, `core/broadcasters.py`, `core/routes.py`. Zero cambiamenti di comportamento, smoke test aggiunto.
-- [x] **CI GitHub Actions** — Pipeline `ci.yml` su ogni push: lint `ruff`, test `pytest`, Python 3.11.
-- [x] **Lint fix `tools/`** — Risolti import non ordinati (I001), whitespace su righe vuote (W293/W291), variabile inutilizzata F841, newline finale W292 in tutti i tool.
-- [x] **Merge `new_main → main`** — Branch principale aggiornato via PR con fast-forward pulito.
-- [x] **Rimozione automazioni statiche legacy** — Eliminati `AUTOMATIONS`, `AUTOMATION_ALIASES` e il fallback `isinstance` in `_check_automation()` da `agent_core.py`. Il sistema usa esclusivamente l'`AutomationEngine` OO per risoluzione, alias e esecuzione delle scene.
-- [x] **Pulizia scene** — Ridotte da 21 a 11 scene: rimosse modalità lavoro, studio, gaming, pausa caffè, bambini dormono, weekend mattina; `ora di dormire`, `notte` e `modalità notte` accorpate in `buonanotte`; `modalità uscita` accorpata in `vado fuori`; `modalità ospite` accorpata in `ospiti in arrivo` (luce, relay, RGB bianco, porta+cancello 90°, melody). Dashboard chip e `SCENE_CHIP_MAP` aggiornati di conseguenza.
-- [x] **Rimozione simulazione Arduino** — `_simulate()` ritorna errore invece di dati fittizi; `broadcast_state` invia `null` per tutti i campi hardware se Arduino non connesso; dashboard mostra `—` sui card instead of valori falsi.
+- [x] **Self-Healing automatico (`self_healer.py`)** — modulo di auto-riparazione dei tool via LLM Groq che scrive patch hot-reload in `plugins/` in caso di errori consecutivi senza fermare il sistema.
+- [x] **Proattività contestuale avanzata (`proactive_manager.py`)** — rilevamento attivo e suggerimenti intelligenti basati su anomalie fisiche dei sensori, promemoria, orario e memoria storica.
+- [x] **Apprendimento statistico delle preferenze utente (`preference_learner.py`)** — monitoraggio delle abitudini con persistenza in `data/user_preferences.json` e iniezione nel prompt.
+- [x] **Risoluzione blocco asincrono Voice Manager** — conversione a letture non bloccanti con `await asyncio.sleep`.
+- [x] **Monitoraggio GPU (`broadcasters.py` + `gpu_stats.py`)** — integrazione di `GPUtil` e direct nvidia-smi per il tracciamento del carico GPU real-time.
+- [x] **Sicurezza XSS Dashboard** — rimozione di `innerHTML` a favore di DOM native API per evitare injection.
+- [x] **Sync Audio/Orb** — sincronizzazione tra animazione dell'orb e output audio TTS.
+- [x] **Refactoring `main.py`** — riduzione del codice ad un thin entrypoint pulito con logica spostata nel modulo `core/`.
+- [x] **Rimozione relè e attuatori statici legacy** — l'intero sistema utilizza i NeoPixel multi-zona e i due servo dedicati.
 
 ### 🔲 In corso / Prossimi
 
@@ -921,12 +735,6 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [ ] **Trigger Wi-Fi telefono** — monitor DHCP lease → `bus.publish("phone_joined_wifi" | "phone_left_wifi")` per automazioni presenze.
 - [ ] **Multi-room multi-board MQTT** — Espansione del protocollo MQTT per gestire schede Arduino R4 WiFi multiple allocate in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
 - [ ] **Suite di test asincroni end-to-end** — Consolidamento e riscrittura dei test di integrazione per validare il comportamento dei moduli asincroni (`proactive_manager`, `self_healer`, `automation_engine`) simulando risposte hardware e interruzioni di rete.
-
-### 🔮 Futuro
-
-- [ ] **Dashboard Mobile (PWA)** — Creazione di una Progressive Web App ottimizzata per smartphone, dotata di service worker per caching offline e controllo rapido dei dispositivi via LAN locale.
-- [ ] **Plugin System avanzato** — Sviluppo di un SDK per plugin di terze parti con caricamento sandbox di moduli `.py` a runtime, con validazione automatica di sicurezza e compatibilità strutturale.
-- [ ] **Integrazione Standard Domotici (Zigbee/Home Assistant)** — Supporto per bridge hardware standard e integrazione diretta con Home Assistant via WebSocket API per estendere il controllo a dispositivi domotici commerciali (luci Philips Hue, prese smart, sensori Aqara).
 
 ---
 
@@ -941,17 +749,16 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 ```
 
 **Cause:**
-- Arduino non connesso USB
-- Porta COM errata in `.env`
+- Arduino non connesso USB.
+- Porta COM errata in `.env`.
 
 **Fix:**
 ```env
-ARDUINO_PORT=COM3          # Specifica porta manualmente
+ARDUINO_PORT=COM3          # Specifica la porta manualmente
 # oppure
-ARDUINO_PORT=AUTO          # Auto-detection (default)
+ARDUINO_PORT=AUTO          # Rilevamento automatico (default)
 ```
-
-Controlla Device Manager (Windows) o `ls /dev/ttyACM*` (Linux).
+Controlla Gestione Dispositivi (Windows) o `ls /dev/ttyACM*` (Linux).
 
 #### MQTT: Connection refused
 
@@ -960,12 +767,12 @@ Controlla Device Manager (Windows) o `ls /dev/ttyACM*` (Linux).
 ```
 
 **Cause:**
-- Mosquitto non avviato
-- IP/porta sbagliati
+- Mosquitto non avviato localmente.
+- IP o porta errati.
 
 **Fix:**
 ```bash
-# Controlla se Mosquitto è in ascolto:
+# Controlla se Mosquitto è attivo:
 netstat -ano | findstr :1883      # Windows
 lsof -i :1883                     # macOS/Linux
 
@@ -981,91 +788,44 @@ sudo systemctl restart mosquitto              # Linux
 ```
 
 **Cause:**
-- Modello non scaricato
-- Microfono non funziona
+- Modello non scaricato o non presente.
+- Microfono non configurato correttamente.
 
 **Fix:**
 ```bash
 # Testa il microfono con PyAudio:
 python -c "import pyaudio; p=pyaudio.PyAudio(); print([p.get_device_info_by_index(i)['name'] for i in range(p.get_device_count())])"
 
-# Scarica modello Whisper:
+# Scarica modello Whisper manualmente:
 python -c "from faster_whisper import WhisperModel; WhisperModel('small')"
 ```
 
-Assicurati che `MAYA_WHISPER_MODEL=small` nel `.env`.
-
-#### Errore `Library cublas64_12.dll is not found or cannot be loaded` (Windows + CUDA GPU)
+#### Errore `Library cublas64_12.dll is not found` (Windows + CUDA GPU)
 
 **Cause:**
-L'agente vocale usa `faster-whisper` (basato sull'engine `ctranslate2`). Su Windows, per girare su GPU, richiede le librerie dynamic runtime di NVIDIA CUDA 12. Se non sono installate o se Python 3.8+ non riesce a localizzarle (a causa delle restrizioni di sicurezza di Windows sul caricamento delle DLL nei percorsi di sistema), il sistema segnala questo errore ed effettua un fallback automatico su CPU.
+`faster-whisper` richiede le librerie dynamic runtime di NVIDIA CUDA 12 per essere eseguito su GPU. Se non presenti o non caricate da Python 3.8+, il sistema ripiega su CPU.
 
-**Fix (Programmatico, già integrato in MAYA):**
-MAYA è ora equipaggiato con un meccanismo di auto-discovery automatico. Se le librerie CUDA di NVIDIA sono installate nel tuo ambiente virtuale Python o a livello globale, MAYA le rileva a runtime e le registra correttamente tramite `os.add_dll_directory`.
-
-Per risolvere ed eseguire MAYA su GPU con tempi di inferenza fulminei:
-1. Installa i pacchetti runtime NVIDIA CUDA via pip nel tuo ambiente:
-   ```bash
-   pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
-   ```
-2. Riavvia MAYA. Il sistema rileverà automaticamente le DLL e caricherà il modello Whisper su GPU (CUDA) con successo!
-
-#### Dashboard non aggiorna stato Arduino
-
-```
-Lo stato dei dispositivi non cambia quando accendi/spegni via Arduino
-```
-
-**Cause:**
-- Arduino non invia telemetria
-- WebSocket non connesso
-- MQTT broker non attivo
-
-**Fix:**
-1. Controlla che Arduino invia su seriale o MQTT:
-   ```bash
-   # Via seriale:
-   python -c "import serial; s=serial.Serial('COM3', 115200); print(s.readline())"
-   
-   # Via MQTT:
-   mosquitto_sub -h localhost -t "maya/rooms/#" -v
-   ```
-2. Verifica WebSocket connessione nel browser:
-   ```javascript
-   // Apri DevTools → Console
-   WebSocket { url: "ws://127.0.0.1:8000/ws", ... }
-   ```
-
-#### Ollama non disponibile all'avvio
-
-```
-[LLM] Ollama non raggiungibile
-```
-
-**Fix:**
+**Fix (Programmatico):**
+MAYA rileva le DLL nella cartella dell'ambiente virtuale se installate. Esegui:
 ```bash
-# Assicurati che Ollama è avviato:
-ollama serve
-
-# Oppure disabilitalo temporaneamente:
-# .env: OLLAMA_ENABLED=false
-# Usa fallback Groq o parser keyword
+pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
 ```
+Riavvia MAYA per caricare Whisper su GPU con tempi di risposta fulminei!
 
-#### CPU spike all'avvio
+#### Dashboard non aggiorna lo stato
 
-```
-MAYA consuma 100% CPU per 10 secondi dopo lo start
-```
-
-**Causa:**
-- Broadcaster non ha jitter iniziale
+**Cause:**
+- Arduino non sta inviando telemetria.
+- WebSocket disconnesso o bloccato.
 
 **Fix:**
-Verificare che tutti i broadcaster (news, weather, stats) hanno `await asyncio.sleep()` iniziale.
-Controllare che `MAYA_CALIB_CHUNKS` non sia troppo alto:
-```env
-MAYA_CALIB_CHUNKS=36    # default, va bene
+Verifica se i messaggi transitano via seriale o MQTT:
+```bash
+# Via seriale:
+python -c "import serial; s=serial.Serial('COM3', 115200); print(s.readline())"
+
+# Via MQTT:
+mosquitto_sub -h localhost -t "maya/rooms/#" -v
 ```
 
 ---
@@ -1073,13 +833,12 @@ MAYA_CALIB_CHUNKS=36    # default, va bene
 ## .gitignore — Cosa viene escluso
 
 ```
-data/          # chroma_db, memory_metadata, calendar, notes
+data/          # chroma_db, memory_metadata, calendar, notes, preference_learner data
 .env           # credenziali e configurazioni locali
 .venv/         # virtualenv
 __pycache__/
 node_modules/
 .vscode/
-.windsurf/
 logs/
 ```
 
@@ -1095,7 +854,7 @@ Progetto sviluppato da studenti dell'**ITIS di Crema** per l'**Arduino Day 2026*
 | **Marcello Patrini** — *Co-Developer* | Contributi allo sviluppo e testing. |
 
 [![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-gabrielerossoni-181717?style=flat-square&logo=github)](https://github.com/gabrielerossoni)
-[![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-Marcello1408-181717?style=flat-square&logo=github)](https://github.com/Marcello1408)
+[![GitHub Marcello1408](https://img.shields.io/badge/GitHub-Marcello1408-181717?style=flat-square&logo=github)](https://github.com/Marcello1408)
 
 ---
 
