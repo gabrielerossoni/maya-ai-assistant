@@ -46,7 +46,7 @@ class ToolManager:
             self.tools[name] = tool_instance
             return True
         except Exception as e:
-            print(f"  [✗] Errore registrazione tool '{name}': {e}")
+            print(f"  [x] Errore registrazione tool '{name}': {e}")
             return False
 
     def unregister_tool(self, name: str):
@@ -84,7 +84,7 @@ class ToolManager:
             try:
                 tool.initialize()
             except Exception as e:
-                print(f"  [✗] Tool '{name}' errore init: {e}")
+                print(f"  [x] Tool '{name}' errore init: {e}")
 
         print(f"[TOOLS] {len(self.tools)} tool inizializzati.")
 

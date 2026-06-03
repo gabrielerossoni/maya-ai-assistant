@@ -106,6 +106,11 @@ class TestResolve:
         result = engine.resolve("che tempo fa domani?")
         assert result is None
 
+    def test_resolve_alias_does_not_match_inside_word(self, engine):
+        engine.register(_simple_automation("buonanotte", aliases=["notte"]))
+        result = engine.resolve("luce fuori nero mezzanotte")
+        assert result is None
+
     def test_resolve_modalita_notte_alias(self, engine):
         engine.register(_simple_automation("buonanotte", aliases=["modalità notte", "modalita notte"]))
         result = engine.resolve("attiva modalità notte")

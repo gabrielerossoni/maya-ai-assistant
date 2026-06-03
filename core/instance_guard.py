@@ -94,7 +94,7 @@ def kill_existing() -> bool:
             raise ValueError("PID non positivo")
     except ValueError as e:
         preview = raw if raw else "(vuoto)"
-        print(f"[KILL] PID file non valido ({PID_FILE}): contenuto malformato ({preview!r}) — {e}. Rimuovo il file.")
+        print(f"[KILL] PID file non valido ({PID_FILE}): contenuto malformato ({preview!r}) - {e}. Rimuovo il file.")
         try:
             os.remove(PID_FILE)
         except OSError:

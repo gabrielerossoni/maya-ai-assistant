@@ -135,7 +135,7 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(temp_path, final_path)
-            print(f"[SELF_HEALER] Patch salvata in {final_path} — hot-reload in corso")
+            print(f"[SELF_HEALER] Patch salvata in {final_path} - hot-reload in corso")
         except Exception as e:
             print(f"[SELF_HEALER] Errore scrittura patch: {e}")
             if os.path.exists(temp_path):

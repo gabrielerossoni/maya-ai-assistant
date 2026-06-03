@@ -12,30 +12,16 @@ class TranslateTool:
     def execute(self, action: dict) -> dict:
         parametro = action.get("parametro")
 
-        text = (
-            action.get("text")
-            or action.get("query")
-            or action.get("input")
-            or action.get("value")
-        )
+        text = action.get("text") or action.get("query") or action.get("input") or action.get("value")
 
         if not text and isinstance(parametro, str):
             text = parametro
 
         if not text and isinstance(parametro, dict):
-            text = (
-                parametro.get("text")
-                or parametro.get("query")
-                or parametro.get("input")
-                or parametro.get("value")
-            )
+            text = parametro.get("text") or parametro.get("query") or parametro.get("input") or parametro.get("value")
 
         target_lang = (
-            action.get("target")
-            or action.get("target_lang")
-            or action.get("language")
-            or action.get("lang")
-            or "en"
+            action.get("target") or action.get("target_lang") or action.get("language") or action.get("lang") or "en"
         )
 
         if isinstance(parametro, dict):
@@ -48,19 +34,13 @@ class TranslateTool:
             )
 
         if not text or not str(text).strip():
-            return {
-                "status": "error",
-                "message": "Nessun testo da tradurre."
-            }
+            return {"status": "error", "message": "Nessun testo da tradurre."}
 
         text = str(text).strip()
         target_lang = str(target_lang).strip().lower()
 
         try:
-            translated = GoogleTranslator(
-                source="auto",
-                target=target_lang
-            ).translate(text)
+            translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
 
             return {
                 "status": "ok",
@@ -70,7 +50,4 @@ class TranslateTool:
             }
 
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore traduzione: {e}"
-            }
+            return {"status": "error", "message": f"Errore traduzione: {e}"}
