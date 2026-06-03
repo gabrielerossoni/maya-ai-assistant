@@ -29,7 +29,7 @@
             --bg-dark: #000000;
             --accent: #ff2a2a;
             --text-main: #ffffff;
-            --text-dim: rgba(255, 255, 255, 0.4);
+            --text-dim: rgba(255, 255, 255, 0.5);
             --panel-bg: rgba(0, 0, 0, 0.95);
             --glass-border: 1px solid rgba(255, 0, 0, 0.5);
             --transition: all 0.9s cubic-bezier(0.4, 0, 0.2, 1);
@@ -120,7 +120,7 @@
 
         .dom-card-state {
             font-size: 8.5px !important;
-            opacity: 0.45 !important;
+            opacity: 0.5 !important;
         }
 
         .dom-card.active .dom-card-state {
@@ -536,7 +536,7 @@
         .wx-temp {
             font-size: 88px;
             font-weight: 100;
-            letter-spacing: -6px;
+            letter-spacing: -3px;
             line-height: 0.85;
             transition: color 1s ease, text-shadow 1s ease;
         }
@@ -641,7 +641,7 @@
             font-family: 'Syncopate', sans-serif;
             font-size: 8px;
             letter-spacing: 1px;
-            opacity: 0.4;
+            opacity: 0.52;
             width: 36px;
             text-transform: uppercase;
         }
@@ -659,7 +659,7 @@
         }
 
         .wx-fc-min {
-            opacity: 0.28;
+            opacity: 0.5;
             font-size: 11px;
             margin-left: 5px;
         }
@@ -1669,6 +1669,11 @@
             text-align: center;
         }
 
+        #cmd-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+            opacity: 1;
+        }
+
         #cmd-input:focus {
             border-color: rgba(255, 30, 30, 0.4);
             background: rgba(255, 255, 255, 0.08);
@@ -2630,7 +2635,7 @@
 
             .wx-temp {
                 font-size: 56px;
-                letter-spacing: -4px;
+                letter-spacing: -2px;
             }
 
             .wx-wind-val {
@@ -2921,6 +2926,17 @@
                 padding: 13px 16px;
             }
         }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-delay: 0s !important;
+                animation-duration: 0s !important;
+                animation-iteration-count: 1 !important;
+                transition-delay: 0s !important;
+                transition-duration: 0s !important;
+                scroll-behavior: auto !important;
+            }
+        }
     </style>
 </head>
 
@@ -2937,7 +2953,7 @@
     <div id="maya-orb-container" onclick="handleOrbClick()">
         <canvas id="orb-canvas"></canvas>
     </div>
-    <div id="orb-branding">MAYA</div>
+    <h1 id="orb-branding">MAYA</h1>
     <div id="spotify-widget">
         <div class="widget-close" onclick="closeSpotifyWidget()">✕</div>
         <div class="spotify-mini-card">
@@ -2979,17 +2995,17 @@
         </div>
         <!-- SCREEN 2: Work — sfondo-maya.png, content panels -->
         <div id="screen-work">
-            <div id="content-area">
+            <main id="content-area">
                 <!-- Header fisso mobile: orb + titolo panel corrente -->
                 <div id="mobile-panel-header">
                     <div style="padding-top: env(safe-area-inset-top);">
                         <div class="mph-label" id="mph-label">MAYA</div>
-                        <div class="mph-title" id="mph-title">—</div>
+                        <div class="mph-title" id="mph-title">-</div>
                     </div>
                 </div>
                 <div style="height:0"></div>
                 <!-- WEATHER PANEL -->
-                <div id="panel-weather" class="panel">
+                <section id="panel-weather" class="panel" role="region" aria-label="Weather">
                     <div class="wx-left">
                         <div class="wx-topbar">
                             <div>
@@ -3018,19 +3034,19 @@
                         <div class="wx-fc-hdr">FORECAST // 5 GIORNI</div>
                         <div id="weather-forecast-col"></div>
                     </div>
-                </div>
-                <div id="panel-map" class="panel">
+                </section>
+                <section id="panel-map" class="panel" role="region" aria-label="Map">
                     <div id="map-container"></div>
-                </div>
-                <div id="panel-browser" class="panel">
+                </section>
+                <section id="panel-browser" class="panel" role="region" aria-label="Web Browser">
                     <iframe id="browser-iframe" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-                </div>
-                <div id="panel-news" class="panel">
+                </section>
+                <section id="panel-news" class="panel" role="region" aria-label="News">
                     <div class="news-ticker-bar">
                         <div class="news-ticker-track" id="news-ticker-track">
                             <span class="ntk-label">NEURAL_FEED</span>
                             <span class="ntk-sep">//</span>
-                            <span class="ntk-item">In attesa di notizie — chiedi a Maya le ultime news</span>
+                            <span class="ntk-item">In attesa di notizie: chiedi a Maya le ultime news</span>
                         </div>
                     </div>
                     <div class="news-main-area">
@@ -3044,19 +3060,19 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                <div id="panel-dashboard" class="panel">
+                </section>
+                <section id="panel-dashboard" class="panel" role="region" aria-label="Domotica Dashboard">
                     <!-- Header -->
-                    <div class="dom-header">
+                    <header class="dom-header">
                         <div class="dom-header-left">
                             <div class="dom-header-label">DOMOTICA // LIVE</div>
-                            <div class="dom-header-title">Casa M.A.Y.A.</div>
+                            <h2 class="dom-header-title">Casa M.A.Y.A.</h2>
                         </div>
                         <div class="dom-header-right">
                             <span class="dom-status-pill" id="dom-scene-pill">
                                 <span class="dot" style="background:rgba(255,30,30,0.7);box-shadow:0 0 6px rgba(255,30,30,0.5)"></span>
                                 🎛️
-                                <span id="dom-scene-pill-text">—</span>
+                                <span id="dom-scene-pill-text">-</span>
                             </span>
                             <span class="dom-status-pill" id="dom-arduino-pill">
                                 <span class="dot"></span>
@@ -3066,7 +3082,7 @@
                                 <span class="dot"></span>MAYA ONLINE
                             </span>
                         </div>
-                    </div>
+                    </header>
                     <!-- Scene chips -->
                     <div class="dom-scene-strip">
                         <span class="dom-scene-strip-label">SCENE</span>
@@ -3273,8 +3289,8 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                <div id="panel-calendar" class="panel">
+                </section>
+                <section id="panel-calendar" class="panel" role="region" aria-label="Calendar">
                     <div class="dom-topbar"
                         style="padding: 0 20px; height:48px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.05); flex-shrink:0;">
                         <span class="dom-header-label"
@@ -3294,7 +3310,7 @@
                         <!-- Right: monthly grid -->
                         <div class="cal-month">
                             <div class="cal-month-header">
-                                <span class="cal-month-title" id="cal-month-title">— —</span>
+                                <span class="cal-month-title" id="cal-month-title">- -</span>
                                 <div class="cal-month-nav">
                                     <button onclick="calNavMonth(-1)">&#8249;</button>
                                     <button onclick="calNavMonth(1)">&#8250;</button>
@@ -3312,9 +3328,9 @@
                             <div class="cal-grid" id="cal-grid"></div>
                         </div>
                     </div>
-                </div>
+                </section>
                 <!-- Trading panel removed -->
-            </div>
+            </main>
         </div>
     </div>
     <div id="debug-controls"></div>
@@ -4620,7 +4636,7 @@
                 pill.style.opacity = '1';
             }
             // Log strip
-            setStatus(`[SCENA] ${sceneName} — ${status.toUpperCase()}`);
+            setStatus(`[SCENA] ${sceneName}: ${status.toUpperCase()}`);
         }
         function clearScenePill() {
             if (_activeChip) {
@@ -4635,7 +4651,7 @@
             const pill = document.getElementById('dom-scene-pill');
             const pillText = document.getElementById('dom-scene-pill-text');
             if (pill && pillText) {
-                pillText.textContent = '—';
+                pillText.textContent = '-';
                 pill.style.display = 'flex';
                 pill.style.opacity = '0.65';
                 pill.style.color = '';
@@ -4839,7 +4855,7 @@
                 if (!el) continue;
                 if (domState[dev] === null) {
                     el.classList.remove('active');
-                    if (stateEl) stateEl.textContent = '—';
+                    if (stateEl) stateEl.textContent = '-';
                 } else if (domState[dev]) {
                     el.classList.add('active');
                     if (stateEl) {
