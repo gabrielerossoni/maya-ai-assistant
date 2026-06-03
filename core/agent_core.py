@@ -649,6 +649,68 @@ class AgentCore:
 
         return {"intent": lower[:30], "actions": actions, "reply": reply}
 
+    def _hard_route_light_command(self, user_input: str) -> dict | None:
+        """
+        Comandi luce deterministici.
+        Evita che il modello spenga tutte le luci quando viene citata una stanza.
+        """
+        text = user_input.lower().strip()
+
+        if "luce" not in text and "luci" not in text:
+            return None
+
+        turn_on_words = ["accendi", "attiva", "metti"]
+        turn_off_words = ["spegni", "disattiva", "togli"]
+
+        is_on = any(w in text for w in turn_on_words)
+        is_off = any(w in text for w in turn_off_words)
+
+        if not is_on and not is_off:
+            return None
+
+        value = 0xFFFFFF if is_on else 0
+
+        room_targets = {
+            "salotto": "rgb1",
+            "soggiorno": "rgb1",
+            "camera": "rgb2",
+            "stanza": "rgb2",
+            "giardino": "rgb3",
+            "esterno": "rgb3",
+            "fuori": "rgb3",
+        }
+
+        for room, target in room_targets.items():
+            if room in text:
+                return {
+                    "tool": "arduino",
+                    "op": "SET",
+                    "target": target,
+                    "value": value,
+                }
+
+        # Solo se dice chiaramente tutte
+        all_words = ["tutte", "tutta casa", "casa", "ovunque"]
+
+        if any(w in text for w in all_words):
+            return {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "rgb1", "value": value},
+                    {"op": "SET", "target": "rgb2", "value": value},
+                    {"op": "SET", "target": "rgb3", "value": value},
+                ],
+            }
+
+        # Default: luce principale, non tutte
+        return {
+            "tool": "arduino",
+            "op": "SET",
+            "target": "light",
+            "value": 1 if is_on else 0,
+        }
+
     # ── FASE 2: EXECUTOR ─────────────────────────────────
     async def _execute_actions(self, actions: list) -> list:
         """Esegui ogni azione tramite il ToolManager."""
@@ -1070,6 +1132,33 @@ class AgentCore:
         # Rimuovi prefissi vocali comuni
         _clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower_input).strip()
 
+        hard_action = self._hard_route_light_command(_clean)
+        if hard_action:
+            result = await self.tool_manager.execute(hard_action)
+            if result.get("status") == "ok":
+                if hard_action.get("op") == "BATCH":
+                    reply = "Ho aggiornato tutte le luci."
+                else:
+                    target = hard_action.get("target")
+                    if target == "rgb3":
+                        reply = (
+                            "Ho spento la luce del giardino."
+                            if hard_action.get("value") == 0
+                            else "Ho acceso la luce del giardino."
+                        )
+                    elif target == "rgb2":
+                        reply = "Ho aggiornato la luce della camera."
+                    elif target == "rgb1":
+                        reply = "Ho aggiornato la luce del salotto."
+                    else:
+                        reply = "Ho aggiornato la luce principale."
+            else:
+                reply = "Non sono riuscita a controllare la luce."
+            
+            for token in (w + " " for w in reply.split()):
+                yield token
+            return
+
         if re.search(r"\b(annulla|undo|ripristina)\b", _clean) and re.search(
             r"\b(ultimo comando|ultimo|comando|azione)\b", _clean
         ):
@@ -1446,17 +1535,6 @@ class AgentCore:
 
                     results = await self._execute_actions(actions)
                     self.learner.observe_command(user_input, actions)
-                    
-                    # Se il tool è translate, rispondi direttamente con il risultato
-                    if len(results) == 1 and results[0]["tool"] == "translate":
-                        result = results[0]["result"]
-                    if result.get("status") == "ok":
-                        final_reply = result.get("message", "Traduzione completata.")
-                    else:
-                        final_reply = result.get("message", "Errore durante la traduzione.")
-
-                    for token in (w + " " for w in final_reply.split()):
-                        yield token
 
                     # 2d. Crea osservazione per il prossimo step
                     observation = ""
