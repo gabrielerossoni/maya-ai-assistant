@@ -1,4 +1,4 @@
-﻿"""
+"""
 agent_core.py - Cuore dell'agente Jarvis
 Gestisce: LLM (Ollama), Planner, Executor, Validator
 """
@@ -84,7 +84,7 @@ NON aggiungere testo fuori dal JSON.
 Tool disponibili:
 - arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/brightness/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); brightness: 0-255; buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
-- network: invia comandi al secondo PC (qualsiasi stringa)
+- network: disattivato di default; non usarlo salvo riattivazione esplicita con NETWORK_TOOL_ENABLED=true
 - system: comandi OS (shutdown, open_browser, screenshot)
 - weather: meteo (location)
 - news: ultime notizie (limit)
@@ -277,6 +277,7 @@ class AgentCore:
             r"\b(perche|come mai)\b",
         ]
         return any(re.search(pattern, lower) for pattern in patterns)
+
     async def _route_intent(self, user_input: str) -> str:
         """Determina l'intent dell'utente con caching."""
         cache_key = user_input.lower().strip()[:60]
@@ -541,8 +542,14 @@ class AgentCore:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
+                self._last_groq_error_status = None
                 return data["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as e:
+            self._last_groq_error_status = e.response.status_code
+            print(f"[GROQ] Errore: {e}")
+            return None
         except Exception as e:
+            self._last_groq_error_status = None
             print(f"[GROQ] Errore: {e}")
             return None
 
@@ -1578,11 +1585,11 @@ class AgentCore:
             elif status == "skipped":
                 reason = exec_result.get("reason", "")
                 if reason == "cooldown":
-                    reply = (
-                        f"La scena '{scene_name}' ÃƒÂ¨ stata giÃƒÂ  eseguita di recente. Attendi un po' prima di riprovare."
-                    )
+                    reply = f"La scena '{scene_name}' ÃƒÂ¨ stata giÃƒÂ  eseguita di recente. Attendi un po' prima di riprovare."
                 else:
-                    reply = f"La scena '{scene_name}' non puÃƒÂ² essere eseguita al momento (condizioni non soddisfatte)."
+                    reply = (
+                        f"La scena '{scene_name}' non puÃƒÂ² essere eseguita al momento (condizioni non soddisfatte)."
+                    )
             else:
                 reply = f"Scena '{scene_name}' completata con alcuni avvisi."
 
@@ -1598,7 +1605,7 @@ class AgentCore:
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
         intent = await self._route_intent(user_input)
 
-        max_steps = 2 if intent == "DOMOTIC" else 4
+        max_steps = int(os.getenv("REACT_MAX_STEPS", "2"))
         current_step = 0
 
         # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
@@ -1679,7 +1686,12 @@ class AgentCore:
                 if not full_response_text:
                     if not is_ollama_enabled():
                         print("[LLM] Ollama disabilitato, salto fallback planner")
-                        return
+                        if getattr(self, "_last_groq_error_status", None) == 429:
+                            final_reply = "Groq ha raggiunto il limite di richieste. Riprova tra poco."
+                        else:
+                            final_reply = "Non riesco a contattare il modello in questo momento."
+                        yield final_reply
+                        break
                     client = ollama.AsyncClient()
 
                     # Streaming della risposta dell'LLM

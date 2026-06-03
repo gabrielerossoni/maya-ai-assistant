@@ -5,6 +5,7 @@ Riceve azioni dal planner e le instrada al tool corretto.
 
 import asyncio
 import inspect
+import os
 
 from tools.arduino_tool import ArduinoTool
 from tools.calendar_tool import CalendarTool
@@ -60,7 +61,6 @@ class ToolManager:
         """Istanzia e registra tutti i tool."""
         self.tools = {
             "arduino": ArduinoTool(),
-            "network": NetworkTool(),
             "system": SystemTool(),
             "calendar": CalendarTool(),
             "weather": WeatherTool(),
@@ -78,6 +78,10 @@ class ToolManager:
             "mqtt": MqttTool(),
             "none": _NoOpTool(),
         }
+        if os.getenv("NETWORK_TOOL_ENABLED", "false").strip().lower() in ("1", "true", "yes"):
+            self.tools["network"] = NetworkTool()
+        else:
+            print("[TOOLS] network disattivato (NETWORK_TOOL_ENABLED=false).")
 
         # Inizializza ogni tool
         for name, tool in self.tools.items():

@@ -29,8 +29,8 @@ def strip_tags(html_content):
     if not html_content:
         return ""
     s = MLStripper()
-    s.feed(html_content)
-    return s.get_data().strip()
+    s.feed(html.unescape(str(html_content)))
+    return html.unescape(s.get_data()).strip()
 
 
 class NewsTool:
@@ -59,7 +59,7 @@ class NewsTool:
                 # 1. Prova regex nel summary
                 img_match = re.search(r'<img[^>]+src="([^">]+)"', raw_summary)
                 if img_match:
-                    image_url = img_match.group(1)
+                    image_url = html.unescape(img_match.group(1))
 
                 # 2. Prova media_content
                 if not image_url and "media_content" in entry and entry.media_content:

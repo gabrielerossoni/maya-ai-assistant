@@ -150,12 +150,12 @@
         }
 
         .ns-title {
-            font-size: 12px !important;
-            opacity: 0.88 !important;
+            font-size: 14px !important;
+            opacity: 0.94 !important;
         }
 
         .ns-source {
-            opacity: 0.65 !important;
+            opacity: 0.9 !important;
         }
 
         /* Weather */
@@ -698,7 +698,19 @@
             height: 100%;
             padding: 0 16px;
             white-space: nowrap;
+            width: max-content;
+            will-change: transform;
             animation: scroll-ticker 50s linear infinite;
+        }
+
+        @keyframes scroll-ticker {
+            from {
+                transform: translateX(0);
+            }
+
+            to {
+                transform: translateX(-50%);
+            }
         }
 
         .ntk-label {
@@ -792,7 +804,7 @@
             font-family: 'Syncopate', sans-serif;
             font-size: 7px;
             letter-spacing: 3px;
-            opacity: 0.22;
+            opacity: 0.58;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             flex-shrink: 0;
         }
@@ -825,12 +837,12 @@
         }
 
         .ns-item {
-            padding: 14px 18px;
+            padding: 16px 18px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             cursor: pointer;
             transition: background 0.2s;
             display: flex;
-            gap: 12px;
+            gap: 14px;
             align-items: flex-start;
         }
 
@@ -853,19 +865,31 @@
             min-width: 0;
         }
 
+        .ns-thumb {
+            width: 58px;
+            height: 58px;
+            object-fit: cover;
+            border-radius: 6px;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
         .ns-source {
             font-family: 'Syncopate', sans-serif;
-            font-size: 6px;
-            letter-spacing: 2px;
+            font-size: 7px;
+            letter-spacing: 2.4px;
             color: var(--accent);
-            opacity: 0.8;
-            margin-bottom: 5px;
+            opacity: 0.95;
+            margin-bottom: 7px;
         }
 
         .ns-title {
-            font-size: 11px;
-            line-height: 1.5;
-            opacity: 0.78;
+            font-size: 14px;
+            line-height: 1.45;
+            opacity: 0.94;
+            color: rgba(255, 255, 255, 0.94);
+            overflow-wrap: anywhere;
         }
 
         /* =============================================
@@ -1361,24 +1385,37 @@
 
         .cal-layout {
             display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 16px;
+            grid-template-columns: minmax(300px, 360px) 1fr;
+            gap: 18px;
             overflow: hidden;
             height: 100%;
             min-height: 0;
-            padding: 16px 20px 20px;
+            padding: 18px 20px 20px;
             box-sizing: border-box;
+        }
+
+        #panel-calendar .dom-topbar {
+            background: linear-gradient(90deg, rgba(255, 30, 30, 0.08), rgba(80, 200, 255, 0.035) 55%, transparent);
+            border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        #cal-pill {
+            padding: 6px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.035);
+            opacity: 0.72 !important;
         }
 
         /* ── Upcoming list ── */
         .cal-upcoming {
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 12px;
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: rgba(255, 30, 30, 0.3) transparent;
-            padding-right: 4px;
+            padding: 2px 4px 2px 0;
             min-height: 0;
         }
 
@@ -1397,11 +1434,12 @@
 
         .cal-upcoming-header {
             font-family: 'Syncopate', sans-serif;
-            font-size: 8px;
+            font-size: 8.5px;
             letter-spacing: 3px;
             color: var(--accent);
             opacity: 1;
-            margin-bottom: 4px;
+            margin: 0 0 4px;
+            padding: 0 2px 2px;
         }
 
         .cal-event-item {
@@ -1409,31 +1447,36 @@
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 12px;
-            padding: 16px 20px;
-            transition: all 0.2s;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+            border: 1px solid rgba(255, 255, 255, 0.075);
+            border-left: 2px solid rgba(255, 30, 30, 0.42);
+            border-radius: 8px;
+            padding: 15px 16px;
+            transition: transform 0.18s, border-color 0.18s, background 0.18s;
             flex-shrink: 0;
         }
 
         .cal-event-item:hover {
             border-color: rgba(255, 30, 30, 0.3);
+            background: rgba(255, 30, 30, 0.055);
+            transform: translateY(-1px);
         }
 
         .cal-event-item.today {
             border-color: rgba(255, 30, 30, 0.45);
-            background: rgba(255, 30, 30, 0.05);
+            border-left-color: var(--accent);
+            background: rgba(255, 30, 30, 0.075);
         }
 
         .cal-event-date {
             font-family: 'Syncopate', sans-serif;
-            font-size: 10.5px;
+            font-size: 10px;
             letter-spacing: 1px;
             color: var(--accent);
             text-align: right;
             flex-shrink: 0;
             line-height: 1.4;
+            min-width: 58px;
         }
 
         .cal-event-info {
@@ -1444,39 +1487,46 @@
         }
 
         .cal-date-sub {
-            font-size: 8px;
-            opacity: 0.5;
-            margin-bottom: 2px;
+            font-size: 7.5px;
+            opacity: 0.68;
+            margin-bottom: 3px;
         }
 
         .cal-time-main {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
             color: #fff;
         }
 
         .cal-event-title {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
-            color: rgba(255, 255, 255, 0.9);
-            white-space: nowrap;
+            color: rgba(255, 255, 255, 0.94);
+            white-space: normal;
             overflow: hidden;
-            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.35;
         }
 
         .cal-event-source {
-            font-size: 10px;
-            opacity: 0.35;
-            margin-top: 2px;
+            font-size: 8px;
+            opacity: 0.55;
+            margin-top: 6px;
             font-family: 'Syncopate', sans-serif;
-            letter-spacing: 1px;
+            letter-spacing: 1.6px;
         }
 
         .cal-empty {
-            opacity: 0.3;
-            font-size: 12px;
+            opacity: 0.55;
+            font-size: 11px;
             text-align: center;
-            margin-top: 40px;
+            margin-top: 26px;
+            padding: 22px 12px;
+            border: 1px dashed rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.025);
             font-family: 'Syncopate', sans-serif;
             letter-spacing: 2px;
         }
@@ -1485,10 +1535,14 @@
         .cal-month {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
             overflow: hidden;
             min-height: 0;
             height: 100%;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.018);
         }
 
         .cal-month-header {
@@ -1499,9 +1553,10 @@
 
         .cal-month-title {
             font-family: 'Syncopate', sans-serif;
-            font-size: 11px;
+            font-size: 12px;
             letter-spacing: 3px;
             font-weight: 700;
+            color: rgba(255, 255, 255, 0.92);
         }
 
         .cal-month-nav {
@@ -1510,14 +1565,14 @@
         }
 
         .cal-month-nav button {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.6);
-            width: 28px;
-            height: 28px;
-            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.055);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            color: rgba(255, 255, 255, 0.72);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1532,23 +1587,23 @@
         .cal-dow-row {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 4px;
+            gap: 6px;
             text-align: center;
         }
 
         .cal-dow {
             font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
+            font-size: 7.5px;
             letter-spacing: 1.5px;
-            opacity: 0.3;
-            padding: 2px 0;
+            opacity: 0.5;
+            padding: 4px 0;
         }
 
         .cal-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             grid-auto-rows: minmax(0, 1fr);
-            gap: 4px;
+            gap: 6px;
             flex: 1;
             min-height: 0;
             overflow: hidden;
@@ -1556,45 +1611,47 @@
 
         .cal-day {
             border-radius: 8px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.028);
+            border: 1px solid rgba(255, 255, 255, 0.045);
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
-            padding-top: 6px;
+            justify-content: center;
+            padding-top: 0;
             cursor: default;
-            transition: border-color 0.15s, background 0.15s;
+            transition: border-color 0.15s, background 0.15s, transform 0.15s;
             position: relative;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.65);
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.72);
         }
 
         .cal-day.has-event {
-            border-color: rgba(255, 30, 30, 0.25);
-            background: rgba(255, 30, 30, 0.04);
+            border-color: rgba(255, 30, 30, 0.35);
+            background: rgba(255, 30, 30, 0.065);
             cursor: pointer;
         }
 
         .cal-day.has-event:hover {
             border-color: rgba(255, 30, 30, 0.55);
-            background: rgba(255, 30, 30, 0.08);
+            background: rgba(255, 30, 30, 0.11);
+            transform: translateY(-1px);
         }
 
         .cal-day.today {
             border-color: var(--accent) !important;
             color: #fff;
             font-weight: 700;
+            background: rgba(255, 30, 30, 0.13);
         }
 
         .cal-day.today::after {
             content: '';
-            width: 4px;
-            height: 4px;
+            width: 18px;
+            height: 2px;
             border-radius: 50%;
             background: var(--accent);
             position: absolute;
-            bottom: 5px;
+            bottom: 7px;
         }
 
         .cal-day.faded {
@@ -1602,11 +1659,27 @@
         }
 
         .cal-day-dot {
-            width: 4px;
-            height: 4px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: var(--accent);
-            margin-top: 3px;
+            margin-top: 5px;
+        }
+
+        .cal-day-count {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            min-width: 14px;
+            height: 14px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: rgba(80, 200, 255, 0.16);
+            color: rgba(220, 248, 255, 0.95);
+            border: 1px solid rgba(80, 200, 255, 0.25);
+            font-size: 8px;
+            line-height: 13px;
+            text-align: center;
         }
 
         #nav-rail {
@@ -2688,11 +2761,18 @@
             }
 
             .ns-item {
-                padding: 12px 14px;
+                padding: 14px 14px;
+                gap: 12px;
+            }
+
+            .ns-thumb {
+                width: 52px;
+                height: 52px;
             }
 
             .ns-title {
-                font-size: 13px !important;
+                font-size: 15px !important;
+                line-height: 1.42;
             }
 
             /* ══════════════════════════════════════════
@@ -4217,6 +4297,12 @@
 
         function updateCalendar(events) {
             _calEvents = events || [];
+            const pill = document.getElementById('cal-pill');
+            if (pill) {
+                const googleCount = _calEvents.filter(e => e.source === 'google').length;
+                const localCount = _calEvents.length - googleCount;
+                pill.textContent = googleCount ? `GOOGLE ${googleCount}` : `MAYA ${localCount}`;
+            }
             renderCalUpcoming();
             renderCalGrid();
         }
@@ -4236,6 +4322,11 @@
                 return;
             }
             const _esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            const _decodeHtml = s => {
+                const t = document.createElement('textarea');
+                t.innerHTML = String(s);
+                return t.value;
+            };
             future.forEach(e => {
                 const dt = new Date(e.time.replace(' ', 'T'));
                 const isToday = dt.toDateString() === now.toDateString();
@@ -4257,7 +4348,7 @@
                 
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'cal-event-title';
-                titleDiv.textContent = title;
+                titleDiv.textContent = _decodeHtml(title);
                 
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'cal-event-source';
@@ -4322,12 +4413,22 @@
             const eventDates = new Set(_calEvents.map(e => {
                 try { const d = new Date(e.time.replace(' ', 'T')); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; } catch { return ''; }
             }));
+            const eventCounts = _calEvents.reduce((acc, e) => {
+                try {
+                    const d = new Date(e.time.replace(' ', 'T'));
+                    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                    acc[key] = (acc[key] || 0) + 1;
+                } catch (_) {}
+                return acc;
+            }, {});
             let html = '';
             for (let i = 0; i < offset; i++) html += '<div class="cal-day faded"></div>';
             for (let day = 1; day <= daysInMonth; day++) {
                 const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === day;
-                const hasEv = eventDates.has(`${y}-${m}-${day}`);
-                html += `<div class="cal-day${isToday ? ' today' : ''}${hasEv ? ' has-event' : ''}">${day}${hasEv ? '<div class="cal-day-dot"></div>' : ''}</div>`;
+                const key = `${y}-${m}-${day}`;
+                const hasEv = eventDates.has(key);
+                const count = eventCounts[key] || 0;
+                html += `<div class="cal-day${isToday ? ' today' : ''}${hasEv ? ' has-event' : ''}" aria-label="${day}${count ? `, ${count} eventi` : ''}">${day}${count > 1 ? `<span class="cal-day-count">${count}</span>` : ''}${hasEv ? '<div class="cal-day-dot"></div>' : ''}</div>`;
             }
             document.getElementById('cal-grid').innerHTML = html;
         }
@@ -4516,12 +4617,19 @@
             if (!articles || articles.length === 0) return;
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
             const _en = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-            const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? _en(p.href) : '#'; } catch(_){return '#';} };
+            const _decodeHtml = s => {
+                const t = document.createElement('textarea');
+                t.innerHTML = String(s);
+                return t.value;
+            };
+            const _safeText = (s, encoded = false) => _decodeHtml(encoded ? String(s || '') : _en(s || ''));
+            const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? p.href : '#'; } catch(_){return '#';} };
             const sidebarList = document.getElementById('news-sidebar-list');
             sidebarList.innerHTML = '';
             
             articles.forEach((a, i) => {
                 const _u = _safeUrl(a.link);
+                const _img = _safeUrl(a.image);
                 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'ns-item';
@@ -4540,15 +4648,24 @@
                 
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'ns-source';
-                sourceDiv.textContent = _en(a.source || 'MAYA FEED');
+                sourceDiv.textContent = _safeText(a.source || 'MAYA FEED');
                 
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'ns-title';
-                titleDiv.textContent = _en(a.title);
+                titleDiv.textContent = _safeText(a.title);
                 
                 contentDiv.appendChild(sourceDiv);
                 contentDiv.appendChild(titleDiv);
                 itemDiv.appendChild(rankDiv);
+                if (_img !== '#') {
+                    const thumb = document.createElement('img');
+                    thumb.className = 'ns-thumb';
+                    thumb.src = _img;
+                    thumb.alt = '';
+                    thumb.loading = 'lazy';
+                    thumb.referrerPolicy = 'no-referrer';
+                    itemDiv.appendChild(thumb);
+                }
                 itemDiv.appendChild(contentDiv);
                 sidebarList.appendChild(itemDiv);
             });
@@ -4561,7 +4678,7 @@
                 articles.forEach(a => {
                     const labelSpan = document.createElement('span');
                     labelSpan.className = 'ntk-label';
-                    labelSpan.textContent = _en(a.source || 'NEWS');
+                    labelSpan.textContent = _safeText(_en(a.source || 'NEWS'), true);
                     
                     const sepSpan1 = document.createElement('span');
                     sepSpan1.className = 'ntk-sep';
@@ -4569,7 +4686,7 @@
                     
                     const itemSpan = document.createElement('span');
                     itemSpan.className = 'ntk-item';
-                    itemSpan.textContent = _en(a.title);
+                    itemSpan.textContent = _safeText(_en(a.title), true);
                     
                     const sepSpan2 = document.createElement('span');
                     sepSpan2.className = 'ntk-sep';

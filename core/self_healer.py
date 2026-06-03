@@ -42,11 +42,13 @@ Rispondi SOLO con il codice Python completo. Zero testo fuori dal codice."""
 
     def record_success(self, tool_name: str):
         """Resetta il contatore errori su esecuzione ok."""
+        if os.getenv("DISABLE_SELF_HEALER", "true").strip().lower() in ("1", "true", "yes"):
+            return
         self._error_counts.pop(tool_name, None)
 
     def record_error(self, tool_name: str, error: Exception, source_file: str):
         """Incrementa il contatore; dopo ERROR_THRESHOLD tenta il fix."""
-        if os.getenv("DISABLE_SELF_HEALER", "false").lower() == "true":
+        if os.getenv("DISABLE_SELF_HEALER", "true").strip().lower() in ("1", "true", "yes"):
             return
 
         count = self._error_counts.get(tool_name, 0) + 1

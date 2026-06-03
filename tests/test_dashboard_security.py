@@ -51,6 +51,11 @@ class TestXSSEscape:
         assert "const title = _esc(" in html
         assert "_esc(e.time)" in html
 
+    def test_calendar_visual_badges_are_present(self, html):
+        assert "cal-day-count" in html
+        assert "GOOGLE ${googleCount}" in html
+        assert "grid-template-columns: minmax(300px, 360px) 1fr" in html
+
     def test_weather_forecast_uses_escape(self, html):
         """La previsione meteo deve escapare desc prima di innerHTML."""
         assert "const _e = s =>" in html or "const _e=" in html
@@ -65,6 +70,23 @@ class TestXSSEscape:
     def test_news_ticker_uses_en_helper(self, html):
         assert "_en(a.source || 'NEWS')" in html
         assert "_en(a.title)" in html
+
+    def test_news_text_is_decoded_before_textcontent(self, html):
+        """Le entity HTML devono essere sicure ma non visibili come L&#39;utente."""
+        assert "const _decodeHtml = s =>" in html
+        assert "titleDiv.textContent = _safeText(a.title)" in html
+        assert "sourceDiv.textContent = _safeText(a.source || 'MAYA FEED')" in html
+
+    def test_news_sidebar_supports_optional_thumbnail(self, html):
+        """La lista notizie deve poter mostrare una miniatura validata."""
+        assert "const _img = _safeUrl(a.image)" in html
+        assert "thumb.className = 'ns-thumb'" in html
+        assert "thumb.referrerPolicy = 'no-referrer'" in html
+
+    def test_news_ticker_has_scroll_animation(self, html):
+        assert "animation: scroll-ticker" in html
+        assert "@keyframes scroll-ticker" in html
+        assert "transform: translateX(-50%)" in html
 
     def test_no_raw_title_injection(self, html):
         """Non ci deve essere ${a.title} senza escape nel ticker o sidebar."""

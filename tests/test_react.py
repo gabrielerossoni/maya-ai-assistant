@@ -190,3 +190,59 @@ async def test_react_loop_logic(agent):
         assert mock_execute.call_count == 1
         # 2 chiamate LLM: prima per decidere il tool, seconda per riformulare
         assert mock_chat.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_react_default_max_steps_is_two(agent, monkeypatch):
+    agent.memory.add_turn = AsyncMock()
+    agent.memory.get_context = AsyncMock(return_value="")
+    monkeypatch.delenv("REACT_MAX_STEPS", raising=False)
+
+    with (
+        patch("core.agent_core.is_ollama_enabled", return_value=True),
+        patch.object(agent, "_call_groq", new_callable=AsyncMock, return_value=None),
+        patch("ollama.AsyncClient.chat", new_callable=AsyncMock) as mock_chat,
+        patch.object(agent, "_route_intent", return_value="REASONING"),
+        patch.object(agent.tool_manager, "execute", new_callable=AsyncMock) as mock_execute,
+    ):
+        mock_chat.return_value = {
+            "message": {
+                "content": json.dumps(
+                    {
+                        "thought": "Continuo a usare tool.",
+                        "actions": [{"tool": "weather", "location": "Milano"}],
+                        "reply": "Controllo...",
+                    }
+                )
+            }
+        }
+        mock_execute.return_value = {"status": "ok", "message": "ok"}
+
+        response_tokens = []
+        async for token in agent.process("chi e Brad Pitt?"):
+            response_tokens.append(token)
+
+    assert mock_chat.call_count == 2
+    assert "troppi passaggi" in "".join(response_tokens)
+
+
+@pytest.mark.asyncio
+async def test_react_rate_limit_returns_voice_reply(agent):
+    agent = AgentCore()
+    agent.memory.add_turn = AsyncMock()
+    agent.memory.get_context = AsyncMock(return_value="")
+
+    async def fake_groq(*args, **kwargs):
+        agent._last_groq_error_status = 429
+        return None
+
+    with (
+        patch("core.agent_core.is_ollama_enabled", return_value=False),
+        patch.object(agent, "_call_groq", side_effect=fake_groq),
+        patch.object(agent, "_route_intent", return_value="REASONING"),
+    ):
+        response_tokens = []
+        async for token in agent.process("chi e Brad Pitt?"):
+            response_tokens.append(token)
+
+    assert "limite di richieste" in "".join(response_tokens)

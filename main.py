@@ -54,6 +54,10 @@ _bg_tasks = []
 _shutdown_started = False
 
 
+def _env_enabled(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in ("1", "true", "yes")
+
+
 async def shutdown_hardware(reason: str = "shutdown"):
     """Porta gli attuatori in stato sicuro prima di chiudere il processo."""
     global _shutdown_started
@@ -134,8 +138,12 @@ async def lifespan(app: FastAPI):
     plugins_dir = os.path.join(os.getcwd(), "plugins")
     os.makedirs(plugins_dir, exist_ok=True)
 
-    plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
-    plugin_loader.start()
+    plugin_loader = None
+    if _env_enabled("PLUGIN_LOADER_ENABLED") or _env_enabled("DEV_MODE"):
+        plugin_loader = PluginLoader(agent.tool_manager, plugins_dir)
+        plugin_loader.start()
+    else:
+        print("[PLUGIN] PluginLoader disattivato (PLUGIN_LOADER_ENABLED/DEV_MODE non attivo).")
 
     proactive_manager = ProactiveManager(
         agent.tool_manager, manager, memory_manager=agent.memory, voice_manager=voice_manager
@@ -311,6 +319,11 @@ async def lifespan(app: FastAPI):
         print("\n[SYSTEM] Spegnimento in corso...")
         await shutdown_hardware("lifespan")
         display.stop()
+        if plugin_loader:
+            try:
+                plugin_loader.stop()
+            except Exception as e:
+                print(f"[SHUTDOWN] Errore stop PluginLoader: {e}")
         # Cancella i task in background al termine
         for task in _bg_tasks:
             task.cancel()
