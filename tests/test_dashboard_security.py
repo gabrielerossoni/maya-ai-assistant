@@ -61,6 +61,18 @@ class TestXSSEscape:
         assert "const _e = s =>" in html or "const _e=" in html
         assert "_e((day.condition" in html or "_e( (day.condition" in html
 
+    def test_weather_forecast_has_dynamic_ui(self, html):
+        assert "wx-fc-icon" in html
+        assert "wx-fc-bar-fill" in html
+        assert "wx-fc-legend" in html
+        assert "forecastTempColor(maxTemp)" in html
+        assert "forecastTempFill(maxTemp)" in html
+        assert "Fresco" in html
+        assert "Mite" in html
+        assert "Caldo" in html
+        assert "day.precip_probability" in html
+        assert "PIOGGIA" in html
+
     def test_news_sidebar_uses_en_helper(self, html):
         """updateNews deve usare _en() per source e title."""
         assert "const _en = s =>" in html
@@ -87,6 +99,15 @@ class TestXSSEscape:
         assert "animation: scroll-ticker" in html
         assert "@keyframes scroll-ticker" in html
         assert "transform: translateX(-50%)" in html
+
+    def test_news_live_streams_use_live_channel_embeds_only(self, html):
+        assert "youtube.com/embed/live_stream?channel=" in html
+        assert "UC16niRr50-MSBwiO3YDb3RA" in html
+        assert "UCLXo7UDZvByw2ixzpQCufnA" not in html
+        assert "fetch('/api/news/live-streams'" in html
+        assert "stream.fallback ? ' · FALLBACK LIVE'" not in html
+        assert "kind: 'video'" not in html
+        assert "oembed?url=" not in html
 
     def test_no_raw_title_injection(self, html):
         """Non ci deve essere ${a.title} senza escape nel ticker o sidebar."""

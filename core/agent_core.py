@@ -33,13 +33,13 @@ os.environ["OLLAMA_HOST"] = os.getenv("OLLAMA_HOST", "127.0.0.1")
 
 
 def is_ollama_enabled() -> bool:
-    """Controlla se Ollama ÃƒÂ¨ abilitato tramite variabile d'ambiente."""
+    """Controlla se Ollama è abilitato tramite variabile d'ambiente."""
     return os.getenv("OLLAMA_ENABLED", "true").strip().lower() in ("1", "true", "yes")
 
 
-# Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+# ----------------------------------------------
 # CONFIGURAZIONE
-# Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+# ----------------------------------------------
 MODELS = {
     "router": os.getenv("MODEL_ROUTER", "llama3.2:1b"),
     "domotic": os.getenv("MODEL_DOMOTIC", "phi4"),
@@ -51,12 +51,12 @@ ACTIVE_MODEL = MODELS["router"]
 
 # Carica il prompt dal .env se disponibile, altrimenti usa il default
 DEFAULT_PROMPT = """Sei MAYA (Multitask Advanced Yielding Assistant), un assistente AI agentico evoluto.
-Il tuo compito ÃƒÂ¨ aiutare l'utente gestendo la casa, cercando informazioni e fornendo dati in tempo reale.
+Il tuo compito è aiutare l'utente gestendo la casa, cercando informazioni e fornendo dati in tempo reale.
 
 REGOLE DI COMPORTAMENTO:
 1. TOOL USAGE: Usa i tool SOLO se strettamente necessario per rispondere. Se l'utente ti saluta o fa chiacchiere, rispondi normalmente senza attivare tool a caso.
-2. PERSONALITÃƒâ‚¬: Sei sicura di te, un po' distaccata ma impeccabile nel servizio. Niente emoji eccessive, sii professionale e "tough".
-3. FORMATO JSON (OBBLIGATORIO): Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. ÃƒË† CRITICO che la chiave "reply" contenga la tua risposta completa per l'utente.
+2. PERSONALITÀ: Sei sicura di te, un po' distaccata ma impeccabile nel servizio. Niente emoji eccessive, sii professionale e "tough".
+3. FORMATO JSON (OBBLIGATORIO): Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. È CRITICO che la chiave "reply" contenga la tua risposta completa per l'utente.
 Struttura:
 {
   "intent": "cosa vuole l'utente",
@@ -78,7 +78,7 @@ SE NON HAI BISOGNO DI TOOL, lascia "actions" come lista vuota [].
 NON aggiungere testo fuori dal JSON.
 4. NO INVENZIONE: Non inventare mai dati. Se usi un tool informativo, scrivi nella reply che stai controllando.
 5. MEMORIA SEMANTICA: Riceverai blocchi di testo marcati come "CONTESTO PASSATO RILEVANTE". Questi sono ricordi recuperati dal database vettoriale. Usali per rispondere a domande su fatti passati o per coerenza a lungo termine.
-6. ReAct LOOP: Puoi eseguire azioni multiple in sequenza. Se il risultato di un tool non ÃƒÂ¨ sufficiente, chiedi un altro tool nel prossimo step. Quando hai l'informazione finale, fornisci la "reply" senza "actions".
+6. ReAct LOOP: Puoi eseguire azioni multiple in sequenza. Se il risultato di un tool non è sufficiente, chiedi un altro tool nel prossimo step. Quando hai l'informazione finale, fornisci la "reply" senza "actions".
 7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
 
 Tool disponibili:
@@ -104,14 +104,14 @@ REGOLE CRITICHE:
 1. NON RIFIUTARE MAI: Hai accesso a internet tramite i tool. Se l'utente chiede prezzi, meteo o notizie, usa i tool dedicati.
 2. FORMATO: Rispondi SOLO con il JSON, nessun altro testo.
 3. Se l'utente chiede il valore di una moneta, usa sempre 'trading' con operation 'price'.
-4. Se usi un tool informativo (trading, weather, search, news), nella tua "reply" NON inventare MAI dati o cifre. DÃƒÂ¬ solo che stai recuperando le informazioni (es: "Certamente, controllo subito..."). I dati reali verranno aggiunti automaticamente dopo.
+4. Se usi un tool informativo (trading, weather, search, news), nella tua "reply" NON inventare MAI dati o cifre. Dì solo che stai recuperando le informazioni (es: "Certamente, controllo subito..."). I dati reali verranno aggiunti automaticamente dopo.
 """
 
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
 
-# Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+# ----------------------------------------------
 # PROMPT SPECIALISTICI
-# Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+# ----------------------------------------------
 
 ROUTER_PROMPT = """Classifica l'intent dell'utente in UNA parola.
 - DOMOTIC: se chiede PREZZI, BITCOIN, CRIPTO, S&P500, BORSA, AZIONI, METEO, NOTIZIE, WIKIPEDIA, TRADUZIONI, LUCI, NOTE o CALENDARIO.
@@ -136,7 +136,7 @@ SPECIALIST_PROMPTS = {
     "REASONING": DEFAULT_PROMPT
     + "\nFOCUS: Fornisci risposte approfondite e strutturate. Se l'utente chiede CODICE, scrivi codice pulito e commentato.",
     "CHITCHAT": DEFAULT_PROMPT
-    + "\nFOCUS: Sii amichevole ma professionale (personalitÃƒÂ  'tough'). Mantieni le risposte brevi.",
+    + "\nFOCUS: Sii amichevole ma professionale (personalità 'tough'). Mantieni le risposte brevi.",
 }
 
 # Messaggi di filler per il feedback durante l'elaborazione (zero latenza aggiuntiva)
@@ -154,7 +154,7 @@ _RGB_DEFAULT_SENTINEL = object()
 class AgentCore:
     """
     Cuore del sistema agentico.
-    Implementa il pattern Planner Ã¢â€ â€™ Executor Ã¢â€ â€™ Validator.
+    Implementa il pattern Planner → Executor → Validator.
     """
 
     def __init__(self):
@@ -216,7 +216,7 @@ class AgentCore:
 
         print("[AGENT] AgentCore pronto.\n")
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬ FASE 1: PLANNER Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # ── FASE 1: PLANNER ──────────────────────────────────
     def _check_automation(self, user_input: str) -> "Automation | None":
         """Controlla se l'input corrisponde a un'automazione predefinita."""
         automation = self.automation_engine.resolve(user_input)
@@ -225,7 +225,7 @@ class AgentCore:
         return automation
 
     def _normalize_router_text(self, text: str) -> str:
-        normalized = unicodedata.normalize("NFKD", text.lower().replace("ï¿½", "e"))
+        normalized = unicodedata.normalize("NFKD", text.lower().replace("è", "e"))
         normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
         normalized = re.sub(r"[^\w\s']", " ", normalized)
         return re.sub(r"\s+", " ", normalized).strip()
@@ -307,12 +307,12 @@ class AgentCore:
             return "CHITCHAT"
 
         # --- 0. ECCEZIONI (MAI HARD-ROUTE) ---
-        # Se contiene citazioni, domande di spiegazione o ÃƒÂ¨ troppo lunga
+        # Se contiene citazioni, domande di spiegazione o è troppo lunga
         never_hard_route = [
             "parla di",
             "spiegami",
             "cosa pensi",
-            "perchÃƒÂ©",
+            "perché",
             "come mai",
             "cosa significa",
         ]
@@ -351,7 +351,7 @@ class AgentCore:
             "camera",
             "giardino",
             "studio",
-            "luminositÃƒÂ ",
+            "luminosità",
             "luminosita",
         ]
         if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
@@ -372,11 +372,11 @@ class AgentCore:
         if any(v in lower for v in crypto_verbs) and any(a in lower for a in crypto_assets):
             return "DOMOTIC"
 
-        # Meteo e News (giÃƒÂ  filtrati per lunghezza > 12 sopra)
+        # Meteo e News (già filtrati per lunghezza > 12 sopra)
         if any(x in lower for x in ["meteo", "che tempo fa", "temperatura"]):
             return "DOMOTIC"
 
-        if any(x in lower for x in ["ultime notizie", "che news", "cosa ÃƒÂ¨ successo oggi"]):
+        if any(x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]):
             return "DOMOTIC"
 
         # Spotify: comandi diretti (es. "spotify next", "spotify play")
@@ -424,7 +424,7 @@ class AgentCore:
     async def _llm_routing(self, user_input: str) -> str:
         """Routing tramite LLM (Groq -> Ollama)."""
         try:
-            # PRIORITÃƒâ‚¬ GROQ PER ROUTING
+            # PRIORITÀ GROQ PER ROUTING
             if os.getenv("GROQ_API_KEY"):
                 messages = [
                     {"role": "system", "content": ROUTER_PROMPT},
@@ -514,7 +514,7 @@ class AgentCore:
         headers = {"Authorization": f"Bearer {api_key}"}
 
         # Scegli il modello in base al contenuto dei messaggi (se router o meno)
-        # Se json_mode ÃƒÂ¨ False, probabilmente siamo nel routing
+        # Se json_mode è False, probabilmente siamo nel routing
         model_env = "GROQ_ROUTER_MODEL" if not json_mode else "GROQ_MODEL"
         default_model = "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
         model = os.getenv(model_env, default_model)
@@ -554,7 +554,7 @@ class AgentCore:
             return None
 
     async def _call_groq_fallback(self, messages: list) -> dict:
-        """Chiamata di fallback a Groq se Ollama non ÃƒÂ¨ disponibile."""
+        """Chiamata di fallback a Groq se Ollama non è disponibile."""
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             print("[LLM] Groq fallback saltato: GROQ_API_KEY non trovata.")
@@ -603,7 +603,7 @@ class AgentCore:
 
         # 3. Chiamata allo Specialista
         try:
-            # Se ÃƒÂ¨ CHITCHAT, limitiamo il contesto per velocitÃƒÂ  estrema
+            # Se è CHITCHAT, limitiamo il contesto per velocità estrema
             if intent == "CHITCHAT":
                 context = await self.memory.get_context(query=None, top_k=2)  # No embedding search for chitchat
             else:
@@ -616,7 +616,7 @@ class AgentCore:
                 {"role": "user", "content": prompt},
             ]
 
-            # PRIORITÃƒâ‚¬ GROQ
+            # PRIORITÀ GROQ
             if os.getenv("GROQ_API_KEY"):
                 response_text = await self._call_groq(messages, json_mode=True)
                 if response_text:
@@ -659,7 +659,7 @@ class AgentCore:
 
     def _fallback_parse(self, user_input: str) -> dict:
         """
-        Parser di fallback per quando Ollama non ÃƒÂ¨ disponibile.
+        Parser di fallback per quando Ollama non è disponibile.
         Regole semplici basate su keyword.
         """
         lower = user_input.lower()
@@ -820,7 +820,7 @@ class AgentCore:
             "value": 1 if is_on else 0,
         }
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬ FASE 2: EXECUTOR Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # ── FASE 2: EXECUTOR ─────────────────────────────────
     def _normalize_arduino_action_for_request(self, action: dict, source_text: str) -> dict:
         if action.get("tool") != "arduino" or not source_text:
             return action
@@ -912,7 +912,7 @@ class AgentCore:
 
         return results
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬ FASE 3: VALIDATOR Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # ── FASE 3: VALIDATOR ────────────────────────────────
     def _validate_results(self, results: list) -> bool:
         """Controlla che le azioni siano andate a buon fine."""
         for r in results:
@@ -1044,7 +1044,7 @@ class AgentCore:
                 "Arduino non e' connesso.",
             )
 
-        if re.search(r"\b(sensor[ei]|temperatura casa|umidit[ÃƒÂ a])\b", text):
+        if re.search(r"\b(sensor[ei]|temperatura casa|umidit[àa])\b", text):
             return (
                 {"tool": "arduino", "op": "GET", "target": "sensor_read"},
                 "Sensori letti.",
@@ -1153,7 +1153,7 @@ class AgentCore:
                 f"Non riesco ad aggiornare {self._zone_label(zone)}: Arduino non e' connesso.",
             )
 
-        if re.search(r"\b(luminosit[ÃƒÂ a]|brightness)\b", text):
+        if re.search(r"\b(luminosit[àa]|brightness)\b", text):
             match = re.search(r"\b(\d{1,3})\b", text)
             if match:
                 pct = max(0, min(100, int(match.group(1))))
@@ -1305,9 +1305,9 @@ class AgentCore:
             )
         return "Nessun comando annullabile."
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬ PROCESSO PRINCIPALE (ReAct Loop) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
     async def process(self, user_input: str, progress_cb=None):
-        """Pipeline completa ReAct: Ragiona Ã¢â€ â€™ Agisci Ã¢â€ â€™ Osserva."""
+        """Pipeline completa ReAct: Ragiona → Agisci → Osserva."""
         # Garbage collect completed tasks from caches to prevent memory leaks
         for t in list(self._current_task_layout.keys()):
             if t.done():
@@ -1585,11 +1585,11 @@ class AgentCore:
             elif status == "skipped":
                 reason = exec_result.get("reason", "")
                 if reason == "cooldown":
-                    reply = f"La scena '{scene_name}' ÃƒÂ¨ stata giÃƒÂ  eseguita di recente. Attendi un po' prima di riprovare."
-                else:
                     reply = (
-                        f"La scena '{scene_name}' non puÃƒÂ² essere eseguita al momento (condizioni non soddisfatte)."
+                        f"La scena '{scene_name}' è stata già eseguita di recente. Attendi un po' prima di riprovare."
                     )
+                else:
+                    reply = f"La scena '{scene_name}' non può essere eseguita al momento (condizioni non soddisfatte)."
             else:
                 reply = f"Scena '{scene_name}' completata con alcuni avvisi."
 
@@ -1678,7 +1678,7 @@ class AgentCore:
             try:
                 full_response_text = ""
 
-                # PRIORITÃƒâ‚¬ GROQ
+                # PRIORITÀ GROQ
                 if os.getenv("GROQ_API_KEY"):
                     full_response_text = await self._call_groq(history, json_mode=True)
 
@@ -1695,9 +1695,9 @@ class AgentCore:
                     client = ollama.AsyncClient()
 
                     # Streaming della risposta dell'LLM
-                    # Se ÃƒÂ¨ l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
+                    # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
                     # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
-                    # Lo streaming dei token ha senso solo se sappiamo che ÃƒÂ¨ la risposta finale.
+                    # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
 
                     response = await client.chat(
                         model=model_name,
@@ -1756,7 +1756,7 @@ class AgentCore:
                         observation += f"Risultato tool '{tool}' ({status}): {compressed_msg}\n"
 
                     # --- EARLY EXIT CHECK ---
-                    # Se abbiamo usato un solo tool (non critico), il risultato ÃƒÂ¨ OK e abbiamo giÃƒÂ  una reply
+                    # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
                     # consistente, usciamo senza fare lo Step 2 (riformulazione).
                     is_error = any(res.get("result", {}).get("status") == "error" for res in results)
 
@@ -1802,7 +1802,7 @@ class AgentCore:
         await self.memory.add_turn("jarvis", final_reply, persist_db=False)
         asyncio.create_task(self.memory.add_turn("jarvis", final_reply, persist_db=True))
 
-        # In un async generator non si puÃƒÂ² usare 'return value' prima di Python 3.10
+        # In un async generator non si può usare 'return value' prima di Python 3.10
         # o in contesti specifici. Usiamo un attributo per passare il layout finale.
         task = asyncio.current_task()
         layout = self._current_task_layout.pop(task, getattr(self, "_last_layout", {"type": "orb", "params": {}}))

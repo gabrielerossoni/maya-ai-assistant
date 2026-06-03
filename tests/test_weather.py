@@ -27,6 +27,7 @@ def test_weather_tool_text_location():
                 "temperature_2m_max": [25.0, 26.0, 27.0, 28.0, 29.0, 30.0],
                 "temperature_2m_min": [15.0, 16.0, 17.0, 18.0, 19.0, 20.0],
                 "weathercode": [0, 1, 2, 3, 45, 48],
+                "precipitation_probability_max": [0, 10, 20, 30, 40, 50],
             },
         }
 
@@ -37,6 +38,7 @@ def test_weather_tool_text_location():
         assert res["data"]["location"] == "Milano"
         assert res["data"]["temp"] == 22.5
         assert res["data"]["humidity"] == 50
+        assert res["data"]["daily"][0]["precip_probability"] == 10
 
 
 def test_weather_tool_coordinates_nominatim_success():

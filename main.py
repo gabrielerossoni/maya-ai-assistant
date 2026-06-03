@@ -38,6 +38,7 @@ from core.proactive_manager import ProactiveManager
 from core.routes import (
     get_dashboard,
     get_manifest,
+    get_news_live_streams,
     get_service_worker,
     health_check,
     websocket_endpoint,
@@ -369,6 +370,11 @@ async def _manifest():
 @app.get("/health")
 async def _health():
     return await health_check()
+
+
+@app.get("/api/news/live-streams")
+async def _news_live_streams():
+    return await get_news_live_streams()
 
 
 @app.post("/shutdown")

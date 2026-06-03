@@ -603,59 +603,137 @@
         }
 
         .wx-forecast {
-            width: 260px;
+            width: 310px;
             flex-shrink: 0;
             border-left: 1px solid rgba(255, 255, 255, 0.06);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            background: rgba(255, 255, 255, 0.01);
+            background: linear-gradient(180deg, rgba(80, 200, 255, 0.035), rgba(255, 255, 255, 0.012));
         }
 
         .wx-fc-hdr {
             font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
+            font-size: 7.5px;
             letter-spacing: 3px;
-            opacity: 0.18;
-            padding: 16px 20px 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            opacity: 0.58;
+            padding: 18px 20px 8px;
             flex-shrink: 0;
         }
 
-        .wx-fc-row {
+        .wx-fc-legend {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 0 18px 13px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            flex-shrink: 0;
+        }
+
+        .wx-fc-legend-item {
             display: flex;
             align-items: center;
-            padding: 16px 22px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            gap: 10px;
-            transition: all 0.2s;
+            gap: 5px;
+            min-width: 0;
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+        }
+
+        .wx-fc-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            flex-shrink: 0;
+            box-shadow: 0 0 12px currentColor;
+        }
+
+        .wx-fc-dot.cold { color: #7ee8ff; background: #7ee8ff; }
+        .wx-fc-dot.mild { color: #ffe87c; background: #ffe87c; }
+        .wx-fc-dot.hot { color: #ff8c42; background: #ff8c42; }
+
+        .wx-fc-row {
+            display: grid;
+            grid-template-columns: 42px 34px 1fr auto;
+            align-items: center;
+            padding: 15px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+            gap: 12px;
+            transition: background 0.2s, border-color 0.2s, transform 0.2s;
             border-left: 2px solid transparent;
+            min-height: 72px;
         }
 
         .wx-fc-row:hover {
-            background: rgba(255, 255, 255, 0.02);
-            border-left-color: rgba(255, 30, 30, 0.35);
+            background: rgba(80, 200, 255, 0.055);
+            border-left-color: rgba(80, 200, 255, 0.45);
+            transform: translateX(-2px);
         }
 
         .wx-fc-day {
             font-family: 'Syncopate', sans-serif;
-            font-size: 8px;
+            font-size: 8.5px;
             letter-spacing: 1px;
-            opacity: 0.52;
-            width: 36px;
+            opacity: 0.74;
+            width: 42px;
             text-transform: uppercase;
         }
 
+        .wx-fc-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            background: rgba(255, 255, 255, 0.055);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 15px;
+        }
+
+        .wx-fc-main {
+            min-width: 0;
+        }
+
         .wx-fc-desc {
-            flex: 1;
-            font-size: 10px;
-            opacity: 0.45;
+            font-size: 12px;
+            opacity: 0.82;
             text-transform: capitalize;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .wx-fc-bar {
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.07);
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .wx-fc-bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #7ee8ff, #ffe87c, #ff8c42);
+            box-shadow: 0 0 10px rgba(255, 232, 124, 0.22);
+        }
+
+        .wx-fc-rain {
+            margin-top: 6px;
+            font-size: 9px;
+            opacity: 0.58;
+        }
+
+        .wx-fc-note {
+            color: rgba(255, 255, 255, 0.38);
         }
 
         .wx-fc-temps {
-            font-size: 14px;
-            font-weight: 200;
+            font-size: 16px;
+            font-weight: 300;
+            text-align: right;
+            color: rgba(255, 255, 255, 0.94);
         }
 
         .wx-fc-min {
@@ -1407,7 +1485,7 @@
             opacity: 0.72 !important;
         }
 
-        /* ── Upcoming list ── */
+        /* -- Upcoming list -- */
         .cal-upcoming {
             display: flex;
             flex-direction: column;
@@ -1531,7 +1609,7 @@
             letter-spacing: 2px;
         }
 
-        /* ── Monthly grid ── */
+        /* -- Monthly grid -- */
         .cal-month {
             display: flex;
             flex-direction: column;
@@ -2419,9 +2497,9 @@
                 -webkit-font-smoothing: antialiased !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                IDLE SCREEN
-               ══════════════════════════════════════════ */
+               ========================================== */
 
             /* Nasconde il logo — spazio prezioso su mobile */
             #top-logo {
@@ -2478,9 +2556,9 @@
                 text-align: center;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                WORK MODE — orb angolo + header mobile
-               ══════════════════════════════════════════ */
+               ========================================== */
 
             /* Orb in angolo top-left */
             #maya-orb-container.corner {
@@ -2524,9 +2602,9 @@
                 box-sizing: border-box !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                BOTTOM NAV BAR (nav-rail)
-               ══════════════════════════════════════════ */
+               ========================================== */
             #nav-rail {
                 right: auto;
                 top: auto;
@@ -2589,9 +2667,9 @@
                 display: none;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                CMD INPUT — sopra la bottom nav in work mode
-               ══════════════════════════════════════════ */
+               ========================================== */
             #cmd-container.corner {
                 top: auto;
                 bottom: calc(76px + env(safe-area-inset-bottom));
@@ -2625,9 +2703,9 @@
                 background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                PANEL AREA — scorrevole tra header e bottom nav
-               ══════════════════════════════════════════ */
+               ========================================== */
 
             /* Tutti i panel occupano lo spazio restante con scroll interno */
             .panel.active {
@@ -2643,9 +2721,9 @@
                 padding-bottom: 128px;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                METEO
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-weather,
             #panel-weather.active {
                 height: auto;
@@ -2729,9 +2807,9 @@
                 flex-shrink: 0;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                NEWS
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-news,
             #panel-news.active {
                 height: auto;
@@ -2775,9 +2853,9 @@
                 line-height: 1.42;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                DOMOTICA
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-dashboard,
             #panel-dashboard.active {
                 height: auto;
@@ -2866,9 +2944,9 @@
                 font-size: 18px !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                CALENDARIO
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-calendar,
             #panel-calendar.active {
                 height: auto;
@@ -2914,9 +2992,9 @@
                 padding-top: 0 !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                SPOTIFY
-               ══════════════════════════════════════════ */
+               ========================================== */
             #spotify-widget {
                 top: auto;
                 bottom: calc(132px + env(safe-area-inset-bottom));
@@ -2963,7 +3041,7 @@
             }
         }
 
-        /* ── iOS Safe Area (notch / Dynamic Island) ── */
+        /* -- iOS Safe Area (notch / Dynamic Island) -- */
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
             @media (max-width: 768px) {
                 #nav-rail {
@@ -2983,7 +3061,7 @@
             }
         }
 
-        /* ── Extra small ≤ 400px ── */
+        /* -- Extra small ≤ 400px -- */
         @media (max-width: 400px) {
             #idle-clock .time {
                 font-size: 34px;
@@ -3035,7 +3113,7 @@
     </div>
     <h1 id="orb-branding">MAYA</h1>
     <div id="spotify-widget">
-        <div class="widget-close" onclick="closeSpotifyWidget()">✕</div>
+        <div class="widget-close" onclick="closeSpotifyWidget()">×</div>
         <div class="spotify-mini-card">
             <img id="spotify-art" class="album-art" src="" alt="Album Art">
             <div class="info">
@@ -3044,14 +3122,14 @@
             </div>
         </div>
         <div class="spotify-mini-controls">
-            <button class="btn-mini-ctrl" onclick="spotifyCmd('prev')">⏮︎</button>
-            <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="spotifyCmd('play_pause')">▶︎</button>
-            <button class="btn-mini-ctrl" onclick="spotifyCmd('next')">⏭︎</button>
+            <button class="btn-mini-ctrl" onclick="spotifyCmd('prev')">⏮</button>
+            <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="spotifyCmd('play_pause')">▶</button>
+            <button class="btn-mini-ctrl" onclick="spotifyCmd('next')">⏭</button>
         </div>
     </div>
     <button class="chat-log-toggle" id="chat-log-toggle" onclick="toggleConsoleWidget('toggle')">CHAT & LOG</button>
     <div id="chat-log-widget">
-        <div class="widget-close" onclick="toggleConsoleWidget('close')">✕</div>
+        <div class="widget-close" onclick="toggleConsoleWidget('close')">×</div>
         <div class="chat-log-header">
             <div class="chat-log-title">CONSOLE LOG</div>
             <div class="chat-log-led" id="chat-log-led"></div>
@@ -3112,6 +3190,11 @@
                     </div>
                     <div class="wx-forecast">
                         <div class="wx-fc-hdr">FORECAST // 5 GIORNI</div>
+                        <div class="wx-fc-legend" aria-label="Legenda forecast">
+                            <span class="wx-fc-legend-item"><span class="wx-fc-dot cold"></span>Fresco</span>
+                            <span class="wx-fc-legend-item"><span class="wx-fc-dot mild"></span>Mite</span>
+                            <span class="wx-fc-legend-item"><span class="wx-fc-dot hot"></span>Caldo</span>
+                        </div>
                         <div id="weather-forecast-col"></div>
                     </div>
                 </section>
@@ -4290,7 +4373,7 @@
         // =============================================
         // PANEL UPDATES
         // =============================================
-        // ── Calendar state ──────────────────────────
+        // -- Calendar state --------------------------
         let _calEvents = [];
         let _calViewYear = new Date().getFullYear();
         let _calViewMonth = new Date().getMonth();
@@ -4334,7 +4417,7 @@
                 const timeLabel = isNaN(dt) ? _esc(e.time) : dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
                 const title = _esc(e.title || '');
                 const _lnk = e.link ? (() => { try { const _p = new URL(e.link); return (_p.protocol === 'https:' || _p.protocol === 'http:') ? _p.href : ''; } catch (_) { return ''; } })() : '';
-                
+
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'cal-event-item' + (isToday ? ' today' : '');
                 if (_lnk) {
@@ -4342,35 +4425,35 @@
                     itemDiv.style.cursor = 'pointer';
                     itemDiv.addEventListener('click', () => setLayout('browser', { url: _lnk }));
                 }
-                
+
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'cal-event-info';
-                
+
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'cal-event-title';
                 titleDiv.textContent = _decodeHtml(title);
-                
+
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'cal-event-source';
                 sourceDiv.textContent = e.source === 'google' ? 'GOOGLE' : 'MAYA';
-                
+
                 infoDiv.appendChild(titleDiv);
                 infoDiv.appendChild(sourceDiv);
-                
+
                 const dateDiv = document.createElement('div');
                 dateDiv.className = 'cal-event-date';
-                
+
                 const dateSubDiv = document.createElement('div');
                 dateSubDiv.className = 'cal-date-sub';
                 dateSubDiv.textContent = dateLabel;
-                
+
                 const timeMainDiv = document.createElement('div');
                 timeMainDiv.className = 'cal-time-main';
                 timeMainDiv.textContent = timeLabel;
-                
+
                 dateDiv.appendChild(dateSubDiv);
                 dateDiv.appendChild(timeMainDiv);
-                
+
                 itemDiv.appendChild(infoDiv);
                 itemDiv.appendChild(dateDiv);
                 list.appendChild(itemDiv);
@@ -4443,6 +4526,16 @@
             'sun': '☀️', 'cloud-sun': '⛅', 'cloud': '☁️', 'cloud-fog': '🌫️',
             'cloud-drizzle': '🌦️', 'cloud-rain': '🌧️', 'cloud-snow': '🌨️', 'cloud-lightning': '⛈️'
         };
+        function forecastTempColor(maxTemp) {
+            if (!Number.isFinite(maxTemp)) return '#7ee8ff';
+            if (maxTemp >= 29) return '#ff8c42';
+            if (maxTemp >= 18) return '#ffe87c';
+            return '#7ee8ff';
+        }
+        function forecastTempFill(maxTemp) {
+            if (!Number.isFinite(maxTemp)) return 18;
+            return Math.max(18, Math.min(100, ((maxTemp + 5) / 40) * 100));
+        }
         let weatherMiniMap;
         let weatherMarker;
         let lastWeatherLatLon = null;
@@ -4509,29 +4602,59 @@
                 data.daily.slice(0, 5).forEach(day => {
                     const d = new Date(day.date).toLocaleDateString('it-IT', { weekday: 'short' }).toUpperCase();
                     const desc = _e((day.condition || day.description || '').toLowerCase());
-                    
+                    const maxTemp = Number(day.max);
+                    const minTemp = Number(day.min);
+                    const fill = forecastTempFill(maxTemp);
+                    const tempColor = forecastTempColor(maxTemp);
+                    const rain = Number.isFinite(Number(day.precip_probability)) ? Number(day.precip_probability) : null;
+
                     const rowDiv = document.createElement('div');
                     rowDiv.className = 'wx-fc-row';
-                    
+
                     const daySpan = document.createElement('span');
                     daySpan.className = 'wx-fc-day';
                     daySpan.textContent = d;
-                    
+
+                    const iconSpan = document.createElement('span');
+                    iconSpan.className = 'wx-fc-icon';
+                    iconSpan.textContent = WEATHER_ICONS[day.icon] || '*';
+
+                    const mainDiv = document.createElement('div');
+                    mainDiv.className = 'wx-fc-main';
+
                     const descSpan = document.createElement('span');
                     descSpan.className = 'wx-fc-desc';
                     descSpan.textContent = desc;
-                    
+
+                    const barDiv = document.createElement('div');
+                    barDiv.className = 'wx-fc-bar';
+                    const fillDiv = document.createElement('div');
+                    fillDiv.className = 'wx-fc-bar-fill';
+                    fillDiv.style.width = `${fill}%`;
+                    fillDiv.style.background = `linear-gradient(90deg, #7ee8ff, ${tempColor})`;
+                    fillDiv.style.boxShadow = `0 0 10px ${tempColor}55`;
+                    barDiv.appendChild(fillDiv);
+
+                    const rainDiv = document.createElement('div');
+                    rainDiv.className = 'wx-fc-rain';
+                    rainDiv.textContent = rain !== null ? `PIOGGIA ${Math.round(rain)}%` : 'PIOGGIA --';
+                    rainDiv.title = 'Probabilità di precipitazioni';
+
                     const tempsSpan = document.createElement('span');
                     tempsSpan.className = 'wx-fc-temps';
-                    tempsSpan.textContent = `${Math.round(day.max)}°`;
-                    
+                    tempsSpan.textContent = `${Math.round(maxTemp)}°`;
+
                     const minSpan = document.createElement('span');
                     minSpan.className = 'wx-fc-min';
-                    minSpan.textContent = `${Math.round(day.min)}°`;
-                    
+                    minSpan.textContent = `${Math.round(minTemp)}°`;
+
+                    mainDiv.appendChild(descSpan);
+                    mainDiv.appendChild(barDiv);
+                    mainDiv.appendChild(rainDiv);
                     tempsSpan.appendChild(minSpan);
                     rowDiv.appendChild(daySpan);
-                    rowDiv.appendChild(descSpan);
+                    rowDiv.appendChild(iconSpan);
+                    rowDiv.appendChild(mainDiv);
                     rowDiv.appendChild(tempsSpan);
                     fc.appendChild(rowDiv);
                 });
@@ -4543,63 +4666,72 @@
                 }
             }
         }
-        // kind:'video'   → embed by video ID, oEmbed-checked for availability
-        // kind:'channel' → embed via live_stream?channel=, no check needed
+        // Solo canali live: ogni riquadro ha fallback live, mai video registrati.
         const NEWS_STREAM_CONFIG = [
-            {
-                primary: { src: 'UCLXo7UDZvByw2ixzpQCufnA', label: 'BBC NEWS', kind: 'channel' },
-                fallback: { src: 'UCknLrEdhRCp1aegoMqRaCZg', label: 'DW NEWS', kind: 'channel' }
-            },
-            {
-                primary: { src: 'UCosnml68cGE8fzm8OLKJ8SQ', label: 'REUTERS', kind: 'channel' },
-                fallback: { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA', kind: 'channel' }
-            },
-            {
-                primary: { src: 'iEpJwprxDdk', label: 'BLOOMBERG', kind: 'video' },
-                fallback: { src: 'bFO_VVRAmCM', label: 'SKY NEWS', kind: 'video' }
-            },
-            {
-                primary: { src: 'UCupvZG-5ko_eiXAupbDfxWw', label: 'CNN', kind: 'channel' },
-                fallback: { src: 'pykpO5kQJ98', label: 'EURONEWS', kind: 'video' }
-            },
+            [
+                { src: 'UC16niRr50-MSBwiO3YDb3RA', label: 'BBC NEWS' },
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+                { src: 'UCknLrEdhRCp1aegoMqRaCZg', label: 'DW NEWS' },
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+            ],
+            [
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+                { src: 'UCknLrEdhRCp1aegoMqRaCZg', label: 'DW NEWS' },
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+                { src: 'UC16niRr50-MSBwiO3YDb3RA', label: 'BBC NEWS' },
+            ],
+            [
+                { src: 'UCknLrEdhRCp1aegoMqRaCZg', label: 'DW NEWS' },
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+                { src: 'UC16niRr50-MSBwiO3YDb3RA', label: 'BBC NEWS' },
+            ],
+            [
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+                { src: 'UCknLrEdhRCp1aegoMqRaCZg', label: 'DW NEWS' },
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+                { src: 'UC16niRr50-MSBwiO3YDb3RA', label: 'BBC NEWS' },
+            ],
         ];
         function streamEmbedUrl(s) {
             const p = 'autoplay=1&mute=1&controls=1&modestbranding=1&rel=0';
-            return s.kind === 'video'
-                ? `https://www.youtube.com/embed/${s.src}?${p}`
-                : `https://www.youtube.com/embed/live_stream?channel=${s.src}&${p}`;
+            return `https://www.youtube.com/embed/live_stream?channel=${s.src}&${p}`;
+        }
+        async function getNewsLiveStreams() {
+            try {
+                const res = await fetch('/api/news/live-streams', { cache: 'no-store' });
+                const data = await res.json();
+                if (res.ok && Array.isArray(data.streams) && data.streams.length) {
+                    return data.streams;
+                }
+            } catch (_) { /* backend non disponibile: usa fallback locale */ }
+            return NEWS_STREAM_CONFIG.map(group => ({ ...group[0], fallback: true, unchecked: true }));
         }
         let newsStreamsInitialized = false;
         let newsStreamsInitTime = 0;
+        let newsLiveStreams = [];
         async function initNewsStreams() {
             if (newsStreamsInitialized) return;
             newsStreamsInitialized = true;
             newsStreamsInitTime = Date.now();
             const grid = document.getElementById('news-live-grid');
-            grid.innerHTML = NEWS_STREAM_CONFIG.map((_, i) => `
+            newsLiveStreams = await getNewsLiveStreams();
+            grid.innerHTML = newsLiveStreams.map((_, i) => `
                 <div class="news-stream-tile" id="stream-tile-${i}">
-                    <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>···</div>
+                    <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>...</div>
                     <iframe id="stream-iframe-${i}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                 </div>`).join('');
-            await Promise.all(NEWS_STREAM_CONFIG.map(async ({ primary, fallback }, i) => {
-                let stream = primary;
-                const oembedUrl = primary.kind === 'video'
-                    ? `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${primary.src}&format=json`
-                    : `https://www.youtube.com/oembed?url=https://www.youtube.com/channel/${primary.src}/live&format=json`;
-                try {
-                    const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(4000) });
-                    if (!res.ok) stream = fallback;
-                } catch { stream = fallback; }
+            newsLiveStreams.forEach((stream, i) => {
                 document.getElementById(`stream-iframe-${i}`).src = streamEmbedUrl(stream);
                 document.getElementById(`stream-label-${i}`).innerHTML =
                     `<span class="ns-live-dot"></span>${stream.label}`;
-            }));
+            });
         }
-        // Refresh streams every 20 min to prevent black screen
+        // Refresh live channels often to avoid stale/non-live embeds.
         setInterval(() => {
             if (!newsStreamsInitialized) return;
             if (!document.getElementById('panel-news').classList.contains('active')) return;
-            for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
+            for (let i = 0; i < newsLiveStreams.length; i++) {
                 const iframe = document.getElementById(`stream-iframe-${i}`);
                 if (iframe && iframe.src) {
                     try {
@@ -4609,10 +4741,10 @@
                             iframe.src = 'about:blank';
                             setTimeout(() => { iframe.src = _safeSrc; }, 300 * i);
                         }
-                    } catch (_) { /* invalid src — skip */ }
+                    } catch (_) { /* invalid src: skip */ }
                 }
             }
-        }, 20 * 60 * 1000);
+        }, 5 * 60 * 1000);
         function updateNews(articles) {
             if (!articles || articles.length === 0) return;
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
@@ -4626,11 +4758,11 @@
             const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? p.href : '#'; } catch(_){return '#';} };
             const sidebarList = document.getElementById('news-sidebar-list');
             sidebarList.innerHTML = '';
-            
+
             articles.forEach((a, i) => {
                 const _u = _safeUrl(a.link);
                 const _img = _safeUrl(a.image);
-                
+
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'ns-item';
                 itemDiv.style.cursor = 'pointer';
@@ -4638,22 +4770,22 @@
                     itemDiv.dataset.url = _u;
                     itemDiv.addEventListener('click', () => setLayout('browser', { url: _u }));
                 }
-                
+
                 const rankDiv = document.createElement('div');
                 rankDiv.className = 'ns-rank';
                 rankDiv.textContent = String(i + 1).padStart(2, '0');
-                
+
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'ns-content';
-                
+
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'ns-source';
                 sourceDiv.textContent = _safeText(a.source || 'MAYA FEED');
-                
+
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'ns-title';
                 titleDiv.textContent = _safeText(a.title);
-                
+
                 contentDiv.appendChild(sourceDiv);
                 contentDiv.appendChild(titleDiv);
                 itemDiv.appendChild(rankDiv);
@@ -4673,32 +4805,32 @@
             // Ticker — all headlines scrolling
             const track = document.getElementById('news-ticker-track');
             track.innerHTML = '';
-            
+
             const appendTickerItems = () => {
                 articles.forEach(a => {
                     const labelSpan = document.createElement('span');
                     labelSpan.className = 'ntk-label';
                     labelSpan.textContent = _safeText(_en(a.source || 'NEWS'), true);
-                    
+
                     const sepSpan1 = document.createElement('span');
                     sepSpan1.className = 'ntk-sep';
                     sepSpan1.textContent = '//';
-                    
+
                     const itemSpan = document.createElement('span');
                     itemSpan.className = 'ntk-item';
                     itemSpan.textContent = _safeText(_en(a.title), true);
-                    
+
                     const sepSpan2 = document.createElement('span');
                     sepSpan2.className = 'ntk-sep';
                     sepSpan2.textContent = '///';
-                    
+
                     track.appendChild(labelSpan);
                     track.appendChild(sepSpan1);
                     track.appendChild(itemSpan);
                     track.appendChild(sepSpan2);
                 });
             };
-            
+
             // Append twice to loop
             appendTickerItems();
             appendTickerItems();

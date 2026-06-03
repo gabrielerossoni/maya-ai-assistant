@@ -125,7 +125,7 @@ class WeatherTool:
                 f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                 "&current_weather=true"
                 "&hourly=relativehumidity_2m,surface_pressure,visibility,precipitation,precipitation_probability,weathercode"
-                "&daily=temperature_2m_max,temperature_2m_min,weathercode"
+                "&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max"
                 "&timezone=auto"
             )
             w_res = requests.get(weather_url, timeout=4).json()
@@ -164,6 +164,7 @@ class WeatherTool:
                 w_arr = daily.get("weathercode") or []
                 mx = daily.get("temperature_2m_max") or []
                 mn = daily.get("temperature_2m_min") or []
+                pr = daily.get("precipitation_probability_max") or []
                 n = min(len(t_arr), len(w_arr), len(mx), len(mn))
                 for i in range(1, min(6, n)):
                     day_code = w_arr[i]
@@ -176,6 +177,7 @@ class WeatherTool:
                             "code": day_code,
                             "condition": day_cond,
                             "icon": day_icon,
+                            "precip_probability": pr[i] if i < len(pr) else None,
                         }
                     )
             except Exception:
