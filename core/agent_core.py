@@ -87,7 +87,7 @@ Tool disponibili:
 - system: comandi OS (shutdown, open_browser, screenshot)
 - weather: meteo (location)
 - news: ultime notizie (limit)
-- wikipedia: ricerca concetti (query)
+- wikipedia: ricerca concetti. FORMATO OBBLIGATORIO: {"tool": "wikipedia", "query": "argomento da cercare"}
 - notes: liste e appunti (operation: add/remove/list, item, category: todo/spesa)
 - trading: criptovalute e azioni (operation: price/chart, symbol, asset_type: crypto/stock)
 - timer: sveglie (minutes, seconds, message)
@@ -113,7 +113,7 @@ SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
 # ──────────────────────────────────────────────
 
 ROUTER_PROMPT = """Classifica l'intent dell'utente in UNA parola.
-- DOMOTIC: se chiede PREZZI, BITCOIN, CRIPTO, S&P500, BORSA, AZIONI, METEO, NOTIZIE, WIKIPEDIA, LUCI, NOTE o CALENDARIO.
+- DOMOTIC: se chiede PREZZI, BITCOIN, CRIPTO, S&P500, BORSA, AZIONI, METEO, NOTIZIE, WIKIPEDIA, TRADUZIONI, LUCI, NOTE o CALENDARIO.
 - REASONING: se chiede CODICE, spiegazioni lunghe, analisi o riassunti.
 - CHITCHAT: se saluta, fa chiacchiere o domande personali.
 
@@ -339,6 +339,10 @@ class AgentCore:
         ]
         spotify_objects = ["musica", "spotify", "canzone", "brano"]
         if any(v in lower for v in spotify_verbs) and any(o in lower for o in spotify_objects):
+            return "DOMOTIC"
+        
+        # Traduzione: deve andare sempre nei tool
+        if any(x in lower for x in ["traduci", "tradurre", "traduzione", "translate"]):
             return "DOMOTIC"
 
         # --- 2. HARD ROUTING: CHITCHAT ---
@@ -1442,6 +1446,17 @@ class AgentCore:
 
                     results = await self._execute_actions(actions)
                     self.learner.observe_command(user_input, actions)
+                    
+                    # Se il tool è translate, rispondi direttamente con il risultato
+                    if len(results) == 1 and results[0]["tool"] == "translate":
+                        result = results[0]["result"]
+                    if result.get("status") == "ok":
+                        final_reply = result.get("message", "Traduzione completata.")
+                    else:
+                        final_reply = result.get("message", "Errore durante la traduzione.")
+
+                    for token in (w + " " for w in final_reply.split()):
+                        yield token
 
                     # 2d. Crea osservazione per il prossimo step
                     observation = ""
@@ -1469,6 +1484,7 @@ class AgentCore:
                         "search",
                         "wikipedia",
                         "calendar",
+                        "translate",
                     ]
                     has_rephrase_tool = any(res["tool"] in needs_rephrase for res in results)
 
