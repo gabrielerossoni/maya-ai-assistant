@@ -60,7 +60,8 @@ def test_news_live_default_groups_exclude_bbc_premiere_channel():
     sources = [stream["src"] for group in mod._NEWS_LIVE_GROUPS for stream in group]
 
     assert "UC16niRr50-MSBwiO3YDb3RA" not in sources
-    assert "UCoMdktPbSTixAyNGwb-UYkQ" in sources
+    assert "UCoMdktPbSTixAyNGwb-UYkQ" not in sources
+    assert "UCSrZ3UV4jOidv8ppoVuvW9Q" in sources
 
 
 @pytest.mark.asyncio
