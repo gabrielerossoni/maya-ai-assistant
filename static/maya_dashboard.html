@@ -4441,11 +4441,6 @@
                 return;
             }
             const _esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-            const _decodeHtml = s => {
-                const t = document.createElement('textarea');
-                t.innerHTML = String(s);
-                return t.value;
-            };
             future.forEach(e => {
                 const dt = new Date(e.time.replace(' ', 'T'));
                 const isToday = dt.toDateString() === now.toDateString();
@@ -4467,7 +4462,7 @@
 
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'cal-event-title';
-                titleDiv.textContent = _decodeHtml(title);
+                titleDiv.textContent = decodeHtmlEntities(title);
 
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'cal-event-source';
@@ -4703,6 +4698,11 @@
             }
         }
         // Solo canali live: ogni riquadro ha fallback live, mai video registrati.
+        const _htmlDecoder = document.createElement('textarea');
+        function decodeHtmlEntities(value) {
+            _htmlDecoder.innerHTML = String(value || '');
+            return _htmlDecoder.value;
+        }
         const NEWS_BLOCKED_STREAMS = new Set(['UC16niRr50-MSBwiO3YDb3RA']);
         const NEWS_STREAM_CONFIG = [
             [
@@ -4740,7 +4740,7 @@
                 return NEWS_STREAM_CONFIG.map(group => {
                     const stream = group.find(s => !NEWS_BLOCKED_STREAMS.has(s.src) && !used.has(s.src)) || group[0];
                     used.add(stream.src);
-                    return { ...stream, fallback: true, unchecked: true };
+                    return { ...stream, fallback: true, unavailable: true, localFallback: true };
                 });
             };
             try {
@@ -4762,8 +4762,29 @@
                     }
                     if (streams.length) return streams;
                 }
-            } catch (_) { /* backend non disponibile: usa fallback locale */ }
+            } catch (err) {
+                console.warn('[NewsLive] feed backend non disponibile, uso fallback locale.', err);
+            }
             return fallbackStreams();
+        }
+        function newsStreamSignature(streams) {
+            return (streams || []).map(s => s && s.src).filter(Boolean).join('|');
+        }
+        function updateNewsStreamTile(stream, i) {
+            const iframe = document.getElementById(`stream-iframe-${i}`);
+            const label = document.getElementById(`stream-label-${i}`);
+            const tile = document.getElementById(`stream-tile-${i}`);
+            if (!iframe || !label || !stream) return;
+            const nextSrc = streamEmbedUrl(stream);
+            if (iframe.src !== nextSrc) iframe.src = nextSrc;
+            tile.classList.toggle('fallback', !!stream.fallback);
+            tile.classList.toggle('unavailable', !!stream.unavailable);
+            const suffix = stream.localFallback ? ' · fallback locale' : (stream.unavailable ? ' · non verificato' : '');
+            label.textContent = '';
+            const dot = document.createElement('span');
+            dot.className = 'ns-live-dot';
+            label.appendChild(dot);
+            label.appendChild(document.createTextNode(`${decodeHtmlEntities(stream.label)}${suffix}`));
         }
         let newsStreamsInitialized = false;
         let newsStreamsInitTime = 0;
@@ -4779,40 +4800,24 @@
                     <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>...</div>
                     <iframe id="stream-iframe-${i}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                 </div>`).join('');
-            newsLiveStreams.forEach((stream, i) => {
-                document.getElementById(`stream-iframe-${i}`).src = streamEmbedUrl(stream);
-                document.getElementById(`stream-label-${i}`).innerHTML =
-                    `<span class="ns-live-dot"></span>${stream.label}`;
-            });
+            newsLiveStreams.forEach((stream, i) => updateNewsStreamTile(stream, i));
         }
         // Refresh live channels often to avoid stale/non-live embeds.
-        setInterval(() => {
+        setInterval(async () => {
             if (!newsStreamsInitialized) return;
             if (!document.getElementById('panel-news').classList.contains('active')) return;
+            const nextStreams = await getNewsLiveStreams();
+            if (newsStreamSignature(nextStreams) === newsStreamSignature(newsLiveStreams)) return;
+            newsLiveStreams = nextStreams;
             for (let i = 0; i < newsLiveStreams.length; i++) {
-                const iframe = document.getElementById(`stream-iframe-${i}`);
-                if (iframe && iframe.src) {
-                    try {
-                        const _ru = new URL(iframe.src);
-                        if (_ru.protocol === 'https:') {
-                            const _safeSrc = _ru.href;
-                            iframe.src = 'about:blank';
-                            setTimeout(() => { iframe.src = _safeSrc; }, 300 * i);
-                        }
-                    } catch (_) { /* invalid src: skip */ }
-                }
+                updateNewsStreamTile(newsLiveStreams[i], i);
             }
         }, 5 * 60 * 1000);
         function updateNews(articles) {
             if (!articles || articles.length === 0) return;
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
             const _en = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-            const _decodeHtml = s => {
-                const t = document.createElement('textarea');
-                t.innerHTML = String(s);
-                return t.value;
-            };
-            const _safeText = (s, encoded = false) => _decodeHtml(encoded ? String(s || '') : _en(s || ''));
+            const _safeText = (s, encoded = false) => decodeHtmlEntities(encoded ? String(s || '') : _en(s || ''));
             const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? p.href : '#'; } catch(_){return '#';} };
             const sidebarList = document.getElementById('news-sidebar-list');
             sidebarList.innerHTML = '';

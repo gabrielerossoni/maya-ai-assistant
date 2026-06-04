@@ -309,3 +309,11 @@ def test_main_module_importable():
     assert hasattr(mod, "agent")
     assert hasattr(mod, "voice_manager")
     assert hasattr(mod, "lifespan")
+
+
+def test_lifespan_closes_context_manager():
+    with open("main.py", encoding="utf-8") as f:
+        src = f.read()
+
+    assert "from core.context_manager import context as home_context" in src
+    assert "home_context.close()" in src

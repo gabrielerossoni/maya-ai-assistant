@@ -109,8 +109,9 @@ class ToolManager:
             full_action.update(action["parametro"])
 
         try:
-            # Ogni tool ha un metodo execute(action) asincrono
-            if asyncio.iscoroutinefunction(tool.execute):
+            if hasattr(tool, "execute_async") and asyncio.iscoroutinefunction(tool.execute_async):
+                result = await tool.execute_async(full_action)
+            elif asyncio.iscoroutinefunction(tool.execute):
                 result = await tool.execute(full_action)
             else:
                 result = tool.execute(full_action)

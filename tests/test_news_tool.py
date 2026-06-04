@@ -1,6 +1,7 @@
 import os
 import sys
-from unittest.mock import patch
+
+import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -24,7 +25,7 @@ def test_news_tool_merges_italian_and_world_feeds(monkeypatch):
     monkeypatch.setenv("NEWS_FEED_URL", "https://example.test/italia.xml")
     monkeypatch.setenv("NEWS_WORLD_FEED_URL", "https://example.test/mondo.xml")
 
-    def fake_parse(url):
+    async def fake_fetch(_client, url):
         if "mondo" in url:
             return Entry(
                 entries=[
@@ -49,8 +50,8 @@ def test_news_tool_merges_italian_and_world_feeds(monkeypatch):
 
     tool = NewsTool()
     tool.initialize()
-    with patch("tools.news_tool.feedparser.parse", side_effect=fake_parse):
-        result = tool.execute({"limit": 5})
+    monkeypatch.setattr(tool, "_fetch_feed", fake_fetch)
+    result = tool.execute({"limit": 5})
 
     assert result["status"] == "ok"
     assert len(result["news"]) == 2
@@ -61,7 +62,7 @@ def test_news_tool_keeps_world_news_visible_with_many_italian_items(monkeypatch)
     monkeypatch.setenv("NEWS_FEED_URL", "https://example.test/italia.xml")
     monkeypatch.setenv("NEWS_WORLD_FEED_URL", "https://example.test/mondo.xml")
 
-    def fake_parse(url):
+    async def fake_fetch(_client, url):
         if "mondo" in url:
             return Entry(
                 entries=[
@@ -87,9 +88,33 @@ def test_news_tool_keeps_world_news_visible_with_many_italian_items(monkeypatch)
 
     tool = NewsTool()
     tool.initialize()
-    with patch("tools.news_tool.feedparser.parse", side_effect=fake_parse):
-        result = tool.execute({"limit": 3})
+    monkeypatch.setattr(tool, "_fetch_feed", fake_fetch)
+    result = tool.execute({"limit": 3})
 
     assert result["status"] == "ok"
     assert len(result["news"]) == 3
     assert any(item["source"].endswith("/ Mondo") for item in result["news"])
+
+
+def test_news_tool_deduplicates_titles_by_slug():
+    tool = NewsTool()
+    tool.feed_urls = [("ITALIA", "unused")]
+    items = [
+        {"title": "Italy wins!", "_feed_label": "ITALIA", "_dt": None},
+        {"title": "italy wins", "_feed_label": "ITALIA", "_dt": None},
+        {"title": "Other news", "_feed_label": "ITALIA", "_dt": None},
+    ]
+
+    selected = tool._select_balanced_news(items, 5)
+
+    assert [item["title"] for item in selected] == ["Italy wins!", "Other news"]
+
+
+@pytest.mark.asyncio
+async def test_news_tool_execute_returns_error_inside_active_loop():
+    tool = NewsTool()
+
+    result = tool.execute({"limit": 1})
+
+    assert result["status"] == "error"
+    assert "execute_async" in result["message"]

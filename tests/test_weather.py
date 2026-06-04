@@ -171,3 +171,41 @@ def test_weather_tool_falls_back_to_wttr_when_open_meteo_forecast_fails():
         assert res["data"]["temp"] == 24.0
         assert res["data"]["condition"] == "Parzialm. Nuvoloso"
         assert res["data"]["daily"][0]["max"] == 28.0
+
+
+def test_weather_tool_returns_structured_error_when_all_providers_fail():
+    tool = WeatherTool()
+    with patch("requests.get") as mock_get:
+        mock_geo_error = MagicMock()
+        mock_geo_error.status_code = 500
+        mock_geo_error.url = "https://geocoding-api.open-meteo.com/v1/search"
+        mock_geo_error.text = "server error"
+        mock_geo_error.headers = {"content-type": "text/plain"}
+
+        mock_wttr_error = MagicMock()
+        mock_wttr_error.status_code = 502
+        mock_wttr_error.url = "https://wttr.in/Roma"
+        mock_wttr_error.text = "bad gateway"
+        mock_wttr_error.headers = {"content-type": "text/plain"}
+
+        mock_get.side_effect = [mock_geo_error, mock_wttr_error]
+
+        res = tool.execute({"location": "Roma"})
+
+    assert res["status"] == "error"
+    assert "Meteo non disponibile" in res["message"]
+
+
+def test_weather_tool_get_json_rejects_non_json_response():
+    tool = WeatherTool()
+    with patch("requests.get") as mock_get:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.url = "https://example.test/weather"
+        mock_response.headers = {"content-type": "text/html"}
+        mock_response.text = "<html>not json</html>"
+        mock_response.json.side_effect = ValueError("not json")
+        mock_get.return_value = mock_response
+
+        with pytest.raises(RuntimeError, match="Risposta non JSON"):
+            tool._get_json("https://example.test/weather", timeout=1)

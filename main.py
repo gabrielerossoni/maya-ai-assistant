@@ -31,6 +31,7 @@ from core.broadcasters import (
     stats_broadcaster,
     weather_broadcaster,
 )
+from core.context_manager import context as home_context
 from core.ngrok_manager import start_ngrok
 from core.ollama_manager import ensure_ollama_running
 from core.plugin_loader import PluginLoader
@@ -336,6 +337,10 @@ async def lifespan(app: FastAPI):
                     tool.close()
                 except Exception as e:
                     print(f"[SHUTDOWN] Errore in chiusura tool {name}: {e}")
+        try:
+            home_context.close()
+        except Exception as e:
+            print(f"[SHUTDOWN] Errore chiusura ContextManager: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -437,6 +442,8 @@ if __name__ == "__main__":
             f"avvio su http://{_http_host}:{_http_port} (chiudi le altre istanze se non serve)."
         )
     os.environ["MAYA_HTTP_PORT"] = str(_http_port)
+    if _instance_guard is not None:
+        _instance_guard.update_port(_http_port)
 
     threading.Thread(target=ensure_ollama_running, daemon=True).start()
     try:

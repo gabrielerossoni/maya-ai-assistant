@@ -85,9 +85,13 @@ class TestXSSEscape:
 
     def test_news_text_is_decoded_before_textcontent(self, html):
         """Le entity HTML devono essere sicure ma non visibili come L&#39;utente."""
-        assert "const _decodeHtml = s =>" in html
+        assert "function decodeHtmlEntities(value)" in html
+        assert html.count("document.createElement('textarea')") == 1
         assert "titleDiv.textContent = _safeText(a.title)" in html
         assert "sourceDiv.textContent = _safeText(a.source || 'MAYA FEED')" in html
+
+    def test_calendar_reuses_shared_html_decoder(self, html):
+        assert "titleDiv.textContent = decodeHtmlEntities(title)" in html
 
     def test_news_sidebar_supports_optional_thumbnail(self, html):
         """La lista notizie deve poter mostrare una miniatura validata."""
@@ -116,6 +120,12 @@ class TestXSSEscape:
         assert "stream.fallback ? ' · FALLBACK LIVE'" not in html
         assert "kind: 'video'" not in html
         assert "oembed?url=" not in html
+
+    def test_news_live_streams_report_fallback_and_do_not_blank_iframes(self, html):
+        assert "console.warn('[NewsLive] feed backend non disponibile" in html
+        assert "fallback locale" in html
+        assert "iframe.src = 'about:blank'" not in html
+        assert "newsStreamSignature(nextStreams)" in html
 
     def test_no_raw_title_injection(self, html):
         """Non ci deve essere ${a.title} senza escape nel ticker o sidebar."""

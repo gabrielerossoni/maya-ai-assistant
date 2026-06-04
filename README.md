@@ -483,6 +483,7 @@ PLUGIN_LOADER_ENABLED=false
 DEV_MODE=false
 NETWORK_TOOL_ENABLED=false
 MEMORY_TOPIC_SUMMARIES_ENABLED=false
+MAYA_WHISPER_DEVICE=auto     # usa CUDA se disponibile, altrimenti CPU; forza cuda solo su host NVIDIA configurati
 ```
 
 ### 3. Download modelli Ollama

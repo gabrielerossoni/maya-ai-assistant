@@ -5,11 +5,13 @@ news_tool.py - Lettore di notizie RSS per dashboard e risposte vocali.
 import html
 import os
 import re
+import asyncio
 from collections import defaultdict
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 
 import feedparser
+import httpx
 
 
 class MLStripper(HTMLParser):
@@ -140,12 +142,26 @@ class NewsTool:
 
         return selected
 
-    def execute(self, action: dict) -> dict:
+    async def _fetch_feed(self, client: httpx.AsyncClient, feed_url: str):
+        res = await client.get(feed_url)
+        res.raise_for_status()
+        return feedparser.parse(res.content)
+
+    async def execute_async(self, action: dict) -> dict:
         limit = action.get("limit", 5)
         try:
             parsed_items = []
-            for feed_label, feed_url in getattr(self, "feed_urls", None) or self._configured_feeds():
-                feed = feedparser.parse(feed_url)
+            feeds = getattr(self, "feed_urls", None) or self._configured_feeds()
+            timeout = float(os.getenv("NEWS_FEED_TIMEOUT", "6.0"))
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                results = await asyncio.gather(
+                    *(self._fetch_feed(client, feed_url) for _feed_label, feed_url in feeds),
+                    return_exceptions=True,
+                )
+
+            for (feed_label, _feed_url), feed in zip(feeds, results):
+                if isinstance(feed, Exception):
+                    continue
                 for entry in feed.entries:
                     parsed_items.append(self._entry_to_news_item(feed_label, entry))
 
@@ -162,3 +178,13 @@ class NewsTool:
             return {"status": "ok", "message": msg, "news": structured_news}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def execute(self, action: dict) -> dict:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.execute_async(action))
+        return {
+            "status": "error",
+            "message": "NewsTool.execute non puo bloccare un event loop attivo; usare execute_async.",
+        }
