@@ -102,7 +102,10 @@ class TestXSSEscape:
 
     def test_news_live_streams_use_live_channel_embeds_only(self, html):
         assert "youtube.com/embed/live_stream?channel=" in html
+        assert "UCoMdktPbSTixAyNGwb-UYkQ" in html
         assert "UC16niRr50-MSBwiO3YDb3RA" in html
+        assert "NEWS_BLOCKED_STREAMS.has(stream.src)" in html
+        assert "BBC NEWS" not in html
         assert "UCLXo7UDZvByw2ixzpQCufnA" not in html
         assert "fetch('/api/news/live-streams'" in html
         assert "stream.fallback ? ' · FALLBACK LIVE'" not in html
@@ -270,6 +273,13 @@ class TestSceneControls:
             "Giardino",
         ]:
             assert label in html
+
+    def test_dashboard_device_cards_have_organized_layout_css(self, html):
+        assert "--dom-card-bg" in html
+        assert "grid-auto-rows: minmax(126px, auto)" in html
+        assert "grid-template-columns: repeat(var(--dom-cols, 3), minmax(0, 1fr))" in html
+        assert "border: 1px solid var(--dom-card-border)" in html
+        assert "grid-template-columns: minmax(0, 1fr) var(--sb-width, 260px)" in html
 
     def test_rgb_cards_cycle_multiple_colors(self, html):
         assert "const RGB_CYCLE" in html

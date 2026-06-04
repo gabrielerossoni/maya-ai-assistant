@@ -55,6 +55,14 @@ def test_import_routes():
     assert hasattr(mod, "websocket_endpoint")
 
 
+def test_news_live_default_groups_exclude_bbc_premiere_channel():
+    mod = importlib.import_module("core.routes")
+    sources = [stream["src"] for group in mod._NEWS_LIVE_GROUPS for stream in group]
+
+    assert "UC16niRr50-MSBwiO3YDb3RA" not in sources
+    assert "UCoMdktPbSTixAyNGwb-UYkQ" in sources
+
+
 @pytest.mark.asyncio
 async def test_news_live_streams_fallback_when_primary_offline():
     mod = importlib.import_module("core.routes")

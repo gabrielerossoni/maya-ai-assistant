@@ -26,28 +26,28 @@ _log_filter_applied = False
 
 _NEWS_LIVE_GROUPS = [
     [
-        {"src": "UC16niRr50-MSBwiO3YDb3RA", "label": "BBC NEWS"},
         {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
         {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
         {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
-    ],
-    [
-        {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
-        {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
-        {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
-        {"src": "UC16niRr50-MSBwiO3YDb3RA", "label": "BBC NEWS"},
+        {"src": "UCoMdktPbSTixAyNGwb-UYkQ", "label": "SKY NEWS"},
     ],
     [
         {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
         {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
+        {"src": "UCoMdktPbSTixAyNGwb-UYkQ", "label": "SKY NEWS"},
         {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
-        {"src": "UC16niRr50-MSBwiO3YDb3RA", "label": "BBC NEWS"},
     ],
     [
         {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
+        {"src": "UCoMdktPbSTixAyNGwb-UYkQ", "label": "SKY NEWS"},
         {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
         {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
-        {"src": "UC16niRr50-MSBwiO3YDb3RA", "label": "BBC NEWS"},
+    ],
+    [
+        {"src": "UCoMdktPbSTixAyNGwb-UYkQ", "label": "SKY NEWS"},
+        {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
+        {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
+        {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
     ],
 ]
 _news_live_cache = {"ts": 0.0, "streams": []}
