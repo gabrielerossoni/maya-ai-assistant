@@ -346,7 +346,38 @@ class VoiceManager:
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
 
+    def _open_audio_input(self):
+        audio = pyaudio.PyAudio()
+        stream = audio.open(
+            format=self.FORMAT, channels=self.CHANNELS, rate=self.RATE, input=True, frames_per_buffer=self.CHUNK
+        )
+        return audio, stream
+
+    def _close_audio_input(self, audio, stream):
+        try:
+            if stream:
+                stream.stop_stream()
+                stream.close()
+        except Exception:
+            pass
+        try:
+            if audio:
+                audio.terminate()
+        except Exception:
+            pass
+
+    def _recover_audio_input(self, audio, stream, error: Exception):
+        print(f"[VOICE] Errore microfono: {error}. Riavvio stream audio...")
+        self._broadcast("IDLE")
+        self._close_audio_input(audio, stream)
+        time.sleep(0.5)
+        audio, stream = self._open_audio_input()
+        self._calibrate_vad_from_stream(stream)
+        return audio, stream
+
     def _run_loop(self):
+        audio = None
+        stream = None
         try:
             try:
                 self._initialize_models()
@@ -358,17 +389,21 @@ class VoiceManager:
                 self.is_running = False
                 return
 
-            audio = pyaudio.PyAudio()
-            stream = audio.open(
-                format=self.FORMAT, channels=self.CHANNELS, rate=self.RATE, input=True, frames_per_buffer=self.CHUNK
-            )
-
+            audio, stream = self._open_audio_input()
             self._calibrate_vad_from_stream(stream)
 
             self._broadcast("IDLE")
 
             while self.is_running:
-                pcm = self._record_utterance_pcm(stream)
+                try:
+                    pcm = self._record_utterance_pcm(stream)
+                except OSError as e:
+                    try:
+                        audio, stream = self._recover_audio_input(audio, stream, e)
+                    except Exception as recover_error:
+                        print(f"[VOICE] Recupero microfono fallito: {recover_error}")
+                        time.sleep(1.0)
+                    continue
                 if not pcm or not self.is_running:
                     self._broadcast("IDLE")
                     continue
@@ -402,19 +437,26 @@ class VoiceManager:
                     if loop:
                         asyncio.run_coroutine_threadsafe(self._process_voice_text(cmd), loop)
                 else:
-                    self._handle_voice_command(stream)
+                    try:
+                        self._handle_voice_command(stream)
+                    except OSError as e:
+                        try:
+                            audio, stream = self._recover_audio_input(audio, stream, e)
+                        except Exception as recover_error:
+                            print(f"[VOICE] Recupero microfono fallito: {recover_error}")
+                            time.sleep(1.0)
+                        continue
 
                 self._broadcast("IDLE")
 
-            stream.stop_stream()
-            stream.close()
-            audio.terminate()
         except Exception as e:
             print(f"[VOICE] ERRORE CRITICO nel loop vocale: {e}")
             import traceback
 
             traceback.print_exc()
             self.is_running = False
+        finally:
+            self._close_audio_input(audio, stream)
 
     def _handle_voice_command(self, stream):
         w = self.followup_wait_sec

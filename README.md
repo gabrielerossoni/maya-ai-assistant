@@ -4,6 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-black?style=for-the-badge&logo=ollama&logoColor=white)
 ![Arduino](https://img.shields.io/badge/Arduino-Hardware-00979D?style=for-the-badge&logo=arduino&logoColor=white)
+![Arduino Day](https://img.shields.io/badge/Arduino%20Day%202026-Presented-00979D?style=for-the-badge&logo=arduino&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge&logo=gnu)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)
 ![Stars](https://img.shields.io/github/stars/gabrielerossoni/maya-ai-assistant?style=for-the-badge&logo=github)
@@ -12,9 +13,9 @@
 ![CI](https://img.shields.io/github/actions/workflow/status/gabrielerossoni/maya-ai-assistant/ci.yml?style=for-the-badge&label=CI&logo=githubactions&logoColor=white)
 
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servomotori, strisce LED NeoPixel, buzzer, speaker e sensori di telemetria.  
-Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
+Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, presentato all'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** 4 Giugno 2026 — **Dashboard rifinita per esposizione**, news italiane + internazionali in italiano con selezione bilanciata, live news YouTube con fallback live, meteo forecast più leggibile, calendario HUD aggiornato, routing domotico corretto per zone RGB, safety flag attive di default e suite di test completa (**160/160 passati**). Rimangono operativi firmware **Arduino Uno R4 WiFi**, **NeoPixel a 3 zone**, doppio servo (**Porta e Cancello**), quake detection fisica (**MPU6050/LSM6DSOX**), sintesi vocale, **Automation Engine OO**, **Monitoraggio GPU** e dashboard WebSocket real-time.
+> **Ultimo aggiornamento:** 5 Giugno 2026 — **Versione definitiva post Arduino Day 2026**. M.A.Y.A. è stato presentato come prototipo di smart home AI con plastico fisico interattivo, dashboard HUD live e controllo hardware tramite Arduino. Restano operativi firmware **Arduino Uno R4 WiFi**, **NeoPixel a 3 zone**, doppio servo (**Porta e Cancello**), quake detection fisica (**MPU6050/LSM6DSOX**), sintesi vocale, **Automation Engine OO**, meteo/news/calendario live, monitoraggio GPU e dashboard WebSocket real-time.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -33,6 +34,24 @@ La differenza rispetto ai sistemi già esistenti:
 - **Rilevamento sismico integrato** — accelerometro fisico che attiva allarmi e notifiche vocali in tempo reale in caso di scosse.
 - **Linguaggio naturale in italiano** — comandi normali, senza formule rigide.
 - **11 scene OO** — film, relax, allarme + scene giornaliere (buongiorno, buonanotte, sveglia, cena, piove, ospiti in arrivo, vado fuori, sono rientrato) con priorità, cooldown e trigger automatici.
+
+---
+
+## Presentazione Arduino Day 2026
+
+M.A.Y.A. è stato presentato all'**Arduino Day 2026** come prototipo completo di casa intelligente: una smart home fisica in miniatura coordinata da un assistente AI, con dashboard live e dispositivi reali controllati da Arduino.
+
+Durante l'esposizione il progetto ha mostrato:
+
+- una **casa fisica interattiva**, non solo una simulazione software;
+- una **dashboard HUD live** per visualizzare stato casa, scene, meteo, news, calendario e telemetria;
+- controllo reale di **luci, NeoPixel RGB, porta, cancello, buzzer, speaker e sensori**;
+- scene domotiche complete come `buongiorno`, `buonanotte`, `piove`, `ospiti in arrivo`, `film`, `relax` e `allarme`;
+- un'idea chiara e comunicabile: **il PC ragiona, Arduino agisce**.
+
+Il valore principale emerso nella demo è stato l'effetto integrato: plastico, AI, hardware e interfaccia non lavorano come pezzi separati, ma come un unico sistema. Anche davanti a un pubblico non tecnico, il funzionamento è risultato comprensibile perché ogni comando produceva una conseguenza visibile sulla casa e sulla dashboard.
+
+> **Caption portfolio:** M.A.Y.A. presented at Arduino Day 2026: an AI-powered smart home prototype combining a physical interactive model, Arduino-controlled devices and a live HUD dashboard.
 
 ---
 
@@ -398,7 +417,7 @@ maya/
 │   ├── main.js                # Electron main process
 │   └── preload.js
 │
-├── tests/                     # Test di integrazione e unitari (pytest, 160 test passati al 04/06/2026)
+├── tests/                     # Test di integrazione e unitari (pytest)
 ├── plugins/                   # Plugin caricati solo con PLUGIN_LOADER_ENABLED=true o DEV_MODE=true
 ├── requirements.txt           # Dipendenze Python
 ├── .env.example               # Template configurazione ambiente
@@ -703,9 +722,9 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 | 16/05/2026 | Verifica 1 | Schema scelto, hardware collegato, dashboard aperta, ≥ 1 dispositivo risponde | ✅ |
 | 23/05/2026 | Verifica 2 | Flusso completo: comando → LLM → Arduino → feedback real-time sulla dashboard | ✅ |
 | 30/05/2026 | Verifica 3 | Demo stabile, correzione bug, prova con pubblico interno, video di backup pronto | ✅ |
-| 04/06/2026 | Arduino Day | Presentazione finale, rifinitura ed esposizione del plastico. **Niente nuove funzioni** | 🚀 (Pronto) |
+| 04/06/2026 | Arduino Day | Presentazione finale ed esposizione del prototipo davanti al pubblico | ✅ Presentato |
 
-> **Milestone Completate** ✅ — Allarmi sismici, interazione vocale, dashboard, news internazionali/live fallback e safety flag testati; 160/160 test passati con successo al 04/06/2026.
+> **Milestone Completate** ✅ — Prototipo presentato all'Arduino Day 2026 con plastico fisico, dashboard HUD live, scene domotiche, meteo/news/calendario, allarmi sismici e controllo Arduino real-time.
 
 ---
 
@@ -713,6 +732,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 
 ### ✅ Completati
 
+- [x] **Presentazione Arduino Day 2026** — prototipo esposto con plastico fisico, dashboard HUD live e controllo Arduino real-time.
 - [x] **Architettura agentica ReAct con routing ibrido** — agenti e pianificazione locale basati su modelli LLM offline.
 - [x] **Voce bidirezionale (Whisper STT locale + Piper TTS)** — trascrizione e sintesi vocale ad alta velocità con streaming.
 - [x] **Memoria semantica (ChromaDB + embedding Ollama)** — conservazione e richiamo intelligente dei turni passati.
@@ -747,6 +767,8 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **`broadcast_state` throttle** — limitazione della frequenza dei controlli Ollama a 30s per preservare le prestazioni.
 - [x] **`mqtt_tool` non-blocking** — pubblicazione dei messaggi MQTT in thread paralleli non bloccanti.
 - [x] **News live con fallback** — canali YouTube live selezionati dal backend; se un primario è offline viene usato un fallback live.
+- [x] **Meteo con fallback provider** — Open-Meteo primario con fallback `wttr.in` per ridurre gli errori in demo.
+- [x] **Alias vocali post-demo** — normalizzazione di trascrizioni come `alarme`, `all'armi` e `allarmi` verso la scena `allarme`.
 - [x] **WiFi secrets** — spostamento delle credenziali Wi-Fi sensibili in un file `secrets.h` dedicato ed escluso da git.
 - [x] **Struttura root pulita** — refactoring e riorganizzazione dei file per rispettare il design architetturale del progetto.
 - [x] **Self-Healing opt-in (`self_healer.py`)** — modulo di auto-riparazione disponibile solo se abilitato manualmente; disattivato di default per la demo.
@@ -759,12 +781,15 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Refactoring `main.py`** — riduzione del codice ad un thin entrypoint pulito con logica spostata nel modulo `core/`.
 - [x] **Rimozione relè e attuatori statici legacy** — l'intero sistema utilizza i NeoPixel multi-zona e i due servo dedicati.
 
-### 🔲 In corso / Prossimi
+### 🔲 Backlog post-demo
 
+Queste attività non erano necessarie per la presentazione Arduino Day; sono idee raccolte per evolvere il prototipo dopo l'esposizione.
+
+- [ ] **Robustezza voce in ambienti rumorosi** — push-to-talk, microfono direzionale/lavalier, comandi demo più corti e conferma visiva del comando rilevato.
+- [ ] **Fallback demo da dashboard** — pulsanti rapidi per scene critiche (`Film`, `Notte`, `Allarme`, `Reset`) indipendenti dalla voce.
 - [ ] **Trigger da processi OS** — `app_opened:vscode` / `app_opened:spotify` rilevati via `psutil` nel `ProactiveManager` → pubblica su `EventBus` per attivare automazioni contestuali.
 - [ ] **Trigger Wi-Fi telefono** — monitor DHCP lease → `bus.publish("phone_joined_wifi" | "phone_left_wifi")` per automazioni presenze.
-- [ ] **Multi-room multi-board MQTT** — Espansione del protocollo MQTT per gestire schede Arduino R4 WiFi multiple allocate in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
-- [ ] **Suite di test asincroni end-to-end** — Consolidamento e riscrittura dei test di integrazione per validare il comportamento dei moduli asincroni (`proactive_manager`, `self_healer`, `automation_engine`) simulando risposte hardware e interruzioni di rete.
+- [ ] **Multi-room multi-board MQTT** — espansione del protocollo MQTT per gestire più schede Arduino R4 WiFi in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
 
 ---
 

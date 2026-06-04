@@ -1254,6 +1254,7 @@ def build_default_automations() -> list[Automation]:
                     *_background_alarm_sequence(duration=20.0, pulse_interval=0.5),
                 ],
             ),
+            aliases=["alarme", "all'armi", "allarmi"],
         ),
         # ── Piove ─────────────────────────────────────────────────────────────
         Automation(

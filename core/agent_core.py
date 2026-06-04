@@ -1303,6 +1303,52 @@ class AgentCore:
                 await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
         return f"Scheda {labels[layout]} aperta."
 
+    def _parse_direct_weather_command(self, text: str) -> dict | None:
+        if re.search(r"\b(sensor[ei]|temperatura casa|umidit[àa]|dht)\b", text):
+            return None
+
+        is_weather = (
+            re.search(r"\bche\s+tempo\s+fa\b", text)
+            or re.fullmatch(r"meteo(?:\s+(?:a|ad|di|per)\s+[a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ' -]{1,60})?", text)
+            or re.search(r"\bprevisioni\b", text)
+            or re.search(r"\b(sta\s+)?piovendo\b", text)
+            or re.search(r"\btemperatura\s+(?:fuori|esterna|a|di)\b", text)
+        )
+        if not is_weather:
+            return None
+
+        location = None
+        match = re.search(
+            r"\b(?:a|ad|di|per)\s+([a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ' -]{1,60})$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            location = match.group(1).strip(" ,.").title()
+
+        return {"tool": "weather", "location": location}
+
+    async def _run_direct_weather_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") != "ok" or not isinstance(result.get("data"), dict):
+            return f"Non riesco a recuperare il meteo: {result.get('message', 'servizio non disponibile')}"
+
+        data = result["data"]
+        if self.socket_manager:
+            await self.socket_manager.broadcast({"type": "weather", "data": data})
+
+        location = data.get("location") or action.get("location") or "la localita impostata"
+        temp = data.get("temp")
+        condition = data.get("condition") or "variabile"
+        wind = data.get("wind")
+
+        parts = [f"A {location}: {condition.lower()}"]
+        if temp is not None:
+            parts.append(f"{round(float(temp))} gradi")
+        if wind is not None:
+            parts.append(f"vento {round(float(wind))} km/h")
+        return ", ".join(parts) + "."
+
     async def _undo_last_reversible_command(self) -> str:
         item = self._last_reversible_command
         self._last_reversible_command = None
@@ -1384,6 +1430,12 @@ class AgentCore:
                 yield token
             return
 
+        direct_weather = self._parse_direct_weather_command(_clean)
+        if direct_weather:
+            reply = await self._run_direct_weather_command(direct_weather)
+            yield await self._reply_fast(reply, {"type": "weather", "params": {}})
+            return
+
         if re.search(r"\b(annulla|undo|ripristina)\b", _clean) and re.search(
             r"\b(ultimo comando|ultimo|comando|azione)\b", _clean
         ):
@@ -1391,7 +1443,9 @@ class AgentCore:
             yield await self._reply_fast(reply)
             return
 
-        if re.search(r"\b(ferma|stop|spegni|disattiva)\b", _clean) and re.search(r"\ballarme\b", _clean):
+        if re.search(r"\b(ferma|stop|spegni|disattiva)\b", _clean) and re.search(
+            r"\b(allarme|alarme|all['’]?armi)\b", _clean
+        ):
             reply = await self._stop_alarm_direct()
             yield await self._reply_fast(reply)
             return

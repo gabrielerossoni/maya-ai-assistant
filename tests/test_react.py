@@ -138,6 +138,90 @@ async def test_process_wake_light_on_uses_direct_visible_white_batch(agent):
 
 
 @pytest.mark.asyncio
+async def test_process_direct_weather_phrase_calls_weather_tool(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent.tool_manager.execute = AsyncMock(
+        return_value={
+            "status": "ok",
+            "data": {
+                "location": "Roma",
+                "temp": 24.2,
+                "condition": "Sereno",
+                "wind": 8.0,
+                "daily": [],
+                "hourly": [],
+            },
+        }
+    )
+
+    tokens = []
+    async for token in agent.process("che tempo fa"):
+        tokens.append(token)
+
+    assert agent.tool_manager.execute.call_args.args[0] == {"tool": "weather", "location": None}
+    response = "".join(tokens)
+    assert "A Roma" in response
+    assert "24 gradi" in response
+
+
+@pytest.mark.asyncio
+async def test_process_direct_weather_phrase_extracts_location(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent.tool_manager.execute = AsyncMock(
+        return_value={
+            "status": "ok",
+            "data": {
+                "location": "Milano",
+                "temp": 19,
+                "condition": "Nuvoloso",
+                "wind": None,
+                "daily": [],
+                "hourly": [],
+            },
+        }
+    )
+
+    tokens = []
+    async for token in agent.process("che tempo fa a Milano"):
+        tokens.append(token)
+
+    assert agent.tool_manager.execute.call_args.args[0] == {"tool": "weather", "location": "Milano"}
+    assert "A Milano" in "".join(tokens)
+
+
+def test_direct_weather_does_not_steal_home_sensor_temperature(agent):
+    agent = AgentCore()
+
+    assert agent._parse_direct_weather_command("temperatura casa") is None
+
+
+@pytest.mark.asyncio
+async def test_process_stop_alarm_accepts_alarme_misrecognition(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent._stop_alarm_direct = AsyncMock(return_value="Allarme fermato.")
+
+    tokens = []
+    async for token in agent.process("ferma alarme"):
+        tokens.append(token)
+
+    agent._stop_alarm_direct.assert_awaited_once()
+    assert "".join(tokens) == "Allarme fermato."
+
+
+@pytest.mark.asyncio
+async def test_process_stop_alarm_accepts_apostrophe_misrecognition(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent._stop_alarm_direct = AsyncMock(return_value="Allarme fermato.")
+
+    tokens = []
+    async for token in agent.process("spegni all'armi"):
+        tokens.append(token)
+
+    agent._stop_alarm_direct.assert_awaited_once()
+    assert "".join(tokens) == "Allarme fermato."
+
+
+@pytest.mark.asyncio
 async def test_react_does_not_repeat_action_reply(agent):
     reply = "Ho aggiornato il dispositivo."
     agent.memory.add_turn = AsyncMock()

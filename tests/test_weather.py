@@ -95,3 +95,79 @@ def test_weather_tool_coordinates_nominatim_failure_fallback():
         # Falls back to "Lat 45.46, Lon 9.19"
         assert "Lat 45.46" in res["data"]["location"]
         assert res["data"]["temp"] == 18.0
+
+
+def test_weather_tool_falls_back_to_wttr_when_open_meteo_forecast_fails():
+    tool = WeatherTool()
+    with patch("requests.get") as mock_get:
+        mock_geo = MagicMock()
+        mock_geo.json.return_value = {"results": [{"latitude": 41.89, "longitude": 12.51, "name": "Roma"}]}
+
+        mock_forecast_error = MagicMock()
+        mock_forecast_error.status_code = 502
+        mock_forecast_error.url = "https://api.open-meteo.com/v1/forecast"
+        mock_forecast_error.text = "<html>Bad Gateway</html>"
+        mock_forecast_error.headers = {"content-type": "text/html"}
+
+        mock_wttr = MagicMock()
+        mock_wttr.status_code = 200
+        mock_wttr.headers = {"content-type": "application/json"}
+        mock_wttr.json.return_value = {
+            "nearest_area": [
+                {
+                    "areaName": [{"value": "Roma"}],
+                    "region": [{"value": "Lazio"}],
+                }
+            ],
+            "current_condition": [
+                {
+                    "temp_C": "24",
+                    "windspeedKmph": "7",
+                    "FeelsLikeC": "25",
+                    "humidity": "55",
+                    "pressure": "1012",
+                    "visibility": "10",
+                    "weatherCode": "116",
+                    "weatherDesc": [{"value": "Partly cloudy"}],
+                }
+            ],
+            "weather": [
+                {
+                    "date": "2026-06-04",
+                    "maxtempC": "27",
+                    "mintempC": "18",
+                    "hourly": [
+                        {
+                            "time": "1200",
+                            "weatherCode": "116",
+                            "weatherDesc": [{"value": "Partly cloudy"}],
+                            "chanceofrain": "10",
+                            "precipMM": "0.0",
+                        }
+                    ],
+                },
+                {
+                    "date": "2026-06-05",
+                    "maxtempC": "28",
+                    "mintempC": "19",
+                    "hourly": [
+                        {
+                            "time": "1200",
+                            "weatherCode": "113",
+                            "weatherDesc": [{"value": "Sunny"}],
+                            "chanceofrain": "0",
+                            "precipMM": "0.0",
+                        }
+                    ],
+                },
+            ],
+        }
+
+        mock_get.side_effect = [mock_geo, mock_forecast_error, mock_wttr]
+
+        res = tool.execute({"location": "Roma"})
+        assert res["status"] == "ok"
+        assert res["data"]["provider"] == "wttr.in"
+        assert res["data"]["temp"] == 24.0
+        assert res["data"]["condition"] == "Parzialm. Nuvoloso"
+        assert res["data"]["daily"][0]["max"] == 28.0

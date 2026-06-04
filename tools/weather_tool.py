@@ -1,8 +1,9 @@
 """
-weather_tool.py - API meteo via Open-Meteo
+weather_tool.py - API meteo via Open-Meteo con fallback wttr.in
 """
 
 import os
+from urllib.parse import quote
 
 import requests
 
@@ -29,6 +30,20 @@ class WeatherTool:
         95: ("Temporale", "cloud-lightning"),
     }
 
+    WTTR_DESCRIPTIONS = {
+        "clear": ("Sereno", "sun"),
+        "sunny": ("Sereno", "sun"),
+        "partly cloudy": ("Parzialm. Nuvoloso", "cloud-sun"),
+        "cloudy": ("Nuvoloso", "cloud"),
+        "overcast": ("Coperto", "cloud"),
+        "mist": ("Nebbia", "cloud-fog"),
+        "fog": ("Nebbia", "cloud-fog"),
+        "rain": ("Pioggia", "cloud-rain"),
+        "drizzle": ("Pioggerellina", "cloud-drizzle"),
+        "snow": ("Neve", "cloud-snow"),
+        "thunder": ("Temporale", "cloud-lightning"),
+    }
+
     def execute(self, action: dict) -> dict:
         if not hasattr(self, "_cache"):
             self._cache = {}
@@ -36,7 +51,6 @@ class WeatherTool:
 
         import time
 
-        # Genera cache key basata sui parametri normalizzati
         cache_key = tuple(sorted((k, v) for k, v in action.items() if v is not None))
         now = time.time()
         if cache_key in self._cache:
@@ -75,10 +89,10 @@ class WeatherTool:
     def _execute_uncached(self, action: dict) -> dict:
         lat = action.get("lat")
         lon = action.get("lon")
+        requested_location = action.get("location") or os.getenv("DEFAULT_WEATHER_LOCATION", "Roma")
         name = None
 
         if lat is not None and lon is not None:
-            # Fallback name if Nominatim fails
             name = f"Lat {round(lat, 2)}, Lon {round(lon, 2)}"
             try:
                 headers = {"User-Agent": "MAYA-AI-Assistant/1.0"}
@@ -101,109 +115,246 @@ class WeatherTool:
             except Exception:
                 pass
         else:
-            location = action.get("location") or os.getenv("DEFAULT_WEATHER_LOCATION")
-            if not location:
+            if not requested_location:
                 return {
                     "status": "error",
-                    "message": "Località non specificata. Fornire 'location' o impostare 'DEFAULT_WEATHER_LOCATION'.",
+                    "message": "Localita non specificata. Fornire 'location' o impostare 'DEFAULT_WEATHER_LOCATION'.",
                 }
-            # Primo step: Geocoding
-            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=it&format=json"
+
+            geo_url = (
+                "https://geocoding-api.open-meteo.com/v1/search"
+                f"?name={quote(str(requested_location))}&count=1&language=it&format=json"
+            )
             try:
-                geo_res = requests.get(geo_url, timeout=3).json()
+                geo_res = self._get_json(geo_url, timeout=3)
                 if "results" not in geo_res or len(geo_res["results"]) == 0:
-                    return {"status": "error", "message": f"Località '{location}' non trovata."}
+                    return self._execute_wttr(location=requested_location, name=str(requested_location))
 
                 res0 = geo_res["results"][0]
                 lat, lon, name = res0["latitude"], res0["longitude"], res0["name"]
             except Exception as e:
-                return {"status": "error", "message": f"Errore geocoding: {str(e)}"}
+                return self._execute_wttr(location=requested_location, name=str(requested_location), primary_error=e)
 
-        # Secondo step: Meteo + Previsioni
         try:
             weather_url = (
                 f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-                "&current_weather=true"
-                "&hourly=relativehumidity_2m,surface_pressure,visibility,precipitation,precipitation_probability,weathercode"
-                "&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max"
+                "&current=temperature_2m,wind_speed_10m,weather_code,apparent_temperature"
+                "&hourly=relative_humidity_2m,surface_pressure,visibility,precipitation,precipitation_probability,weather_code"
+                "&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max"
                 "&timezone=auto"
             )
-            w_res = requests.get(weather_url, timeout=4).json()
-            current = w_res.get("current_weather", {})
-            daily = w_res.get("daily", {})
-            hourly = w_res.get("hourly", {})
+            w_res = self._get_json(weather_url, timeout=4)
+            return self._parse_open_meteo(w_res, lat=lat, lon=lon, name=name)
+        except Exception as e:
+            return self._execute_wttr(location=requested_location, lat=lat, lon=lon, name=name, primary_error=e)
 
-            code = current.get("weathercode")
-            condition, icon = self.WMO_CODES.get(code, ("Variabile", "cloud-sun"))
+    def _parse_open_meteo(self, w_res: dict, lat, lon, name: str | None) -> dict:
+        current = w_res.get("current") or w_res.get("current_weather", {})
+        daily = w_res.get("daily", {})
+        hourly = w_res.get("hourly", {})
 
-            # Prendi valori attuali da hourly (prima ora disponibile)
-            humidity = hourly.get("relativehumidity_2m", [None])[0]
-            pressure = hourly.get("surface_pressure", [None])[0]
-            visibility_m = hourly.get("visibility", [None])[0]
-            visibility_km = round(visibility_m / 1000, 1) if visibility_m else None
+        code = current.get("weather_code", current.get("weathercode"))
+        condition, icon = self.WMO_CODES.get(code, ("Variabile", "cloud-sun"))
+
+        humidity = self._first(hourly.get("relative_humidity_2m"), hourly.get("relativehumidity_2m"))
+        pressure = self._first(hourly.get("surface_pressure"))
+        visibility_m = self._first(hourly.get("visibility"))
+        visibility_km = round(visibility_m / 1000, 1) if visibility_m else None
+
+        data = {
+            "location": name,
+            "lat": lat,
+            "lon": lon,
+            "temp": current.get("temperature_2m", current.get("temperature")),
+            "wind": current.get("wind_speed_10m", current.get("windspeed")),
+            "feels_like": current.get("apparent_temperature"),
+            "humidity": humidity,
+            "pressure": round(pressure) if pressure else None,
+            "visibility": visibility_km,
+            "code": code,
+            "condition": condition,
+            "icon": icon,
+            "daily": [],
+            "hourly": [],
+            "provider": "open-meteo",
+        }
+
+        try:
+            t_arr = daily.get("time") or []
+            w_arr = daily.get("weather_code") or daily.get("weathercode") or []
+            mx = daily.get("temperature_2m_max") or []
+            mn = daily.get("temperature_2m_min") or []
+            pr = daily.get("precipitation_probability_max") or []
+            n = min(len(t_arr), len(w_arr), len(mx), len(mn))
+            for i in range(1, min(6, n)):
+                day_code = w_arr[i]
+                day_cond, day_icon = self.WMO_CODES.get(day_code, ("Variabile", "cloud-sun"))
+                data["daily"].append(
+                    {
+                        "date": t_arr[i],
+                        "max": mx[i],
+                        "min": mn[i],
+                        "code": day_code,
+                        "condition": day_cond,
+                        "icon": day_icon,
+                        "precip_probability": pr[i] if i < len(pr) else None,
+                    }
+                )
+        except Exception:
+            pass
+
+        try:
+            h_time = hourly.get("time") or []
+            h_prec = hourly.get("precipitation") or []
+            h_prob = hourly.get("precipitation_probability") or []
+            h_code = hourly.get("weather_code") or hourly.get("weathercode") or []
+            n = min(len(h_time), len(h_prec), len(h_code))
+            for i in range(n):
+                code_i = h_code[i]
+                cond_i, _ = self.WMO_CODES.get(code_i, ("Variabile", "cloud-sun"))
+                data["hourly"].append(
+                    {
+                        "time": h_time[i],
+                        "precip_mm": h_prec[i] if h_prec[i] is not None else 0,
+                        "prob": h_prob[i] if i < len(h_prob) else None,
+                        "code": code_i,
+                        "condition": cond_i,
+                    }
+                )
+        except Exception:
+            pass
+
+        return {"status": "ok", "message": f"Meteo a {name}: {data['temp']} C", "data": data}
+
+    def _execute_wttr(
+        self,
+        location: str | None,
+        lat=None,
+        lon=None,
+        name: str | None = None,
+        primary_error: Exception | None = None,
+    ) -> dict:
+        query = location or (f"{lat},{lon}" if lat is not None and lon is not None else None)
+        if not query:
+            detail = f" Dettaglio Open-Meteo: {primary_error}" if primary_error else ""
+            return {"status": "error", "message": f"Meteo non disponibile.{detail}"}
+
+        try:
+            url = f"https://wttr.in/{quote(str(query))}?format=j1&m"
+            payload = self._get_json(url, timeout=6)
+            current = self._first(payload.get("current_condition")) or {}
+            nearest_area = self._first(payload.get("nearest_area")) or {}
+            area_name = self._first(nearest_area.get("areaName")) or {}
+            region = self._first(nearest_area.get("region")) or {}
+            resolved_name = name or area_name.get("value") or str(query)
+            if region.get("value") and region.get("value") not in resolved_name:
+                resolved_name = f"{resolved_name}, {region.get('value')}"
+
+            desc_obj = self._first(current.get("weatherDesc")) or {}
+            condition, icon = self._condition_from_wttr(desc_obj.get("value"))
 
             data = {
-                "location": name,
+                "location": resolved_name,
                 "lat": lat,
                 "lon": lon,
-                "temp": current.get("temperature"),
-                "wind": current.get("windspeed"),
-                "humidity": humidity,
-                "pressure": round(pressure) if pressure else None,
-                "visibility": visibility_km,
-                "code": code,
+                "temp": self._to_float(current.get("temp_C")),
+                "wind": self._to_float(current.get("windspeedKmph")),
+                "feels_like": self._to_float(current.get("FeelsLikeC")),
+                "humidity": self._to_int(current.get("humidity")),
+                "pressure": self._to_int(current.get("pressure")),
+                "visibility": self._to_float(current.get("visibility")),
+                "code": self._to_int(current.get("weatherCode")),
                 "condition": condition,
                 "icon": icon,
                 "daily": [],
                 "hourly": [],
+                "provider": "wttr.in",
             }
 
-            # Prepara previsioni per i prossimi 5 giorni
-            try:
-                t_arr = daily.get("time") or []
-                w_arr = daily.get("weathercode") or []
-                mx = daily.get("temperature_2m_max") or []
-                mn = daily.get("temperature_2m_min") or []
-                pr = daily.get("precipitation_probability_max") or []
-                n = min(len(t_arr), len(w_arr), len(mx), len(mn))
-                for i in range(1, min(6, n)):
-                    day_code = w_arr[i]
-                    day_cond, day_icon = self.WMO_CODES.get(day_code, ("Variabile", "cloud-sun"))
-                    data["daily"].append(
+            for day in (payload.get("weather") or [])[1:6]:
+                hourly = day.get("hourly") or []
+                mid = hourly[len(hourly) // 2] if hourly else {}
+                day_desc = self._first(mid.get("weatherDesc")) or {}
+                day_condition, day_icon = self._condition_from_wttr(day_desc.get("value"))
+                data["daily"].append(
+                    {
+                        "date": day.get("date"),
+                        "max": self._to_float(day.get("maxtempC")),
+                        "min": self._to_float(day.get("mintempC")),
+                        "code": self._to_int(mid.get("weatherCode")),
+                        "condition": day_condition,
+                        "icon": day_icon,
+                        "precip_probability": self._to_int(mid.get("chanceofrain")),
+                    }
+                )
+
+            for day in (payload.get("weather") or [])[:2]:
+                date = day.get("date")
+                for hour in day.get("hourly") or []:
+                    desc_obj = self._first(hour.get("weatherDesc")) or {}
+                    hour_condition, _ = self._condition_from_wttr(desc_obj.get("value"))
+                    time_value = str(hour.get("time", "0")).zfill(4)
+                    data["hourly"].append(
                         {
-                            "date": t_arr[i],
-                            "max": mx[i],
-                            "min": mn[i],
-                            "code": day_code,
-                            "condition": day_cond,
-                            "icon": day_icon,
-                            "precip_probability": pr[i] if i < len(pr) else None,
+                            "time": f"{date}T{time_value[:2]}:{time_value[2:]}",
+                            "precip_mm": self._to_float(hour.get("precipMM")) or 0,
+                            "prob": self._to_int(hour.get("chanceofrain")),
+                            "code": self._to_int(hour.get("weatherCode")),
+                            "condition": hour_condition,
                         }
                     )
-            except Exception:
-                pass
 
-            # Prepara hourly compatto per le prossime ore
-            try:
-                h_time = hourly.get("time") or []
-                h_prec = hourly.get("precipitation") or []
-                h_prob = hourly.get("precipitation_probability") or []
-                h_code = hourly.get("weathercode") or []
-                n = min(len(h_time), len(h_prec), len(h_code))
-                for i in range(n):
-                    code_i = h_code[i]
-                    cond_i, _ = self.WMO_CODES.get(code_i, ("Variabile", "cloud-sun"))
-                    item = {
-                        "time": h_time[i],
-                        "precip_mm": h_prec[i] if h_prec[i] is not None else 0,
-                        "prob": (h_prob[i] if i < len(h_prob) else None),
-                        "code": code_i,
-                        "condition": cond_i,
-                    }
-                    data["hourly"].append(item)
-            except Exception:
-                pass
+            return {"status": "ok", "message": f"Meteo a {resolved_name}: {data['temp']} C", "data": data}
+        except Exception as wttr_error:
+            detail = f"Open-Meteo: {primary_error}; wttr.in: {wttr_error}"
+            return {"status": "error", "message": f"Meteo non disponibile. {detail}"}
 
-            return {"status": "ok", "message": f"Meteo a {name}: {data['temp']}°C", "data": data}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+    def _get_json(self, url: str, timeout: int) -> dict:
+        headers = {"User-Agent": "MAYA-AI-Assistant/1.0"}
+        response = requests.get(url, headers=headers, timeout=timeout)
+        status_code = getattr(response, "status_code", 200)
+        if not isinstance(status_code, int):
+            status_code = 200
+        if status_code >= 400:
+            raise RuntimeError(f"HTTP {response.status_code} da {response.url}")
+        try:
+            return response.json()
+        except ValueError:
+            content_type = response.headers.get("content-type", "")
+            if not isinstance(content_type, str):
+                content_type = ""
+            if "json" not in content_type.lower():
+                snippet = response.text[:120].replace("\n", " ").replace("\r", " ")
+                raise RuntimeError(f"Risposta non JSON da {response.url}: {snippet}")
+            raise
+
+    @staticmethod
+    def _first(*values):
+        for value in values:
+            if isinstance(value, list) and value:
+                return value[0]
+            if value is not None and not isinstance(value, list):
+                return value
+        return None
+
+    @staticmethod
+    def _to_float(value):
+        if value in (None, ""):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _to_int(value):
+        numeric = WeatherTool._to_float(value)
+        return int(round(numeric)) if numeric is not None else None
+
+    def _condition_from_wttr(self, description: str | None) -> tuple[str, str]:
+        desc = (description or "Variabile").strip()
+        lower = desc.lower()
+        for needle, mapped in self.WTTR_DESCRIPTIONS.items():
+            if needle in lower:
+                return mapped
+        return desc, "cloud-sun"
