@@ -61,7 +61,9 @@ def test_news_live_default_groups_exclude_bbc_premiere_channel():
 
     assert "UC16niRr50-MSBwiO3YDb3RA" not in sources
     assert "UCoMdktPbSTixAyNGwb-UYkQ" not in sources
+    assert "UCknLrEdhRCp1aegoMqRaCZg" not in sources
     assert "UCSrZ3UV4jOidv8ppoVuvW9Q" in sources
+    assert "UC7fWeaHhqgM4Ry-RMpM2YYw" in sources
 
 
 @pytest.mark.asyncio

@@ -104,10 +104,13 @@ class TestXSSEscape:
         assert "youtube.com/embed/live_stream?channel=" in html
         assert "UCoMdktPbSTixAyNGwb-UYkQ" not in html
         assert "UCSrZ3UV4jOidv8ppoVuvW9Q" in html
+        assert "UC7fWeaHhqgM4Ry-RMpM2YYw" in html
+        assert "UCknLrEdhRCp1aegoMqRaCZg" not in html
         assert "UC16niRr50-MSBwiO3YDb3RA" in html
         assert "NEWS_BLOCKED_STREAMS.has(stream.src)" in html
         assert "BBC NEWS" not in html
         assert "SKY NEWS" not in html
+        assert "DW NEWS" not in html
         assert "UCLXo7UDZvByw2ixzpQCufnA" not in html
         assert "fetch('/api/news/live-streams'" in html
         assert "stream.fallback ? ' · FALLBACK LIVE'" not in html

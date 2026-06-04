@@ -27,12 +27,12 @@ _log_filter_applied = False
 _NEWS_LIVE_GROUPS = [
     [
         {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
-        {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
         {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
         {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
     ],
     [
-        {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
         {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
         {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
         {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
@@ -40,13 +40,13 @@ _NEWS_LIVE_GROUPS = [
     [
         {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
         {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
-        {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
         {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
     ],
     [
         {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
         {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
-        {"src": "UCknLrEdhRCp1aegoMqRaCZg", "label": "DW NEWS"},
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
         {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
     ],
 ]
