@@ -1,10 +1,12 @@
 """
-news_tool.py - Lettore di notizie RSS
+news_tool.py - Lettore di notizie RSS per dashboard e risposte vocali.
 """
 
 import html
 import os
 import re
+from collections import defaultdict
+from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 
 import feedparser
@@ -29,68 +31,132 @@ def strip_tags(html_content):
     if not html_content:
         return ""
     s = MLStripper()
-    s.feed(html_content)
-    return s.get_data().strip()
+    s.feed(html.unescape(str(html_content)))
+    return html.unescape(s.get_data()).strip()
 
 
 class NewsTool:
     def initialize(self):
-        # Usiamo il feed ANSA come default
         self.feed_url = os.getenv("NEWS_FEED_URL", "https://www.ansa.it/sito/ansait_rss.xml")
+        self.feed_urls = self._configured_feeds()
+
+    def _configured_feeds(self) -> list[tuple[str, str]]:
+        primary = os.getenv("NEWS_FEED_URL", "https://www.ansa.it/sito/ansait_rss.xml")
+        world = os.getenv(
+            "NEWS_WORLD_FEED_URL",
+            "https://news.google.com/rss/headlines/section/topic/WORLD?hl=it&gl=IT&ceid=IT:it",
+        )
+        extra = os.getenv("NEWS_EXTRA_FEEDS", "")
+
+        feeds = [("ITALIA", primary), ("MONDO", world)]
+        for item in extra.split(","):
+            url = item.strip()
+            if url:
+                feeds.append(("EXTRA", url))
+
+        seen = set()
+        unique = []
+        for label, url in feeds:
+            if url not in seen:
+                seen.add(url)
+                unique.append((label, url))
+        return unique
 
     def _clean_html(self, raw_html):
-        """Rimuove tag HTML e decodifica entità."""
         return strip_tags(raw_html)
+
+    def _entry_datetime(self, entry):
+        for key in ("published", "updated", "created"):
+            value = entry.get(key)
+            if value:
+                try:
+                    return parsedate_to_datetime(value)
+                except Exception:
+                    pass
+        return None
+
+    def _entry_to_news_item(self, feed_label, entry):
+        raw_summary = entry.get("summary", "")
+        image_url = None
+
+        img_match = re.search(r'<img[^>]+src="([^">]+)"', raw_summary)
+        if img_match:
+            image_url = html.unescape(img_match.group(1))
+
+        if not image_url and "media_content" in entry and entry.media_content:
+            image_url = entry.media_content[0]["url"]
+
+        if not image_url and "enclosures" in entry and entry.enclosures:
+            image_url = entry.enclosures[0]["href"]
+
+        summary = self._clean_html(raw_summary)
+        raw_title = self._clean_html(entry.get("title", ""))
+
+        source = "Breaking News"
+        title = raw_title
+        if " - " in raw_title:
+            parts = raw_title.rsplit(" - ", 1)
+            title = parts[0]
+            source = parts[1]
+
+        if feed_label == "MONDO" and "mondo" not in source.lower():
+            source = f"{source} / Mondo"
+
+        return {
+            "title": title,
+            "source": source,
+            "link": entry.link,
+            "image": image_url,
+            "summary": summary[:200] + ("..." if len(summary) > 200 else ""),
+            "published": entry.get("published", ""),
+            "_feed_label": feed_label,
+            "_dt": self._entry_datetime(entry),
+        }
+
+    def _select_balanced_news(self, items, limit):
+        grouped = defaultdict(list)
+        for item in items:
+            grouped[item["_feed_label"]].append(item)
+
+        epoch = parsedate_to_datetime("Thu, 01 Jan 1970 00:00:00 +0000")
+        for group_items in grouped.values():
+            group_items.sort(key=lambda item: item["_dt"] or epoch, reverse=True)
+
+        ordered_labels = [label for label, _url in getattr(self, "feed_urls", []) if grouped.get(label)]
+        selected = []
+        seen_titles = set()
+
+        while len(selected) < limit and any(grouped.get(label) for label in ordered_labels):
+            for label in ordered_labels:
+                if len(selected) >= limit:
+                    break
+                while grouped.get(label):
+                    item = grouped[label].pop(0)
+                    title_key = re.sub(r"\W+", "", item["title"].lower())
+                    if title_key and title_key not in seen_titles:
+                        seen_titles.add(title_key)
+                        selected.append(item)
+                        break
+
+        return selected
 
     def execute(self, action: dict) -> dict:
         limit = action.get("limit", 5)
         try:
-            feed = feedparser.parse(self.feed_url)
-            if not feed.entries:
+            parsed_items = []
+            for feed_label, feed_url in getattr(self, "feed_urls", None) or self._configured_feeds():
+                feed = feedparser.parse(feed_url)
+                for entry in feed.entries:
+                    parsed_items.append(self._entry_to_news_item(feed_label, entry))
+
+            if not parsed_items:
                 return {"status": "error", "message": "Nessuna notizia trovata."}
 
-            news_list = []
-            structured_news = []
-            for entry in feed.entries[:limit]:
-                raw_summary = entry.get("summary", "")
-                # Estrai immagine se presente
-                image_url = None
-
-                # 1. Prova regex nel summary
-                img_match = re.search(r'<img[^>]+src="([^">]+)"', raw_summary)
-                if img_match:
-                    image_url = img_match.group(1)
-
-                # 2. Prova media_content
-                if not image_url and "media_content" in entry and entry.media_content:
-                    image_url = entry.media_content[0]["url"]
-
-                # 3. Prova enclosure
-                if not image_url and "enclosures" in entry and entry.enclosures:
-                    image_url = entry.enclosures[0]["href"]
-
-                summary = self._clean_html(raw_summary)
-                raw_title = self._clean_html(entry.get("title", ""))
-
-                # Google News usa spesso "Titolo - Fonte"
-                source = "Breaking News"
-                title = raw_title
-                if " - " in raw_title:
-                    parts = raw_title.rsplit(" - ", 1)
-                    title = parts[0]
-                    source = parts[1]
-
-                news_list.append(f"- {title} ({source})")
-                structured_news.append(
-                    {
-                        "title": title,
-                        "source": source,
-                        "link": entry.link,
-                        "image": image_url,
-                        "summary": summary[:200] + ("..." if len(summary) > 200 else ""),
-                        "published": entry.get("published", ""),
-                    }
-                )
+            structured_news = self._select_balanced_news(parsed_items, limit)
+            news_list = [f"- {item['title']} ({item['source']})" for item in structured_news]
+            for item in structured_news:
+                item.pop("_feed_label", None)
+                item.pop("_dt", None)
 
             msg = "Ecco le ultime notizie:\n" + "\n".join(news_list)
             return {"status": "ok", "message": msg, "news": structured_news}

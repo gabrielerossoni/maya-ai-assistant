@@ -106,6 +106,11 @@ class TestResolve:
         result = engine.resolve("che tempo fa domani?")
         assert result is None
 
+    def test_resolve_alias_does_not_match_inside_word(self, engine):
+        engine.register(_simple_automation("buonanotte", aliases=["notte"]))
+        result = engine.resolve("luce fuori nero mezzanotte")
+        assert result is None
+
     def test_resolve_modalita_notte_alias(self, engine):
         engine.register(_simple_automation("buonanotte", aliases=["modalità notte", "modalita notte"]))
         result = engine.resolve("attiva modalità notte")
@@ -556,6 +561,22 @@ class TestDefaults:
         assert any(a.params.get("target") == "buzzer" and a.params.get("value") == 0 for a in background_actions)
         assert any(a.params.get("target") == "neopixel" and a.params.get("value") == 0 for a in background_actions)
         assert round(sum(a.delay for a in background_actions), 1) == 20.0
+
+    def test_alarm_accepts_voice_misrecognition_alias(self, engine, fresh_context, fresh_registry):
+        engine.register_all(build_default_automations())
+
+        auto = engine.resolve("attiva alarme")
+
+        assert auto is not None
+        assert auto.name == "allarme"
+
+    def test_alarm_accepts_apostrophe_voice_misrecognition_alias(self, engine, fresh_context, fresh_registry):
+        engine.register_all(build_default_automations())
+
+        auto = engine.resolve("all'armi")
+
+        assert auto is not None
+        assert auto.name == "allarme"
 
     def test_wake_scene_uses_radar_melody_for_30_seconds(self, fresh_context, fresh_registry):
         auto = next(a for a in build_default_automations() if a.name == "sveglia")

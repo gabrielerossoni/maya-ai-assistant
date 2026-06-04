@@ -5,7 +5,9 @@ Estratto da main.py per ridurre la complessità del punto di ingresso.
 
 import asyncio
 import os
+import time
 
+import httpx
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
@@ -21,6 +23,34 @@ from core.log_utils import setup_dashboard_log_filter
 
 # Flag globale per applicare il filtro log una sola volta
 _log_filter_applied = False
+
+_NEWS_LIVE_GROUPS = [
+    [
+        {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
+        {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
+        {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
+    ],
+    [
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
+        {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
+        {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
+        {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
+    ],
+    [
+        {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
+        {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
+        {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
+    ],
+    [
+        {"src": "UCSrZ3UV4jOidv8ppoVuvW9Q", "label": "EURONEWS"},
+        {"src": "UCQfwfsi5VrQ8yKZ-UWmAEFg", "label": "FRANCE 24"},
+        {"src": "UC7fWeaHhqgM4Ry-RMpM2YYw", "label": "TRT WORLD"},
+        {"src": "UCNye-wNBqNL5ZzHSJj3l8Bg", "label": "AL JAZEERA"},
+    ],
+]
+_news_live_cache = {"ts": 0.0, "streams": []}
 
 _DIRECT_TOOL_ALLOWLIST = {
     "arduino": {
@@ -115,6 +145,85 @@ async def get_manifest():
 
 async def health_check():
     return {"status": "ok"}
+
+
+async def _youtube_live_channel_available(client: httpx.AsyncClient, channel_id: str) -> bool:
+    live_url = f"https://www.youtube.com/channel/{channel_id}/live"
+    oembed_url = f"https://www.youtube.com/oembed?url={live_url}&format=json"
+    try:
+        res = await client.get(oembed_url)
+        if res.status_code != 200:
+            return False
+
+        page = await client.get(live_url)
+        if page.status_code != 200:
+            return False
+
+        html = page.text.lower()
+        upcoming_markers = (
+            '"isupcoming":true',
+            '"upcomingeventdata"',
+            '"scheduledstarttime"',
+            "premiere",
+            "waiting room",
+            "set reminder",
+            "notify me",
+        )
+        if any(marker in html for marker in upcoming_markers):
+            return False
+
+        live_markers = (
+            '"islivenow":true',
+            '"islive":true',
+            '"badges":[{"metadataBadgeRenderer":{"style":"BADGE_STYLE_TYPE_LIVE_NOW"',
+            "badge_style_type_live_now",
+        )
+        return any(marker in html for marker in live_markers)
+    except httpx.HTTPError:
+        return False
+
+
+async def _select_news_live_streams(groups=None, checker=None):
+    groups = groups or _NEWS_LIVE_GROUPS
+    checker = checker or _youtube_live_channel_available
+
+    async with httpx.AsyncClient(
+        timeout=3.0,
+        headers={"User-Agent": "MAYA-dashboard/1.0"},
+        follow_redirects=True,
+    ) as client:
+        selected = []
+        used = set()
+
+        async def _select_group(group, used_sources):
+            for index, candidate in enumerate(group):
+                if candidate["src"] in used_sources:
+                    continue
+                if await checker(client, candidate["src"]):
+                    return {**candidate, "fallback": index > 0}
+
+            fallback = next((candidate for candidate in group[1:] if candidate["src"] not in used_sources), None)
+            if fallback is None:
+                fallback = next((candidate for candidate in group if candidate["src"] not in used_sources), group[0])
+            return {**fallback, "fallback": True, "unchecked": True}
+
+        for group in groups:
+            stream = await _select_group(group, used)
+            selected.append(stream)
+            used.add(stream["src"])
+
+        return selected
+
+
+async def get_news_live_streams():
+    now = time.monotonic()
+    if _news_live_cache["streams"] and now - _news_live_cache["ts"] < 120:
+        return {"status": "ok", "mode": "live_channel_fallback", "streams": _news_live_cache["streams"]}
+
+    streams = await _select_news_live_streams()
+    _news_live_cache["ts"] = now
+    _news_live_cache["streams"] = streams
+    return {"status": "ok", "mode": "live_channel_fallback", "streams": streams}
 
 
 # ---------------------------------------------------------------------------

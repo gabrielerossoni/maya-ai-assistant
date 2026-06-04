@@ -27,10 +27,10 @@ class SpotifyTool:
     def initialize(self):
         enabled = os.environ.get("SPOTIFY_ENABLED", "true").strip().lower() not in ("0", "false", "no")
         if not enabled:
-            print("[SPOTIFY] Disabilitato via SPOTIFY_ENABLED=false — skip init.")
+            print("[SPOTIFY] Disabilitato via SPOTIFY_ENABLED=false - skip init.")
             return
         if not os.getenv("SPOTIFY_CLIENT_ID") or not os.getenv("SPOTIFY_CLIENT_SECRET"):
-            print("[SPOTIFY] Credenziali mancanti — skip init.")
+            print("[SPOTIFY] Credenziali mancanti - skip init.")
             return
         try:
             auth_manager = SpotifyOAuth(

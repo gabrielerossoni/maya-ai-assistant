@@ -36,9 +36,12 @@
             --hud-color: rgba(255, 0, 0, 0.4);
             --ui-scale: 1;
             --dom-cols: 3;
-            --dom-gap: 10px;
+            --dom-gap: 14px;
             --sb-width: 260px;
             --card-accent: rgba(255,42,42,0.9);
+            --dom-card-bg: rgba(255, 255, 255, 0.026);
+            --dom-card-border: rgba(255, 255, 255, 0.072);
+            --dom-card-border-hover: rgba(255, 255, 255, 0.13);
         }
 
         /* =============================================
@@ -150,12 +153,12 @@
         }
 
         .ns-title {
-            font-size: 12px !important;
-            opacity: 0.88 !important;
+            font-size: 14px !important;
+            opacity: 0.94 !important;
         }
 
         .ns-source {
-            opacity: 0.65 !important;
+            opacity: 0.9 !important;
         }
 
         /* Weather */
@@ -359,7 +362,7 @@
         }
 
         body.content-open #orb-branding {
-            top: 108px;
+            top: 100px;
             left: 0;
             width: 128px;
             transform: translate(0, 0);
@@ -603,59 +606,137 @@
         }
 
         .wx-forecast {
-            width: 260px;
+            width: 310px;
             flex-shrink: 0;
             border-left: 1px solid rgba(255, 255, 255, 0.06);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            background: rgba(255, 255, 255, 0.01);
+            background: linear-gradient(180deg, rgba(80, 200, 255, 0.035), rgba(255, 255, 255, 0.012));
         }
 
         .wx-fc-hdr {
             font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
+            font-size: 7.5px;
             letter-spacing: 3px;
-            opacity: 0.18;
-            padding: 16px 20px 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            opacity: 0.58;
+            padding: 18px 20px 8px;
             flex-shrink: 0;
         }
 
-        .wx-fc-row {
+        .wx-fc-legend {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 0 18px 13px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            flex-shrink: 0;
+        }
+
+        .wx-fc-legend-item {
             display: flex;
             align-items: center;
-            padding: 16px 22px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            gap: 10px;
-            transition: all 0.2s;
+            gap: 5px;
+            min-width: 0;
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+        }
+
+        .wx-fc-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            flex-shrink: 0;
+            box-shadow: 0 0 12px currentColor;
+        }
+
+        .wx-fc-dot.cold { color: #7ee8ff; background: #7ee8ff; }
+        .wx-fc-dot.mild { color: #ffe87c; background: #ffe87c; }
+        .wx-fc-dot.hot { color: #ff8c42; background: #ff8c42; }
+
+        .wx-fc-row {
+            display: grid;
+            grid-template-columns: 42px 34px 1fr auto;
+            align-items: center;
+            padding: 15px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+            gap: 12px;
+            transition: background 0.2s, border-color 0.2s, transform 0.2s;
             border-left: 2px solid transparent;
+            min-height: 72px;
         }
 
         .wx-fc-row:hover {
-            background: rgba(255, 255, 255, 0.02);
-            border-left-color: rgba(255, 30, 30, 0.35);
+            background: rgba(80, 200, 255, 0.055);
+            border-left-color: rgba(80, 200, 255, 0.45);
+            transform: translateX(-2px);
         }
 
         .wx-fc-day {
             font-family: 'Syncopate', sans-serif;
-            font-size: 8px;
+            font-size: 8.5px;
             letter-spacing: 1px;
-            opacity: 0.52;
-            width: 36px;
+            opacity: 0.74;
+            width: 42px;
             text-transform: uppercase;
         }
 
+        .wx-fc-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            background: rgba(255, 255, 255, 0.055);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 15px;
+        }
+
+        .wx-fc-main {
+            min-width: 0;
+        }
+
         .wx-fc-desc {
-            flex: 1;
-            font-size: 10px;
-            opacity: 0.45;
+            font-size: 12px;
+            opacity: 0.82;
             text-transform: capitalize;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .wx-fc-bar {
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.07);
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .wx-fc-bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #7ee8ff, #ffe87c, #ff8c42);
+            box-shadow: 0 0 10px rgba(255, 232, 124, 0.22);
+        }
+
+        .wx-fc-rain {
+            margin-top: 6px;
+            font-size: 9px;
+            opacity: 0.58;
+        }
+
+        .wx-fc-note {
+            color: rgba(255, 255, 255, 0.38);
         }
 
         .wx-fc-temps {
-            font-size: 14px;
-            font-weight: 200;
+            font-size: 16px;
+            font-weight: 300;
+            text-align: right;
+            color: rgba(255, 255, 255, 0.94);
         }
 
         .wx-fc-min {
@@ -698,7 +779,19 @@
             height: 100%;
             padding: 0 16px;
             white-space: nowrap;
+            width: max-content;
+            will-change: transform;
             animation: scroll-ticker 50s linear infinite;
+        }
+
+        @keyframes scroll-ticker {
+            from {
+                transform: translateX(0);
+            }
+
+            to {
+                transform: translateX(-50%);
+            }
         }
 
         .ntk-label {
@@ -792,7 +885,7 @@
             font-family: 'Syncopate', sans-serif;
             font-size: 7px;
             letter-spacing: 3px;
-            opacity: 0.22;
+            opacity: 0.58;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             flex-shrink: 0;
         }
@@ -825,12 +918,12 @@
         }
 
         .ns-item {
-            padding: 14px 18px;
+            padding: 16px 18px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             cursor: pointer;
             transition: background 0.2s;
             display: flex;
-            gap: 12px;
+            gap: 14px;
             align-items: flex-start;
         }
 
@@ -853,19 +946,31 @@
             min-width: 0;
         }
 
+        .ns-thumb {
+            width: 58px;
+            height: 58px;
+            object-fit: cover;
+            border-radius: 6px;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
         .ns-source {
             font-family: 'Syncopate', sans-serif;
-            font-size: 6px;
-            letter-spacing: 2px;
+            font-size: 7px;
+            letter-spacing: 2.4px;
             color: var(--accent);
-            opacity: 0.8;
-            margin-bottom: 5px;
+            opacity: 0.95;
+            margin-bottom: 7px;
         }
 
         .ns-title {
-            font-size: 11px;
-            line-height: 1.5;
-            opacity: 0.78;
+            font-size: 14px;
+            line-height: 1.45;
+            opacity: 0.94;
+            color: rgba(255, 255, 255, 0.94);
+            overflow-wrap: anywhere;
         }
 
         /* =============================================
@@ -1022,14 +1127,16 @@
         .dom-content {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr var(--sb-width, 260px);
-            gap: 0;
+            grid-template-columns: minmax(0, 1fr) var(--sb-width, 260px);
+            gap: 14px;
             overflow: hidden;
+            padding: 18px 24px 20px;
         }
 
         /* Devices area */
         .dom-devices-area {
-            padding: 22px 28px;
+            min-width: 0;
+            padding: 0;
             overflow-y: auto;
             scrollbar-width: none;
         }
@@ -1043,14 +1150,17 @@
             font-size: 7px;
             letter-spacing: 3px;
             opacity: 0.18;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             display: block;
         }
 
         .dom-cards-grid {
             display: grid;
-            grid-template-columns: repeat(var(--dom-cols, 3), 1fr);
+            grid-template-columns: repeat(var(--dom-cols, 3), minmax(0, 1fr));
+            grid-auto-rows: minmax(126px, auto);
             gap: var(--dom-gap, 10px);
+            align-items: stretch;
+            align-content: start;
         }
 
         .dom-kpi-row {
@@ -1091,36 +1201,52 @@
 
         /* Device card */
         .dom-card {
-            background: transparent;
-            border: none;
-            border-radius: 0;
+            background: linear-gradient(180deg, var(--dom-card-bg), rgba(255, 255, 255, 0.012));
+            border: 1px solid var(--dom-card-border);
+            border-radius: 8px;
             padding: 18px 16px 16px;
             cursor: pointer;
             transition: background 0.28s ease, border-color 0.28s ease, transform 0.18s ease, box-shadow 0.28s ease;
             position: relative;
-            overflow: visible;
+            overflow: hidden;
             user-select: none;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            min-height: 118px;
-            backdrop-filter: none;
-            box-shadow: none;
+            gap: 13px;
+            min-height: 126px;
+            backdrop-filter: saturate(115%) blur(3px);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 10px 24px rgba(0,0,0,0.16);
         }
 
         /* Accent header line + corner glow */
         .dom-card::before{
-            display: none;
+            content: '';
+            position: absolute;
+            left: 14px;
+            right: 14px;
+            top: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-card, var(--card-accent)), transparent);
+            opacity: 0.18;
         }
         .dom-card::after{
-            display: none;
+            content: '';
+            position: absolute;
+            inset: auto -24px -34px auto;
+            width: 84px;
+            height: 84px;
+            border-radius: 999px;
+            background: radial-gradient(circle, color-mix(in srgb, var(--accent-card, var(--card-accent)) 22%, transparent), transparent 68%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
         }
 
         .dom-card:hover {
-            background: transparent;
-            border-color: transparent;
-            transform: translateY(0);
-            box-shadow: none;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018));
+            border-color: var(--dom-card-border-hover);
+            transform: translateY(-1px);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 14px 28px rgba(0,0,0,0.22);
         }
 
         .dom-card:active {
@@ -1128,17 +1254,25 @@
         }
 
         .dom-card.active {
-            background: transparent;
-            border-color: transparent;
-            box-shadow: none;
+            background: linear-gradient(180deg, color-mix(in srgb, var(--accent-card, var(--card-accent)) 11%, rgba(255,255,255,0.03)), rgba(255, 255, 255, 0.015));
+            border-color: color-mix(in srgb, var(--accent-card, var(--card-accent)) 34%, rgba(255,255,255,0.07));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 14px 30px rgba(0,0,0,0.2);
         }
 
         .dom-card.active:hover {
-            background: transparent;
+            background: linear-gradient(180deg, color-mix(in srgb, var(--accent-card, var(--card-accent)) 14%, rgba(255,255,255,0.04)), rgba(255, 255, 255, 0.018));
+        }
+
+        .dom-card:hover::after,
+        .dom-card.active::after {
+            opacity: 1;
         }
 
         .dom-card-top {
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
         }
 
         .dom-card-icon {
@@ -1185,7 +1319,7 @@
         .dom-card-name {
             font-size: 12px;
             font-weight: 400;
-            opacity: 0.8;
+            opacity: 0.86;
         }
 
         .dom-card-state {
@@ -1250,14 +1384,16 @@
 
         /* Right sidebar */
         .dom-sidebar-new {
-            border-left: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            border-radius: 8px;
             display: flex;
             flex-direction: column;
             overflow-y: auto;
-            background: rgba(255, 255, 255, 0.008);
-            padding: 22px 20px;
+            background: rgba(255, 255, 255, 0.014);
+            padding: 20px 18px;
             gap: 0;
             scrollbar-width: none;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
         }
 
         .dom-sidebar-new::-webkit-scrollbar {
@@ -1361,24 +1497,37 @@
 
         .cal-layout {
             display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 16px;
+            grid-template-columns: minmax(300px, 360px) 1fr;
+            gap: 18px;
             overflow: hidden;
             height: 100%;
             min-height: 0;
-            padding: 16px 20px 20px;
+            padding: 18px 20px 20px;
             box-sizing: border-box;
         }
 
-        /* ── Upcoming list ── */
+        #panel-calendar .dom-topbar {
+            background: linear-gradient(90deg, rgba(255, 30, 30, 0.08), rgba(80, 200, 255, 0.035) 55%, transparent);
+            border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        #cal-pill {
+            padding: 6px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.035);
+            opacity: 0.72 !important;
+        }
+
+        /* -- Upcoming list -- */
         .cal-upcoming {
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 12px;
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: rgba(255, 30, 30, 0.3) transparent;
-            padding-right: 4px;
+            padding: 2px 4px 2px 0;
             min-height: 0;
         }
 
@@ -1397,11 +1546,12 @@
 
         .cal-upcoming-header {
             font-family: 'Syncopate', sans-serif;
-            font-size: 8px;
+            font-size: 8.5px;
             letter-spacing: 3px;
             color: var(--accent);
             opacity: 1;
-            margin-bottom: 4px;
+            margin: 0 0 4px;
+            padding: 0 2px 2px;
         }
 
         .cal-event-item {
@@ -1409,31 +1559,36 @@
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 12px;
-            padding: 16px 20px;
-            transition: all 0.2s;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+            border: 1px solid rgba(255, 255, 255, 0.075);
+            border-left: 2px solid rgba(255, 30, 30, 0.42);
+            border-radius: 8px;
+            padding: 15px 16px;
+            transition: transform 0.18s, border-color 0.18s, background 0.18s;
             flex-shrink: 0;
         }
 
         .cal-event-item:hover {
             border-color: rgba(255, 30, 30, 0.3);
+            background: rgba(255, 30, 30, 0.055);
+            transform: translateY(-1px);
         }
 
         .cal-event-item.today {
             border-color: rgba(255, 30, 30, 0.45);
-            background: rgba(255, 30, 30, 0.05);
+            border-left-color: var(--accent);
+            background: rgba(255, 30, 30, 0.075);
         }
 
         .cal-event-date {
             font-family: 'Syncopate', sans-serif;
-            font-size: 10.5px;
+            font-size: 10px;
             letter-spacing: 1px;
             color: var(--accent);
             text-align: right;
             flex-shrink: 0;
             line-height: 1.4;
+            min-width: 58px;
         }
 
         .cal-event-info {
@@ -1444,51 +1599,62 @@
         }
 
         .cal-date-sub {
-            font-size: 8px;
-            opacity: 0.5;
-            margin-bottom: 2px;
+            font-size: 7.5px;
+            opacity: 0.68;
+            margin-bottom: 3px;
         }
 
         .cal-time-main {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
             color: #fff;
         }
 
         .cal-event-title {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
-            color: rgba(255, 255, 255, 0.9);
-            white-space: nowrap;
+            color: rgba(255, 255, 255, 0.94);
+            white-space: normal;
             overflow: hidden;
-            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.35;
         }
 
         .cal-event-source {
-            font-size: 10px;
-            opacity: 0.35;
-            margin-top: 2px;
+            font-size: 8px;
+            opacity: 0.55;
+            margin-top: 6px;
             font-family: 'Syncopate', sans-serif;
-            letter-spacing: 1px;
+            letter-spacing: 1.6px;
         }
 
         .cal-empty {
-            opacity: 0.3;
-            font-size: 12px;
+            opacity: 0.55;
+            font-size: 11px;
             text-align: center;
-            margin-top: 40px;
+            margin-top: 26px;
+            padding: 22px 12px;
+            border: 1px dashed rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.025);
             font-family: 'Syncopate', sans-serif;
             letter-spacing: 2px;
         }
 
-        /* ── Monthly grid ── */
+        /* -- Monthly grid -- */
         .cal-month {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
             overflow: hidden;
             min-height: 0;
             height: 100%;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.018);
         }
 
         .cal-month-header {
@@ -1499,9 +1665,10 @@
 
         .cal-month-title {
             font-family: 'Syncopate', sans-serif;
-            font-size: 11px;
+            font-size: 12px;
             letter-spacing: 3px;
             font-weight: 700;
+            color: rgba(255, 255, 255, 0.92);
         }
 
         .cal-month-nav {
@@ -1510,14 +1677,14 @@
         }
 
         .cal-month-nav button {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.6);
-            width: 28px;
-            height: 28px;
-            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.055);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            color: rgba(255, 255, 255, 0.72);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1532,23 +1699,23 @@
         .cal-dow-row {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 4px;
+            gap: 6px;
             text-align: center;
         }
 
         .cal-dow {
             font-family: 'Syncopate', sans-serif;
-            font-size: 7px;
+            font-size: 7.5px;
             letter-spacing: 1.5px;
-            opacity: 0.3;
-            padding: 2px 0;
+            opacity: 0.5;
+            padding: 4px 0;
         }
 
         .cal-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             grid-auto-rows: minmax(0, 1fr);
-            gap: 4px;
+            gap: 6px;
             flex: 1;
             min-height: 0;
             overflow: hidden;
@@ -1556,45 +1723,47 @@
 
         .cal-day {
             border-radius: 8px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.028);
+            border: 1px solid rgba(255, 255, 255, 0.045);
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
-            padding-top: 6px;
+            justify-content: center;
+            padding-top: 0;
             cursor: default;
-            transition: border-color 0.15s, background 0.15s;
+            transition: border-color 0.15s, background 0.15s, transform 0.15s;
             position: relative;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.65);
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.72);
         }
 
         .cal-day.has-event {
-            border-color: rgba(255, 30, 30, 0.25);
-            background: rgba(255, 30, 30, 0.04);
+            border-color: rgba(255, 30, 30, 0.35);
+            background: rgba(255, 30, 30, 0.065);
             cursor: pointer;
         }
 
         .cal-day.has-event:hover {
             border-color: rgba(255, 30, 30, 0.55);
-            background: rgba(255, 30, 30, 0.08);
+            background: rgba(255, 30, 30, 0.11);
+            transform: translateY(-1px);
         }
 
         .cal-day.today {
             border-color: var(--accent) !important;
             color: #fff;
             font-weight: 700;
+            background: rgba(255, 30, 30, 0.13);
         }
 
         .cal-day.today::after {
             content: '';
-            width: 4px;
-            height: 4px;
+            width: 18px;
+            height: 2px;
             border-radius: 50%;
             background: var(--accent);
             position: absolute;
-            bottom: 5px;
+            bottom: 7px;
         }
 
         .cal-day.faded {
@@ -1602,11 +1771,27 @@
         }
 
         .cal-day-dot {
-            width: 4px;
-            height: 4px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: var(--accent);
-            margin-top: 3px;
+            margin-top: 5px;
+        }
+
+        .cal-day-count {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            min-width: 14px;
+            height: 14px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: rgba(80, 200, 255, 0.16);
+            color: rgba(220, 248, 255, 0.95);
+            border: 1px solid rgba(80, 200, 255, 0.25);
+            font-size: 8px;
+            line-height: 13px;
+            text-align: center;
         }
 
         #nav-rail {
@@ -2346,9 +2531,9 @@
                 -webkit-font-smoothing: antialiased !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                IDLE SCREEN
-               ══════════════════════════════════════════ */
+               ========================================== */
 
             /* Nasconde il logo — spazio prezioso su mobile */
             #top-logo {
@@ -2405,9 +2590,9 @@
                 text-align: center;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                WORK MODE — orb angolo + header mobile
-               ══════════════════════════════════════════ */
+               ========================================== */
 
             /* Orb in angolo top-left */
             #maya-orb-container.corner {
@@ -2418,7 +2603,7 @@
             }
 
             body.content-open #orb-branding {
-                top: calc(72px + env(safe-area-inset-top));
+                top: calc(68px + env(safe-area-inset-top));
                 left: 0;
                 width: 72px;
                 font-size: 6px;
@@ -2451,9 +2636,9 @@
                 box-sizing: border-box !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                BOTTOM NAV BAR (nav-rail)
-               ══════════════════════════════════════════ */
+               ========================================== */
             #nav-rail {
                 right: auto;
                 top: auto;
@@ -2516,9 +2701,9 @@
                 display: none;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                CMD INPUT — sopra la bottom nav in work mode
-               ══════════════════════════════════════════ */
+               ========================================== */
             #cmd-container.corner {
                 top: auto;
                 bottom: calc(76px + env(safe-area-inset-bottom));
@@ -2552,9 +2737,9 @@
                 background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                PANEL AREA — scorrevole tra header e bottom nav
-               ══════════════════════════════════════════ */
+               ========================================== */
 
             /* Tutti i panel occupano lo spazio restante con scroll interno */
             .panel.active {
@@ -2570,9 +2755,9 @@
                 padding-bottom: 128px;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                METEO
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-weather,
             #panel-weather.active {
                 height: auto;
@@ -2656,9 +2841,9 @@
                 flex-shrink: 0;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                NEWS
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-news,
             #panel-news.active {
                 height: auto;
@@ -2688,16 +2873,23 @@
             }
 
             .ns-item {
-                padding: 12px 14px;
+                padding: 14px 14px;
+                gap: 12px;
+            }
+
+            .ns-thumb {
+                width: 52px;
+                height: 52px;
             }
 
             .ns-title {
-                font-size: 13px !important;
+                font-size: 15px !important;
+                line-height: 1.42;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                DOMOTICA
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-dashboard,
             #panel-dashboard.active {
                 height: auto;
@@ -2733,10 +2925,12 @@
                 display: flex;
                 flex-direction: column;
                 overflow: visible;
+                padding: 12px;
+                gap: 12px;
             }
 
             .dom-devices-area {
-                padding: 12px 12px 0;
+                padding: 0;
                 overflow: visible;
             }
 
@@ -2748,7 +2942,7 @@
 
             .dom-card {
                 min-height: 90px;
-                padding: 14px 12px 10px;
+                padding: 14px 12px 12px;
                 gap: 10px;
             }
 
@@ -2764,8 +2958,8 @@
 
             /* Sidebar sensori sotto i dispositivi, orizzontale */
             .dom-sidebar-new {
-                border-left: none;
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
+                border-left: 1px solid rgba(255, 255, 255, 0.055);
+                border-top: 1px solid rgba(255, 255, 255, 0.055);
                 padding: 14px 12px;
                 display: grid;
                 grid-template-columns: 1fr 1fr;
@@ -2786,9 +2980,9 @@
                 font-size: 18px !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                CALENDARIO
-               ══════════════════════════════════════════ */
+               ========================================== */
             #panel-calendar,
             #panel-calendar.active {
                 height: auto;
@@ -2834,9 +3028,9 @@
                 padding-top: 0 !important;
             }
 
-            /* ══════════════════════════════════════════
+            /* ==========================================
                SPOTIFY
-               ══════════════════════════════════════════ */
+               ========================================== */
             #spotify-widget {
                 top: auto;
                 bottom: calc(132px + env(safe-area-inset-bottom));
@@ -2883,7 +3077,7 @@
             }
         }
 
-        /* ── iOS Safe Area (notch / Dynamic Island) ── */
+        /* -- iOS Safe Area (notch / Dynamic Island) -- */
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
             @media (max-width: 768px) {
                 #nav-rail {
@@ -2903,7 +3097,7 @@
             }
         }
 
-        /* ── Extra small ≤ 400px ── */
+        /* -- Extra small ≤ 400px -- */
         @media (max-width: 400px) {
             #idle-clock .time {
                 font-size: 34px;
@@ -2955,7 +3149,7 @@
     </div>
     <h1 id="orb-branding">MAYA</h1>
     <div id="spotify-widget">
-        <div class="widget-close" onclick="closeSpotifyWidget()">✕</div>
+        <div class="widget-close" onclick="closeSpotifyWidget()">×</div>
         <div class="spotify-mini-card">
             <img id="spotify-art" class="album-art" src="" alt="Album Art">
             <div class="info">
@@ -2964,14 +3158,14 @@
             </div>
         </div>
         <div class="spotify-mini-controls">
-            <button class="btn-mini-ctrl" onclick="spotifyCmd('prev')">⏮︎</button>
-            <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="spotifyCmd('play_pause')">▶︎</button>
-            <button class="btn-mini-ctrl" onclick="spotifyCmd('next')">⏭︎</button>
+            <button class="btn-mini-ctrl" onclick="spotifyCmd('prev')">⏮</button>
+            <button class="btn-mini-ctrl" id="spotify-play-btn" onclick="spotifyCmd('play_pause')">▶</button>
+            <button class="btn-mini-ctrl" onclick="spotifyCmd('next')">⏭</button>
         </div>
     </div>
     <button class="chat-log-toggle" id="chat-log-toggle" onclick="toggleConsoleWidget('toggle')">CHAT & LOG</button>
     <div id="chat-log-widget">
-        <div class="widget-close" onclick="toggleConsoleWidget('close')">✕</div>
+        <div class="widget-close" onclick="toggleConsoleWidget('close')">×</div>
         <div class="chat-log-header">
             <div class="chat-log-title">CONSOLE LOG</div>
             <div class="chat-log-led" id="chat-log-led"></div>
@@ -3032,6 +3226,11 @@
                     </div>
                     <div class="wx-forecast">
                         <div class="wx-fc-hdr">FORECAST // 5 GIORNI</div>
+                        <div class="wx-fc-legend" aria-label="Legenda forecast">
+                            <span class="wx-fc-legend-item"><span class="wx-fc-dot cold"></span>Fresco</span>
+                            <span class="wx-fc-legend-item"><span class="wx-fc-dot mild"></span>Mite</span>
+                            <span class="wx-fc-legend-item"><span class="wx-fc-dot hot"></span>Caldo</span>
+                        </div>
                         <div id="weather-forecast-col"></div>
                     </div>
                 </section>
@@ -4210,13 +4409,19 @@
         // =============================================
         // PANEL UPDATES
         // =============================================
-        // ── Calendar state ──────────────────────────
+        // -- Calendar state --------------------------
         let _calEvents = [];
         let _calViewYear = new Date().getFullYear();
         let _calViewMonth = new Date().getMonth();
 
         function updateCalendar(events) {
             _calEvents = events || [];
+            const pill = document.getElementById('cal-pill');
+            if (pill) {
+                const googleCount = _calEvents.filter(e => e.source === 'google').length;
+                const localCount = _calEvents.length - googleCount;
+                pill.textContent = googleCount ? `GOOGLE ${googleCount}` : `MAYA ${localCount}`;
+            }
             renderCalUpcoming();
             renderCalGrid();
         }
@@ -4236,6 +4441,11 @@
                 return;
             }
             const _esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            const _decodeHtml = s => {
+                const t = document.createElement('textarea');
+                t.innerHTML = String(s);
+                return t.value;
+            };
             future.forEach(e => {
                 const dt = new Date(e.time.replace(' ', 'T'));
                 const isToday = dt.toDateString() === now.toDateString();
@@ -4243,7 +4453,7 @@
                 const timeLabel = isNaN(dt) ? _esc(e.time) : dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
                 const title = _esc(e.title || '');
                 const _lnk = e.link ? (() => { try { const _p = new URL(e.link); return (_p.protocol === 'https:' || _p.protocol === 'http:') ? _p.href : ''; } catch (_) { return ''; } })() : '';
-                
+
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'cal-event-item' + (isToday ? ' today' : '');
                 if (_lnk) {
@@ -4251,35 +4461,35 @@
                     itemDiv.style.cursor = 'pointer';
                     itemDiv.addEventListener('click', () => setLayout('browser', { url: _lnk }));
                 }
-                
+
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'cal-event-info';
-                
+
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'cal-event-title';
-                titleDiv.textContent = title;
-                
+                titleDiv.textContent = _decodeHtml(title);
+
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'cal-event-source';
                 sourceDiv.textContent = e.source === 'google' ? 'GOOGLE' : 'MAYA';
-                
+
                 infoDiv.appendChild(titleDiv);
                 infoDiv.appendChild(sourceDiv);
-                
+
                 const dateDiv = document.createElement('div');
                 dateDiv.className = 'cal-event-date';
-                
+
                 const dateSubDiv = document.createElement('div');
                 dateSubDiv.className = 'cal-date-sub';
                 dateSubDiv.textContent = dateLabel;
-                
+
                 const timeMainDiv = document.createElement('div');
                 timeMainDiv.className = 'cal-time-main';
                 timeMainDiv.textContent = timeLabel;
-                
+
                 dateDiv.appendChild(dateSubDiv);
                 dateDiv.appendChild(timeMainDiv);
-                
+
                 itemDiv.appendChild(infoDiv);
                 itemDiv.appendChild(dateDiv);
                 list.appendChild(itemDiv);
@@ -4322,12 +4532,22 @@
             const eventDates = new Set(_calEvents.map(e => {
                 try { const d = new Date(e.time.replace(' ', 'T')); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; } catch { return ''; }
             }));
+            const eventCounts = _calEvents.reduce((acc, e) => {
+                try {
+                    const d = new Date(e.time.replace(' ', 'T'));
+                    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                    acc[key] = (acc[key] || 0) + 1;
+                } catch (_) {}
+                return acc;
+            }, {});
             let html = '';
             for (let i = 0; i < offset; i++) html += '<div class="cal-day faded"></div>';
             for (let day = 1; day <= daysInMonth; day++) {
                 const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === day;
-                const hasEv = eventDates.has(`${y}-${m}-${day}`);
-                html += `<div class="cal-day${isToday ? ' today' : ''}${hasEv ? ' has-event' : ''}">${day}${hasEv ? '<div class="cal-day-dot"></div>' : ''}</div>`;
+                const key = `${y}-${m}-${day}`;
+                const hasEv = eventDates.has(key);
+                const count = eventCounts[key] || 0;
+                html += `<div class="cal-day${isToday ? ' today' : ''}${hasEv ? ' has-event' : ''}" aria-label="${day}${count ? `, ${count} eventi` : ''}">${day}${count > 1 ? `<span class="cal-day-count">${count}</span>` : ''}${hasEv ? '<div class="cal-day-dot"></div>' : ''}</div>`;
             }
             document.getElementById('cal-grid').innerHTML = html;
         }
@@ -4342,6 +4562,16 @@
             'sun': '☀️', 'cloud-sun': '⛅', 'cloud': '☁️', 'cloud-fog': '🌫️',
             'cloud-drizzle': '🌦️', 'cloud-rain': '🌧️', 'cloud-snow': '🌨️', 'cloud-lightning': '⛈️'
         };
+        function forecastTempColor(maxTemp) {
+            if (!Number.isFinite(maxTemp)) return '#7ee8ff';
+            if (maxTemp >= 29) return '#ff8c42';
+            if (maxTemp >= 18) return '#ffe87c';
+            return '#7ee8ff';
+        }
+        function forecastTempFill(maxTemp) {
+            if (!Number.isFinite(maxTemp)) return 18;
+            return Math.max(18, Math.min(100, ((maxTemp + 5) / 40) * 100));
+        }
         let weatherMiniMap;
         let weatherMarker;
         let lastWeatherLatLon = null;
@@ -4408,29 +4638,59 @@
                 data.daily.slice(0, 5).forEach(day => {
                     const d = new Date(day.date).toLocaleDateString('it-IT', { weekday: 'short' }).toUpperCase();
                     const desc = _e((day.condition || day.description || '').toLowerCase());
-                    
+                    const maxTemp = Number(day.max);
+                    const minTemp = Number(day.min);
+                    const fill = forecastTempFill(maxTemp);
+                    const tempColor = forecastTempColor(maxTemp);
+                    const rain = Number.isFinite(Number(day.precip_probability)) ? Number(day.precip_probability) : null;
+
                     const rowDiv = document.createElement('div');
                     rowDiv.className = 'wx-fc-row';
-                    
+
                     const daySpan = document.createElement('span');
                     daySpan.className = 'wx-fc-day';
                     daySpan.textContent = d;
-                    
+
+                    const iconSpan = document.createElement('span');
+                    iconSpan.className = 'wx-fc-icon';
+                    iconSpan.textContent = WEATHER_ICONS[day.icon] || '*';
+
+                    const mainDiv = document.createElement('div');
+                    mainDiv.className = 'wx-fc-main';
+
                     const descSpan = document.createElement('span');
                     descSpan.className = 'wx-fc-desc';
                     descSpan.textContent = desc;
-                    
+
+                    const barDiv = document.createElement('div');
+                    barDiv.className = 'wx-fc-bar';
+                    const fillDiv = document.createElement('div');
+                    fillDiv.className = 'wx-fc-bar-fill';
+                    fillDiv.style.width = `${fill}%`;
+                    fillDiv.style.background = `linear-gradient(90deg, #7ee8ff, ${tempColor})`;
+                    fillDiv.style.boxShadow = `0 0 10px ${tempColor}55`;
+                    barDiv.appendChild(fillDiv);
+
+                    const rainDiv = document.createElement('div');
+                    rainDiv.className = 'wx-fc-rain';
+                    rainDiv.textContent = rain !== null ? `PIOGGIA ${Math.round(rain)}%` : 'PIOGGIA --';
+                    rainDiv.title = 'Probabilità di precipitazioni';
+
                     const tempsSpan = document.createElement('span');
                     tempsSpan.className = 'wx-fc-temps';
-                    tempsSpan.textContent = `${Math.round(day.max)}°`;
-                    
+                    tempsSpan.textContent = `${Math.round(maxTemp)}°`;
+
                     const minSpan = document.createElement('span');
                     minSpan.className = 'wx-fc-min';
-                    minSpan.textContent = `${Math.round(day.min)}°`;
-                    
+                    minSpan.textContent = `${Math.round(minTemp)}°`;
+
+                    mainDiv.appendChild(descSpan);
+                    mainDiv.appendChild(barDiv);
+                    mainDiv.appendChild(rainDiv);
                     tempsSpan.appendChild(minSpan);
                     rowDiv.appendChild(daySpan);
-                    rowDiv.appendChild(descSpan);
+                    rowDiv.appendChild(iconSpan);
+                    rowDiv.appendChild(mainDiv);
                     rowDiv.appendChild(tempsSpan);
                     fc.appendChild(rowDiv);
                 });
@@ -4442,63 +4702,94 @@
                 }
             }
         }
-        // kind:'video'   → embed by video ID, oEmbed-checked for availability
-        // kind:'channel' → embed via live_stream?channel=, no check needed
+        // Solo canali live: ogni riquadro ha fallback live, mai video registrati.
+        const NEWS_BLOCKED_STREAMS = new Set(['UC16niRr50-MSBwiO3YDb3RA']);
         const NEWS_STREAM_CONFIG = [
-            {
-                primary: { src: 'UCLXo7UDZvByw2ixzpQCufnA', label: 'BBC NEWS', kind: 'channel' },
-                fallback: { src: 'UCknLrEdhRCp1aegoMqRaCZg', label: 'DW NEWS', kind: 'channel' }
-            },
-            {
-                primary: { src: 'UCosnml68cGE8fzm8OLKJ8SQ', label: 'REUTERS', kind: 'channel' },
-                fallback: { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA', kind: 'channel' }
-            },
-            {
-                primary: { src: 'iEpJwprxDdk', label: 'BLOOMBERG', kind: 'video' },
-                fallback: { src: 'bFO_VVRAmCM', label: 'SKY NEWS', kind: 'video' }
-            },
-            {
-                primary: { src: 'UCupvZG-5ko_eiXAupbDfxWw', label: 'CNN', kind: 'channel' },
-                fallback: { src: 'pykpO5kQJ98', label: 'EURONEWS', kind: 'video' }
-            },
+            [
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+                { src: 'UC7fWeaHhqgM4Ry-RMpM2YYw', label: 'TRT WORLD' },
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+                { src: 'UCSrZ3UV4jOidv8ppoVuvW9Q', label: 'EURONEWS' },
+            ],
+            [
+                { src: 'UC7fWeaHhqgM4Ry-RMpM2YYw', label: 'TRT WORLD' },
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+                { src: 'UCSrZ3UV4jOidv8ppoVuvW9Q', label: 'EURONEWS' },
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+            ],
+            [
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+                { src: 'UCSrZ3UV4jOidv8ppoVuvW9Q', label: 'EURONEWS' },
+                { src: 'UC7fWeaHhqgM4Ry-RMpM2YYw', label: 'TRT WORLD' },
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+            ],
+            [
+                { src: 'UCSrZ3UV4jOidv8ppoVuvW9Q', label: 'EURONEWS' },
+                { src: 'UCQfwfsi5VrQ8yKZ-UWmAEFg', label: 'FRANCE 24' },
+                { src: 'UC7fWeaHhqgM4Ry-RMpM2YYw', label: 'TRT WORLD' },
+                { src: 'UCNye-wNBqNL5ZzHSJj3l8Bg', label: 'AL JAZEERA' },
+            ],
         ];
         function streamEmbedUrl(s) {
             const p = 'autoplay=1&mute=1&controls=1&modestbranding=1&rel=0';
-            return s.kind === 'video'
-                ? `https://www.youtube.com/embed/${s.src}?${p}`
-                : `https://www.youtube.com/embed/live_stream?channel=${s.src}&${p}`;
+            return `https://www.youtube.com/embed/live_stream?channel=${s.src}&${p}`;
+        }
+        async function getNewsLiveStreams() {
+            const fallbackStreams = () => {
+                const used = new Set();
+                return NEWS_STREAM_CONFIG.map(group => {
+                    const stream = group.find(s => !NEWS_BLOCKED_STREAMS.has(s.src) && !used.has(s.src)) || group[0];
+                    used.add(stream.src);
+                    return { ...stream, fallback: true, unchecked: true };
+                });
+            };
+            try {
+                const res = await fetch('/api/news/live-streams', { cache: 'no-store' });
+                const data = await res.json();
+                if (res.ok && Array.isArray(data.streams) && data.streams.length) {
+                    const used = new Set();
+                    const streams = data.streams.filter(stream => {
+                        if (!stream || NEWS_BLOCKED_STREAMS.has(stream.src) || used.has(stream.src)) return false;
+                        used.add(stream.src);
+                        return true;
+                    });
+                    for (const stream of fallbackStreams()) {
+                        if (streams.length >= NEWS_STREAM_CONFIG.length) break;
+                        if (!used.has(stream.src)) {
+                            used.add(stream.src);
+                            streams.push(stream);
+                        }
+                    }
+                    if (streams.length) return streams;
+                }
+            } catch (_) { /* backend non disponibile: usa fallback locale */ }
+            return fallbackStreams();
         }
         let newsStreamsInitialized = false;
         let newsStreamsInitTime = 0;
+        let newsLiveStreams = [];
         async function initNewsStreams() {
             if (newsStreamsInitialized) return;
             newsStreamsInitialized = true;
             newsStreamsInitTime = Date.now();
             const grid = document.getElementById('news-live-grid');
-            grid.innerHTML = NEWS_STREAM_CONFIG.map((_, i) => `
+            newsLiveStreams = await getNewsLiveStreams();
+            grid.innerHTML = newsLiveStreams.map((_, i) => `
                 <div class="news-stream-tile" id="stream-tile-${i}">
-                    <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>···</div>
+                    <div class="ns-live-label" id="stream-label-${i}"><span class="ns-live-dot"></span>...</div>
                     <iframe id="stream-iframe-${i}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                 </div>`).join('');
-            await Promise.all(NEWS_STREAM_CONFIG.map(async ({ primary, fallback }, i) => {
-                let stream = primary;
-                const oembedUrl = primary.kind === 'video'
-                    ? `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${primary.src}&format=json`
-                    : `https://www.youtube.com/oembed?url=https://www.youtube.com/channel/${primary.src}/live&format=json`;
-                try {
-                    const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(4000) });
-                    if (!res.ok) stream = fallback;
-                } catch { stream = fallback; }
+            newsLiveStreams.forEach((stream, i) => {
                 document.getElementById(`stream-iframe-${i}`).src = streamEmbedUrl(stream);
                 document.getElementById(`stream-label-${i}`).innerHTML =
                     `<span class="ns-live-dot"></span>${stream.label}`;
-            }));
+            });
         }
-        // Refresh streams every 20 min to prevent black screen
+        // Refresh live channels often to avoid stale/non-live embeds.
         setInterval(() => {
             if (!newsStreamsInitialized) return;
             if (!document.getElementById('panel-news').classList.contains('active')) return;
-            for (let i = 0; i < NEWS_STREAM_CONFIG.length; i++) {
+            for (let i = 0; i < newsLiveStreams.length; i++) {
                 const iframe = document.getElementById(`stream-iframe-${i}`);
                 if (iframe && iframe.src) {
                     try {
@@ -4508,21 +4799,28 @@
                             iframe.src = 'about:blank';
                             setTimeout(() => { iframe.src = _safeSrc; }, 300 * i);
                         }
-                    } catch (_) { /* invalid src — skip */ }
+                    } catch (_) { /* invalid src: skip */ }
                 }
             }
-        }, 20 * 60 * 1000);
+        }, 5 * 60 * 1000);
         function updateNews(articles) {
             if (!articles || articles.length === 0) return;
             // Sidebar — ALL articles ranked by position (RSS order = newest/most important first)
             const _en = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-            const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? _en(p.href) : '#'; } catch(_){return '#';} };
+            const _decodeHtml = s => {
+                const t = document.createElement('textarea');
+                t.innerHTML = String(s);
+                return t.value;
+            };
+            const _safeText = (s, encoded = false) => _decodeHtml(encoded ? String(s || '') : _en(s || ''));
+            const _safeUrl = u => { try { const p = new URL(u); return (p.protocol==='https:'||p.protocol==='http:') ? p.href : '#'; } catch(_){return '#';} };
             const sidebarList = document.getElementById('news-sidebar-list');
             sidebarList.innerHTML = '';
-            
+
             articles.forEach((a, i) => {
                 const _u = _safeUrl(a.link);
-                
+                const _img = _safeUrl(a.image);
+
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'ns-item';
                 itemDiv.style.cursor = 'pointer';
@@ -4530,25 +4828,34 @@
                     itemDiv.dataset.url = _u;
                     itemDiv.addEventListener('click', () => setLayout('browser', { url: _u }));
                 }
-                
+
                 const rankDiv = document.createElement('div');
                 rankDiv.className = 'ns-rank';
                 rankDiv.textContent = String(i + 1).padStart(2, '0');
-                
+
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'ns-content';
-                
+
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'ns-source';
-                sourceDiv.textContent = _en(a.source || 'MAYA FEED');
-                
+                sourceDiv.textContent = _safeText(a.source || 'MAYA FEED');
+
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'ns-title';
-                titleDiv.textContent = _en(a.title);
-                
+                titleDiv.textContent = _safeText(a.title);
+
                 contentDiv.appendChild(sourceDiv);
                 contentDiv.appendChild(titleDiv);
                 itemDiv.appendChild(rankDiv);
+                if (_img !== '#') {
+                    const thumb = document.createElement('img');
+                    thumb.className = 'ns-thumb';
+                    thumb.src = _img;
+                    thumb.alt = '';
+                    thumb.loading = 'lazy';
+                    thumb.referrerPolicy = 'no-referrer';
+                    itemDiv.appendChild(thumb);
+                }
                 itemDiv.appendChild(contentDiv);
                 sidebarList.appendChild(itemDiv);
             });
@@ -4556,32 +4863,32 @@
             // Ticker — all headlines scrolling
             const track = document.getElementById('news-ticker-track');
             track.innerHTML = '';
-            
+
             const appendTickerItems = () => {
                 articles.forEach(a => {
                     const labelSpan = document.createElement('span');
                     labelSpan.className = 'ntk-label';
-                    labelSpan.textContent = _en(a.source || 'NEWS');
-                    
+                    labelSpan.textContent = _safeText(_en(a.source || 'NEWS'), true);
+
                     const sepSpan1 = document.createElement('span');
                     sepSpan1.className = 'ntk-sep';
                     sepSpan1.textContent = '//';
-                    
+
                     const itemSpan = document.createElement('span');
                     itemSpan.className = 'ntk-item';
-                    itemSpan.textContent = _en(a.title);
-                    
+                    itemSpan.textContent = _safeText(_en(a.title), true);
+
                     const sepSpan2 = document.createElement('span');
                     sepSpan2.className = 'ntk-sep';
                     sepSpan2.textContent = '///';
-                    
+
                     track.appendChild(labelSpan);
                     track.appendChild(sepSpan1);
                     track.appendChild(itemSpan);
                     track.appendChild(sepSpan2);
                 });
             };
-            
+
             // Append twice to loop
             appendTickerItems();
             appendTickerItems();

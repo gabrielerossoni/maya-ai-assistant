@@ -51,10 +51,27 @@ class TestXSSEscape:
         assert "const title = _esc(" in html
         assert "_esc(e.time)" in html
 
+    def test_calendar_visual_badges_are_present(self, html):
+        assert "cal-day-count" in html
+        assert "GOOGLE ${googleCount}" in html
+        assert "grid-template-columns: minmax(300px, 360px) 1fr" in html
+
     def test_weather_forecast_uses_escape(self, html):
         """La previsione meteo deve escapare desc prima di innerHTML."""
         assert "const _e = s =>" in html or "const _e=" in html
         assert "_e((day.condition" in html or "_e( (day.condition" in html
+
+    def test_weather_forecast_has_dynamic_ui(self, html):
+        assert "wx-fc-icon" in html
+        assert "wx-fc-bar-fill" in html
+        assert "wx-fc-legend" in html
+        assert "forecastTempColor(maxTemp)" in html
+        assert "forecastTempFill(maxTemp)" in html
+        assert "Fresco" in html
+        assert "Mite" in html
+        assert "Caldo" in html
+        assert "day.precip_probability" in html
+        assert "PIOGGIA" in html
 
     def test_news_sidebar_uses_en_helper(self, html):
         """updateNews deve usare _en() per source e title."""
@@ -65,6 +82,40 @@ class TestXSSEscape:
     def test_news_ticker_uses_en_helper(self, html):
         assert "_en(a.source || 'NEWS')" in html
         assert "_en(a.title)" in html
+
+    def test_news_text_is_decoded_before_textcontent(self, html):
+        """Le entity HTML devono essere sicure ma non visibili come L&#39;utente."""
+        assert "const _decodeHtml = s =>" in html
+        assert "titleDiv.textContent = _safeText(a.title)" in html
+        assert "sourceDiv.textContent = _safeText(a.source || 'MAYA FEED')" in html
+
+    def test_news_sidebar_supports_optional_thumbnail(self, html):
+        """La lista notizie deve poter mostrare una miniatura validata."""
+        assert "const _img = _safeUrl(a.image)" in html
+        assert "thumb.className = 'ns-thumb'" in html
+        assert "thumb.referrerPolicy = 'no-referrer'" in html
+
+    def test_news_ticker_has_scroll_animation(self, html):
+        assert "animation: scroll-ticker" in html
+        assert "@keyframes scroll-ticker" in html
+        assert "transform: translateX(-50%)" in html
+
+    def test_news_live_streams_use_live_channel_embeds_only(self, html):
+        assert "youtube.com/embed/live_stream?channel=" in html
+        assert "UCoMdktPbSTixAyNGwb-UYkQ" not in html
+        assert "UCSrZ3UV4jOidv8ppoVuvW9Q" in html
+        assert "UC7fWeaHhqgM4Ry-RMpM2YYw" in html
+        assert "UCknLrEdhRCp1aegoMqRaCZg" not in html
+        assert "UC16niRr50-MSBwiO3YDb3RA" in html
+        assert "NEWS_BLOCKED_STREAMS.has(stream.src)" in html
+        assert "BBC NEWS" not in html
+        assert "SKY NEWS" not in html
+        assert "DW NEWS" not in html
+        assert "UCLXo7UDZvByw2ixzpQCufnA" not in html
+        assert "fetch('/api/news/live-streams'" in html
+        assert "stream.fallback ? ' · FALLBACK LIVE'" not in html
+        assert "kind: 'video'" not in html
+        assert "oembed?url=" not in html
 
     def test_no_raw_title_injection(self, html):
         """Non ci deve essere ${a.title} senza escape nel ticker o sidebar."""
@@ -227,6 +278,13 @@ class TestSceneControls:
             "Giardino",
         ]:
             assert label in html
+
+    def test_dashboard_device_cards_have_organized_layout_css(self, html):
+        assert "--dom-card-bg" in html
+        assert "grid-auto-rows: minmax(126px, auto)" in html
+        assert "grid-template-columns: repeat(var(--dom-cols, 3), minmax(0, 1fr))" in html
+        assert "border: 1px solid var(--dom-card-border)" in html
+        assert "grid-template-columns: minmax(0, 1fr) var(--sb-width, 260px)" in html
 
     def test_rgb_cards_cycle_multiple_colors(self, html):
         assert "const RGB_CYCLE" in html

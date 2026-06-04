@@ -72,7 +72,7 @@ class ArduinoTool:
     def initialize(self):
         if not SERIAL_AVAILABLE:
             self.simulated = True
-            print("[ARDUINO] pyserial assente → simulazione")
+            print("[ARDUINO] pyserial assente -> simulazione")
             return
 
         self._running = True
@@ -120,7 +120,7 @@ class ArduinoTool:
                 self._dispatch(data)
 
             except SERIAL_EXCEPTION:
-                print("[ARDUINO] Connessione persa → tentativo riconnessione...")
+                print("[ARDUINO] Connessione persa -> tentativo riconnessione...")
                 self._reconnect()
             except Exception as e:
                 print(f"[ARDUINO] Reader error: {e}")

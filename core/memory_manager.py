@@ -320,7 +320,7 @@ class MemoryManager:
         if self.collection.count() > 0:
             return
 
-        print(f"[MEMORY] ChromaDB vuoto — reindicizzazione di {len(self.turns)} turni dal JSON...")
+            print(f"[MEMORY] ChromaDB vuoto - reindicizzazione di {len(self.turns)} turni dal JSON...")
         imported = 0
         errors = 0
         for i, turn in enumerate(self.turns):

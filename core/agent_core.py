@@ -10,6 +10,7 @@ import json
 import os
 import random
 import re
+import unicodedata
 from collections import OrderedDict
 
 import httpx
@@ -36,9 +37,9 @@ def is_ollama_enabled() -> bool:
     return os.getenv("OLLAMA_ENABLED", "true").strip().lower() in ("1", "true", "yes")
 
 
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 # CONFIGURAZIONE
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 MODELS = {
     "router": os.getenv("MODEL_ROUTER", "llama3.2:1b"),
     "domotic": os.getenv("MODEL_DOMOTIC", "phi4"),
@@ -83,11 +84,11 @@ NON aggiungere testo fuori dal JSON.
 Tool disponibili:
 - arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/brightness/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); brightness: 0-255; buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
-- network: invia comandi al secondo PC (qualsiasi stringa)
+- network: disattivato di default; non usarlo salvo riattivazione esplicita con NETWORK_TOOL_ENABLED=true
 - system: comandi OS (shutdown, open_browser, screenshot)
 - weather: meteo (location)
 - news: ultime notizie (limit)
-- wikipedia: ricerca concetti (query)
+- wikipedia: ricerca concetti. FORMATO OBBLIGATORIO: {"tool": "wikipedia", "query": "argomento da cercare"}
 - notes: liste e appunti (operation: add/remove/list, item, category: todo/spesa)
 - trading: criptovalute e azioni (operation: price/chart, symbol, asset_type: crypto/stock)
 - timer: sveglie (minutes, seconds, message)
@@ -108,19 +109,24 @@ REGOLE CRITICHE:
 
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
 
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 # PROMPT SPECIALISTICI
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 
 ROUTER_PROMPT = """Classifica l'intent dell'utente in UNA parola.
-- DOMOTIC: se chiede PREZZI, BITCOIN, CRIPTO, S&P500, BORSA, AZIONI, METEO, NOTIZIE, WIKIPEDIA, LUCI, NOTE o CALENDARIO.
-- REASONING: se chiede CODICE, spiegazioni lunghe, analisi o riassunti.
-- CHITCHAT: se saluta, fa chiacchiere o domande personali.
+- DOMOTIC: se chiede PREZZI, BITCOIN, CRIPTO, S&P500, BORSA, AZIONI, METEO, NOTIZIE, WIKIPEDIA, TRADUZIONI, LUCI, NOTE o CALENDARIO.
+- REASONING: se chiede CODICE, spiegazioni, analisi, riassunti, definizioni o conoscenza generale.
+- CHITCHAT: SOLO saluti, ringraziamenti, frasi sociali brevi o domande rivolte a MAYA tipo "come stai".
+
+Regola critica:
+- Domande tipo "chi e'", "che e'", "cos'e'", "dimmi chi e'", "parlami di", nomi di persone storiche/famose o richieste enciclopediche NON sono CHITCHAT: sono REASONING.
 
 Esempi:
 "Quanto vale S&P500?" -> DOMOTIC
 "Che tempo fa?" -> DOMOTIC
 "Scrivi un loop" -> REASONING
+"Chi e' Brad Pitt?" -> REASONING
+"Che e' Napoleone?" -> REASONING
 "Ciao come stai" -> CHITCHAT
 
 Rispondi SOLO con la categoria: DOMOTIC, REASONING o CHITCHAT."""
@@ -141,6 +147,8 @@ FILLER_MESSAGES = [
     "Accesso ai dati in corso...",
     "Elaborazione in corso...",
 ]
+
+_RGB_DEFAULT_SENTINEL = object()
 
 
 class AgentCore:
@@ -216,6 +224,69 @@ class AgentCore:
             print(f"[PLANNER] Engine: automazione '{automation.name}' rilevata")
         return automation
 
+    def _normalize_router_text(self, text: str) -> str:
+        normalized = unicodedata.normalize("NFKD", text.lower().replace("è", "e"))
+        normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+        normalized = re.sub(r"[^\w\s']", " ", normalized)
+        return re.sub(r"\s+", " ", normalized).strip()
+
+    def _strip_wake_prefix(self, text: str) -> str:
+        clean = str(text or "").strip()
+        return re.sub(
+            r"^(?:(?:ok|okay|ehi|hey|eh|e)\s+)?(?:maya|maia|maja)\b\s*[,:\-]?\s*",
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        ).strip()
+
+    def _is_chitchat_input(self, text: str) -> bool:
+        lower = self._normalize_router_text(text)
+        if not lower:
+            return False
+
+        exact_phrases = {
+            "ciao",
+            "ciao maya",
+            "hey",
+            "hey maya",
+            "ehi",
+            "ehi maya",
+            "salve",
+            "buongiorno",
+            "buonasera",
+            "buonanotte",
+            "grazie",
+            "grazie maya",
+            "ok grazie",
+            "come stai",
+            "come va",
+            "tutto bene",
+            "che fai",
+        }
+        if lower in exact_phrases:
+            return True
+
+        return bool(
+            re.fullmatch(
+                r"(ciao|hey|ehi|salve|buongiorno|buonasera)\s+(maya\s+)?(come stai|come va|tutto bene)?",
+                lower,
+            )
+        )
+
+    def _is_knowledge_question(self, text: str) -> bool:
+        lower = self._normalize_router_text(text)
+        patterns = [
+            r"\b(chi|che|cosa|cos)\s+e\b",
+            r"\bcos\s*e\b",
+            r"\bdimmi\s+(chi|che|cosa|cos)\s+e\b",
+            r"\b(parlami|raccontami)\s+di\b",
+            r"\b(spiegami|spiega)\b",
+            r"\b(cosa significa|che significa|significato di)\b",
+            r"\b(definisci|definizione di)\b",
+            r"\b(perche|come mai)\b",
+        ]
+        return any(re.search(pattern, lower) for pattern in patterns)
+
     async def _route_intent(self, user_input: str) -> str:
         """Determina l'intent dell'utente con caching."""
         cache_key = user_input.lower().strip()[:60]
@@ -234,9 +305,15 @@ class AgentCore:
 
     async def _route_intent_uncached(self, user_input: str) -> str:
         """Determina l'intent dell'utente con logica ibrida: Hard Routing + LLM."""
-        lower = user_input.lower()
+        lower = self._strip_wake_prefix(user_input).lower()
         words = lower.split()
         word_count = len(words)
+
+        if self._is_knowledge_question(user_input):
+            return "REASONING"
+
+        if self._is_chitchat_input(user_input):
+            return "CHITCHAT"
 
         # --- 0. ECCEZIONI (MAI HARD-ROUTE) ---
         # Se contiene citazioni, domande di spiegazione o è troppo lunga
@@ -341,16 +418,13 @@ class AgentCore:
         if any(v in lower for v in spotify_verbs) and any(o in lower for o in spotify_objects):
             return "DOMOTIC"
 
+        # Traduzione: deve andare sempre nei tool
+        if any(x in lower for x in ["traduci", "tradurre", "traduzione", "translate"]):
+            return "DOMOTIC"
+
         # --- 2. HARD ROUTING: CHITCHAT ---
-        # Saluto puro o messaggio brevissimo senza keyword tool
-        greetings = ["ciao", "hey", "salve", "buon"]
-        is_greeting = any(lower.startswith(g) for g in greetings)
-
-        # Se è un saluto e non ci sono altre keyword (finanza/meteo/ecc già controllate sopra)
-        if is_greeting and word_count <= 4:
-            return "CHITCHAT"
-
-        if word_count <= 2:
+        # Solo saluti/frasi sociali strette. Le domande brevi non sono chitchat.
+        if self._is_chitchat_input(user_input):
             return "CHITCHAT"
 
         # --- 3. FALLBACK LLM ---
@@ -370,6 +444,9 @@ class AgentCore:
                     intent = response_text.strip().upper()
                     for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
                         if category in intent:
+                            if category == "CHITCHAT" and not self._is_chitchat_input(user_input):
+                                print("[ROUTER] CHITCHAT rifiutato: richiesta non sociale -> REASONING")
+                                return "REASONING"
                             print(f"[ROUTER] Intent rilevato (Groq): {category}")
                             return category
 
@@ -392,12 +469,15 @@ class AgentCore:
             intent = response.get("response", "CHITCHAT").strip().upper()
             for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
                 if category in intent:
+                    if category == "CHITCHAT" and not self._is_chitchat_input(user_input):
+                        print("[ROUTER] CHITCHAT rifiutato: richiesta non sociale -> REASONING")
+                        return "REASONING"
                     print(f"[ROUTER] Intent rilevato: {category}")
                     return category
-            return "CHITCHAT"
+            return "CHITCHAT" if self._is_chitchat_input(user_input) else "REASONING"
         except Exception as e:
             print(f"[ROUTER] Errore routing LLM: {e}")
-            return "CHITCHAT"
+            return "CHITCHAT" if self._is_chitchat_input(user_input) else "REASONING"
 
     def _clean_json(self, text: str) -> dict:
         """
@@ -471,8 +551,14 @@ class AgentCore:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
+                self._last_groq_error_status = None
                 return data["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as e:
+            self._last_groq_error_status = e.response.status_code
+            print(f"[GROQ] Errore: {e}")
+            return None
         except Exception as e:
+            self._last_groq_error_status = None
             print(f"[GROQ] Errore: {e}")
             return None
 
@@ -522,7 +608,7 @@ class AgentCore:
         model_name = MODELS.get(model_key, MODELS["chitchat"])
         system_prompt = SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)
 
-        print(f"[LLM] {model_key.upper()} → {model_name}")
+        print(f"[LLM] {model_key.upper()} -> {model_name}")
 
         # 3. Chiamata allo Specialista
         try:
@@ -589,7 +675,7 @@ class AgentCore:
         actions = []
         reply = "Comando eseguito."
 
-        clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower).strip()
+        clean = self._strip_wake_prefix(lower)
         direct = self._parse_direct_arduino_command(clean)
         if direct:
             action, ok_reply, _ = direct
@@ -645,18 +731,160 @@ class AgentCore:
 
         return {"intent": lower[:30], "actions": actions, "reply": reply}
 
+    def _light_room_target_from_text(self, text: str) -> str | None:
+        room_targets = {
+            "salotto": "rgb1",
+            "soggiorno": "rgb1",
+            "camera": "rgb2",
+            "stanza": "rgb2",
+            "giardino": "rgb3",
+            "studio": "rgb3",
+            "esterno": "rgb3",
+            "fuori": "rgb3",
+        }
+        for room, target in room_targets.items():
+            if re.search(rf"\b{re.escape(room)}\b", text):
+                return target
+        return None
+
+    def _hard_route_light_command(self, user_input: str) -> dict | None:
+        """
+        Comandi luce deterministici.
+        Evita che il modello spenga tutte le luci quando viene citata una stanza.
+        """
+        text = self._strip_wake_prefix(user_input).lower().strip()
+
+        if not re.search(r"\b(luce|luci|led|lampad[ae]|illuminazione|rgb)\b", text):
+            return None
+
+        is_on = bool(re.search(r"\b(accendi|attiva|metti|imposta)\b", text))
+        is_off = bool(re.search(r"\b(spegni|spegner\w*|disattiva|togli|stop|ferma)\b", text))
+        color_value = self._rgb_value_from_text(text, default=None)
+        if is_off:
+            value = 0
+        elif color_value is not None:
+            value = color_value
+        elif is_on:
+            value = {"r": 255, "g": 255, "b": 255}
+        else:
+            return None
+
+        effect = 0
+        if re.search(r"\b(pulse|pulsa|respiro)\b", text):
+            effect = 1
+        elif re.search(r"\b(rainbow|arcobaleno)\b", text):
+            effect = 2
+        elif re.search(r"\b(alert|allerta)\b", text):
+            effect = 3
+
+        target = self._light_room_target_from_text(text)
+        if target:
+            return {
+                "tool": "arduino",
+                "op": "SET",
+                "target": target,
+                "value": value,
+                "effect": effect,
+            }
+
+        if is_off:
+            return {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "light", "value": 0},
+                    {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
+                    {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
+                ],
+            }
+
+        # Solo se dice chiaramente tutte
+        all_words = ["tutte", "tutta casa", "casa", "ovunque"]
+
+        if any(w in text for w in all_words):
+            return {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "rgb1", "value": value, "effect": effect},
+                    {"op": "SET", "target": "rgb2", "value": value, "effect": effect},
+                    {"op": "SET", "target": "rgb3", "value": value, "effect": effect},
+                ],
+            }
+
+        if color_value is not None or re.search(r"\b(rgb|colore|colori|led)\b", text):
+            return {
+                "tool": "arduino",
+                "op": "SET",
+                "target": "rgb",
+                "value": value,
+                "effect": effect,
+            }
+
+        if is_on:
+            return {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "light", "value": 1},
+                    {"op": "SET", "target": "rgb", "value": {"r": 255, "g": 255, "b": 255}, "effect": 0},
+                ],
+            }
+
+        # Default: luce principale, non tutte
+        return {
+            "tool": "arduino",
+            "op": "SET",
+            "target": "light",
+            "value": 1 if is_on else 0,
+        }
+
     # ── FASE 2: EXECUTOR ─────────────────────────────────
-    async def _execute_actions(self, actions: list) -> list:
+    def _normalize_arduino_action_for_request(self, action: dict, source_text: str) -> dict:
+        if action.get("tool") != "arduino" or not source_text:
+            return action
+
+        text = source_text.lower()
+        if re.search(r"\b(tutte|tutta casa|casa|ovunque)\b", text):
+            return action
+
+        target = self._light_room_target_from_text(text)
+        if not target:
+            return action
+
+        normalized = action.copy()
+        if str(normalized.get("op", "SET")).upper() == "BATCH":
+            batch = []
+            changed = False
+            for item in normalized.get("actions", []):
+                if not isinstance(item, dict):
+                    batch.append(item)
+                    continue
+                sub_item = item.copy()
+                if sub_item.get("target") in {"rgb", "neopixel", ""}:
+                    sub_item["target"] = target
+                    changed = True
+                batch.append(sub_item)
+            if changed:
+                normalized["actions"] = batch
+            return normalized
+
+        if normalized.get("target") in {"rgb", "neopixel", ""}:
+            normalized["target"] = target
+        return normalized
+
+    async def _execute_actions(self, actions: list, source_text: str = "") -> list:
         """Esegui ogni azione tramite il ToolManager."""
         results = []
         for action in actions:
+            action = self._normalize_arduino_action_for_request(action, source_text)
             tool_name = action.get("tool", "none")
             target = action.get("target", action.get("operation", ""))
-            print(f"[→] {tool_name}{': ' + target if target else ''}")
+            print(f"[->] {tool_name}{': ' + target if target else ''}")
             result = await self.tool_manager.execute(action)
             results.append({"tool": tool_name, "result": result})
             if result.get("status") == "error":
-                print(f"[✗] {tool_name}: {result.get('message', result)}")
+                print(f"[x] {tool_name}: {result.get('message', result)}")
 
             # --- BROADCAST AUTOMATICO PER DASHBOARD ---
             if self.socket_manager:
@@ -744,24 +972,73 @@ class AgentCore:
             }
         )
 
-    def _rgb_value_from_text(self, text: str) -> dict | int:
+    def _rgb_value_from_text(self, text: str, default=_RGB_DEFAULT_SENTINEL) -> dict | int | None:
         colors = {
+            "nero mezzanotte": {"r": 0, "g": 0, "b": 20},
+            "blu elettrico": {"r": 0, "g": 80, "b": 255},
+            "blu notte": {"r": 0, "g": 0, "b": 60},
+            "verde acqua": {"r": 0, "g": 180, "b": 160},
+            "rosso sangue": {"r": 140, "g": 0, "b": 0},
+            "viola neon": {"r": 180, "g": 0, "b": 255},
+            "arancione tramonto": {"r": 255, "g": 90, "b": 20},
+            "marrone scuro": {"r": 80, "g": 45, "b": 25},
+            "marrone chiaro": {"r": 150, "g": 95, "b": 55},
+            "testa di moro": {"r": 55, "g": 30, "b": 20},
+            "verde smeraldo": {"r": 0, "g": 200, "b": 120},
+            "blu petrolio": {"r": 0, "g": 95, "b": 110},
+            "rosa antico": {"r": 190, "g": 95, "b": 120},
+            "bianco caldo": {"r": 255, "g": 213, "b": 128},
+            "bianco freddo": {"r": 210, "g": 235, "b": 255},
             "rosso": {"r": 255, "g": 30, "b": 30},
+            "rossa": {"r": 255, "g": 30, "b": 30},
+            "rossi": {"r": 255, "g": 30, "b": 30},
+            "rosse": {"r": 255, "g": 30, "b": 30},
             "verde": {"r": 0, "g": 255, "b": 153},
+            "verdi": {"r": 0, "g": 255, "b": 153},
             "blu": {"r": 30, "g": 144, "b": 255},
             "azzurro": {"r": 68, "g": 136, "b": 255},
+            "azzurri": {"r": 68, "g": 136, "b": 255},
+            "azzurra": {"r": 68, "g": 136, "b": 255},
+            "azzurre": {"r": 68, "g": 136, "b": 255},
             "viola": {"r": 174, "g": 69, "b": 255},
+            "viole": {"r": 174, "g": 69, "b": 255},
+            "violette": {"r": 174, "g": 69, "b": 255},
+            "fucsia": {"r": 255, "g": 0, "b": 255},
+            "magenta": {"r": 255, "g": 0, "b": 255},
             "arancio": {"r": 255, "g": 106, "b": 0},
             "arancione": {"r": 255, "g": 106, "b": 0},
+            "arancioni": {"r": 255, "g": 106, "b": 0},
+            "ambra": {"r": 255, "g": 150, "b": 0},
+            "oro": {"r": 255, "g": 190, "b": 40},
             "giallo": {"r": 255, "g": 213, "b": 128},
+            "gialla": {"r": 255, "g": 213, "b": 128},
+            "gialli": {"r": 255, "g": 213, "b": 128},
+            "gialle": {"r": 255, "g": 213, "b": 128},
             "rosa": {"r": 255, "g": 90, "b": 160},
+            "turchese": {"r": 0, "g": 200, "b": 220},
+            "turchesi": {"r": 0, "g": 200, "b": 220},
+            "ciano": {"r": 0, "g": 255, "b": 255},
             "bianco": {"r": 255, "g": 255, "b": 255},
+            "bianca": {"r": 255, "g": 255, "b": 255},
+            "bianchi": {"r": 255, "g": 255, "b": 255},
+            "bianche": {"r": 255, "g": 255, "b": 255},
             "caldo": {"r": 255, "g": 213, "b": 128},
+            "nero": {"r": 0, "g": 0, "b": 0},
+            "neri": {"r": 0, "g": 0, "b": 0},
+            "nera": {"r": 0, "g": 0, "b": 0},
+            "nere": {"r": 0, "g": 0, "b": 0},
+            "marrone": {"r": 120, "g": 70, "b": 35},
+            "marroni": {"r": 120, "g": 70, "b": 35},
+            "cioccolato": {"r": 95, "g": 50, "b": 25},
+            "spento": 0,
+            "spenta": 0,
         }
-        for name, value in colors.items():
+        for name, value in sorted(colors.items(), key=lambda item: len(item[0]), reverse=True):
             if re.search(rf"\b{name}\b", text):
                 return value
-        return {"r": 255, "g": 255, "b": 255}
+        if default is _RGB_DEFAULT_SENTINEL:
+            return {"r": 255, "g": 255, "b": 255}
+        return default
 
     def _zone_label(self, target: str) -> str:
         return {
@@ -855,7 +1132,7 @@ class AgentCore:
             zone = "rgb1"
         elif re.search(r"\bcamera\b", text):
             zone = "rgb2"
-        elif re.search(r"\b(giardino|studio)\b", text):
+        elif re.search(r"\b(giardino|studio|esterno|fuori)\b", text):
             zone = "rgb3"
         elif re.search(
             r"\b(rgb|neopixel|colore|colori|luce|luci|led|lampad[ae]|illuminazione|effetto|effetti)\b", text
@@ -872,7 +1149,7 @@ class AgentCore:
         if zone and (
             re.search(rf"\b{on_words}\b", text)
             or re.search(
-                r"\b(rosso|verde|blu|azzurro|viola|arancio|arancione|giallo|rosa|bianco|caldo|arcobaleno|rainbow|pulse|pulsa|respiro|alert|allerta|sfumatura)\b",
+                r"\b(nero mezzanotte|blu elettrico|blu notte|verde acqua|rosso sangue|viola neon|arancione tramonto|marrone scuro|marrone chiaro|testa di moro|verde smeraldo|blu petrolio|rosa antico|bianco caldo|bianco freddo|rosso|rossa|rossi|rosse|verde|verdi|blu|azzurro|azzurri|azzurra|azzurre|viola|viole|violette|fucsia|magenta|arancio|arancione|arancioni|ambra|oro|giallo|gialla|gialli|gialle|rosa|turchese|turchesi|ciano|bianco|bianca|bianchi|bianche|caldo|nero|neri|nera|nere|marrone|marroni|cioccolato|arcobaleno|rainbow|pulse|pulsa|respiro|alert|allerta|sfumatura)\b",
                 text,
             )
         ):
@@ -1026,6 +1303,52 @@ class AgentCore:
                 await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
         return f"Scheda {labels[layout]} aperta."
 
+    def _parse_direct_weather_command(self, text: str) -> dict | None:
+        if re.search(r"\b(sensor[ei]|temperatura casa|umidit[àa]|dht)\b", text):
+            return None
+
+        is_weather = (
+            re.search(r"\bche\s+tempo\s+fa\b", text)
+            or re.fullmatch(r"meteo(?:\s+(?:a|ad|di|per)\s+[a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ' -]{1,60})?", text)
+            or re.search(r"\bprevisioni\b", text)
+            or re.search(r"\b(sta\s+)?piovendo\b", text)
+            or re.search(r"\btemperatura\s+(?:fuori|esterna|a|di)\b", text)
+        )
+        if not is_weather:
+            return None
+
+        location = None
+        match = re.search(
+            r"\b(?:a|ad|di|per)\s+([a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ' -]{1,60})$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            location = match.group(1).strip(" ,.").title()
+
+        return {"tool": "weather", "location": location}
+
+    async def _run_direct_weather_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") != "ok" or not isinstance(result.get("data"), dict):
+            return f"Non riesco a recuperare il meteo: {result.get('message', 'servizio non disponibile')}"
+
+        data = result["data"]
+        if self.socket_manager:
+            await self.socket_manager.broadcast({"type": "weather", "data": data})
+
+        location = data.get("location") or action.get("location") or "la localita impostata"
+        temp = data.get("temp")
+        condition = data.get("condition") or "variabile"
+        wind = data.get("wind")
+
+        parts = [f"A {location}: {condition.lower()}"]
+        if temp is not None:
+            parts.append(f"{round(float(temp))} gradi")
+        if wind is not None:
+            parts.append(f"vento {round(float(wind))} km/h")
+        return ", ".join(parts) + "."
+
     async def _undo_last_reversible_command(self) -> str:
         item = self._last_reversible_command
         self._last_reversible_command = None
@@ -1064,7 +1387,54 @@ class AgentCore:
         # 0. Fast path: comandi Spotify diretti (bypass routing)
         lower_input = user_input.strip().lower()
         # Rimuovi prefissi vocali comuni
-        _clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower_input).strip()
+        _clean = self._strip_wake_prefix(lower_input)
+
+        hard_action = self._hard_route_light_command(_clean)
+        if hard_action:
+            result = await self.tool_manager.execute(hard_action)
+            if result.get("status") == "ok":
+                await self._broadcast_arduino_state(result.get("state", {}))
+                if hard_action.get("op") == "BATCH":
+                    values = [item.get("value") for item in hard_action.get("actions", []) if isinstance(item, dict)]
+                    targets = [item.get("target") for item in hard_action.get("actions", []) if isinstance(item, dict)]
+                    if values and all(value == 0 for value in values):
+                        reply = "Luci spente."
+                    elif targets == ["light", "rgb"]:
+                        reply = "Luce accesa."
+                    else:
+                        reply = "Ho aggiornato tutte le luci."
+                else:
+                    target = hard_action.get("target")
+                    if target == "rgb3":
+                        reply = (
+                            "Ho spento la luce del giardino."
+                            if hard_action.get("value") == 0
+                            else "Ho acceso la luce del giardino."
+                        )
+                    elif target == "rgb2":
+                        reply = "Ho aggiornato la luce della camera."
+                    elif target == "rgb1":
+                        reply = "Ho aggiornato la luce del salotto."
+                    elif target == "rgb":
+                        reply = "Luci spente." if hard_action.get("value") == 0 else "Ho aggiornato le luci."
+                    elif target == "light":
+                        reply = (
+                            "Luce principale spenta." if hard_action.get("value") == 0 else "Luce principale accesa."
+                        )
+                    else:
+                        reply = "Ho aggiornato la luce principale."
+            else:
+                reply = "Non sono riuscita a controllare la luce."
+
+            for token in (w + " " for w in reply.split()):
+                yield token
+            return
+
+        direct_weather = self._parse_direct_weather_command(_clean)
+        if direct_weather:
+            reply = await self._run_direct_weather_command(direct_weather)
+            yield await self._reply_fast(reply, {"type": "weather", "params": {}})
+            return
 
         if re.search(r"\b(annulla|undo|ripristina)\b", _clean) and re.search(
             r"\b(ultimo comando|ultimo|comando|azione)\b", _clean
@@ -1073,7 +1443,9 @@ class AgentCore:
             yield await self._reply_fast(reply)
             return
 
-        if re.search(r"\b(ferma|stop|spegni|disattiva)\b", _clean) and re.search(r"\ballarme\b", _clean):
+        if re.search(r"\b(ferma|stop|spegni|disattiva)\b", _clean) and re.search(
+            r"\b(allarme|alarme|all['’]?armi)\b", _clean
+        ):
             reply = await self._stop_alarm_direct()
             yield await self._reply_fast(reply)
             return
@@ -1308,7 +1680,7 @@ class AgentCore:
         # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
         intent = await self._route_intent(user_input)
 
-        max_steps = 2 if intent == "DOMOTIC" else 4
+        max_steps = int(os.getenv("REACT_MAX_STEPS", "2"))
         current_step = 0
 
         # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
@@ -1372,7 +1744,7 @@ class AgentCore:
         final_reply = ""
         model_name = MODELS.get(intent.lower(), MODELS["domotic"])
 
-        print(f"[ReAct] {intent} ← '{user_input[:60]}'")
+        print(f"[ReAct] {intent} <- '{user_input[:60]}'")
 
         while current_step < max_steps:
             current_step += 1
@@ -1389,7 +1761,12 @@ class AgentCore:
                 if not full_response_text:
                     if not is_ollama_enabled():
                         print("[LLM] Ollama disabilitato, salto fallback planner")
-                        return
+                        if getattr(self, "_last_groq_error_status", None) == 429:
+                            final_reply = "Groq ha raggiunto il limite di richieste. Riprova tra poco."
+                        else:
+                            final_reply = "Non riesco a contattare il modello in questo momento."
+                        yield final_reply
+                        break
                     client = ollama.AsyncClient()
 
                     # Streaming della risposta dell'LLM
@@ -1424,7 +1801,7 @@ class AgentCore:
                         for token in (w + " " for w in final_reply.split()):
                             yield token
                     else:
-                        print("[ReAct] Reply vuota — richiamo pipeline specialistica.")
+                        print("[ReAct] Reply vuota - richiamo pipeline specialistica.")
                         fallback = await self._call_llm(user_input, progress_cb)
                         final_reply = fallback.get("reply") or "Come posso aiutarti?"
                         for token in (w + " " for w in final_reply.split()):
@@ -1440,7 +1817,7 @@ class AgentCore:
                         if progress_cb:
                             await progress_cb(reply)
 
-                    results = await self._execute_actions(actions)
+                    results = await self._execute_actions(actions, user_input)
                     self.learner.observe_command(user_input, actions)
 
                     # 2d. Crea osservazione per il prossimo step
@@ -1469,13 +1846,12 @@ class AgentCore:
                         "search",
                         "wikipedia",
                         "calendar",
+                        "translate",
                     ]
                     has_rephrase_tool = any(res["tool"] in needs_rephrase for res in results)
 
                     if not is_error and not has_rephrase_tool and len(reply) > 15:
                         final_reply = reply
-                        for token in (w + " " for w in final_reply.split()):
-                            yield token
                         break
 
                     # Aggiungi azione e osservazione alla storia

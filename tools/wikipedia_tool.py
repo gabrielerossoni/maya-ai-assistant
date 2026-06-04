@@ -1,6 +1,4 @@
-"""
-wikipedia_tool.py - Ricerca su Wikipedia
-"""
+"""wikipedia_tool.py - Ricerca su Wikipedia"""
 
 import wikipedia
 
@@ -10,16 +8,68 @@ class WikipediaTool:
         wikipedia.set_lang("it")
 
     def execute(self, action: dict) -> dict:
-        query = action.get("query", "")
+        query = (
+            action.get("query")
+            or action.get("q")
+            or action.get("topic")
+            or action.get("title")
+            or action.get("value")
+            or action.get("input")
+        )
+
+        parametro = action.get("parametro")
+
+        if not query and isinstance(parametro, dict):
+            query = (
+                parametro.get("query")
+                or parametro.get("q")
+                or parametro.get("topic")
+                or parametro.get("title")
+                or parametro.get("value")
+            )
+
+        if not query and isinstance(parametro, str):
+            query = parametro
+
         if not query:
-            return {"status": "error", "message": "Nessuna query fornita per Wikipedia."}
+            return {
+                "status": "error",
+                "message": "Nessuna query fornita per Wikipedia.",
+            }
+
+        query = str(query).strip()
+
+        if not query:
+            return {
+                "status": "error",
+                "message": "Query Wikipedia vuota.",
+            }
 
         try:
-            summary = wikipedia.summary(query, sentences=2)
-            return {"status": "ok", "message": summary}
+            sentences = int(action.get("sentences", 4))
+            summary = wikipedia.summary(query, sentences=sentences, auto_suggest=True)
+
+            return {
+                "status": "ok",
+                "message": summary,
+                "query": query,
+            }
+
         except wikipedia.exceptions.DisambiguationError as e:
-            return {"status": "ok", "message": f"Termine ambiguo. Forse intendevi: {', '.join(e.options[:3])}?"}
+            return {
+                "status": "error",
+                "message": ("Termine ambiguo. Forse intendevi: " + ", ".join(e.options[:5])),
+                "options": e.options[:5],
+            }
+
         except wikipedia.exceptions.PageError:
-            return {"status": "error", "message": f"Nessuna pagina trovata per '{query}'."}
+            return {
+                "status": "error",
+                "message": f"Nessuna pagina trovata per '{query}'.",
+            }
+
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return {
+                "status": "error",
+                "message": str(e),
+            }

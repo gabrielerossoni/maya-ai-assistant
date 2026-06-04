@@ -10,14 +10,44 @@ class TranslateTool:
         pass
 
     def execute(self, action: dict) -> dict:
-        text = action.get("text", "")
-        target_lang = action.get("target", "en")  # codice lingua, es. 'en', 'es', 'ja'
+        parametro = action.get("parametro")
 
-        if not text:
+        text = action.get("text") or action.get("query") or action.get("input") or action.get("value")
+
+        if not text and isinstance(parametro, str):
+            text = parametro
+
+        if not text and isinstance(parametro, dict):
+            text = parametro.get("text") or parametro.get("query") or parametro.get("input") or parametro.get("value")
+
+        target_lang = (
+            action.get("target") or action.get("target_lang") or action.get("language") or action.get("lang") or "en"
+        )
+
+        if isinstance(parametro, dict):
+            target_lang = (
+                parametro.get("target")
+                or parametro.get("target_lang")
+                or parametro.get("language")
+                or parametro.get("lang")
+                or target_lang
+            )
+
+        if not text or not str(text).strip():
             return {"status": "error", "message": "Nessun testo da tradurre."}
+
+        text = str(text).strip()
+        target_lang = str(target_lang).strip().lower()
 
         try:
             translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
-            return {"status": "ok", "message": f"Traduzione ({target_lang}): {translated}"}
+
+            return {
+                "status": "ok",
+                "message": translated,
+                "original": text,
+                "target": target_lang,
+            }
+
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return {"status": "error", "message": f"Errore traduzione: {e}"}

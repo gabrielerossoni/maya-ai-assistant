@@ -300,9 +300,14 @@ class Automation:
     def matches_input(self, text: str) -> bool:
         """Controlla se il testo attiva questa automazione (nome o alias)."""
         lower = text.lower().strip()
-        if self.name in lower:
+
+        def phrase_matches(phrase: str) -> bool:
+            escaped = re.escape(phrase.lower().strip())
+            return bool(re.search(rf"(?<!\w){escaped}(?!\w)", lower))
+
+        if phrase_matches(self.name):
             return True
-        return any(alias in lower for alias in self.aliases)
+        return any(phrase_matches(alias) for alias in self.aliases)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1249,6 +1254,7 @@ def build_default_automations() -> list[Automation]:
                     *_background_alarm_sequence(duration=20.0, pulse_interval=0.5),
                 ],
             ),
+            aliases=["alarme", "all'armi", "allarmi"],
         ),
         # ── Piove ─────────────────────────────────────────────────────────────
         Automation(

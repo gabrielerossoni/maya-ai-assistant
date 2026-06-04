@@ -4,6 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-black?style=for-the-badge&logo=ollama&logoColor=white)
 ![Arduino](https://img.shields.io/badge/Arduino-Hardware-00979D?style=for-the-badge&logo=arduino&logoColor=white)
+![Arduino Day](https://img.shields.io/badge/Arduino%20Day%202026-Presented-00979D?style=for-the-badge&logo=arduino&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge&logo=gnu)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)
 ![Stars](https://img.shields.io/github/stars/gabrielerossoni/maya-ai-assistant?style=for-the-badge&logo=github)
@@ -12,9 +13,9 @@
 ![CI](https://img.shields.io/github/actions/workflow/status/gabrielerossoni/maya-ai-assistant/ci.yml?style=for-the-badge&label=CI&logo=githubactions&logoColor=white)
 
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servomotori, strisce LED NeoPixel, buzzer, speaker e sensori di telemetria.  
-Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, pensato per l'**Arduino Day 2026**.
+Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, presentato all'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** 3 Giugno 2026 — **EventiArduino e Quake Detection completati**, integrazione firmware **Arduino Uno R4 WiFi** con supporto **NeoPixel a 3 zone**, gestione sincrona ed efficiente del doppio servo (**Porta e Cancello**), allarmi sismici automatizzati basati su accelerometro fisico (**MPU6050/LSM6DSOX**) con sintesi vocale e suite di test unitari completa (132/132 passati), **Monitoraggio GPU** (GPUtil), **Automation Engine OO** (scene tipizzate, priorità, trigger, cooldown, event bus, scheduler, device registry, context manager), **Rimozione relè e attuatori statici legacy**, risposte IA ultra-rapide e streaming vocale.
+> **Ultimo aggiornamento:** 5 Giugno 2026 — **Versione definitiva post Arduino Day 2026**. M.A.Y.A. è stato presentato come prototipo di smart home AI con plastico fisico interattivo, dashboard HUD live e controllo hardware tramite Arduino. Restano operativi firmware **Arduino Uno R4 WiFi**, **NeoPixel a 3 zone**, doppio servo (**Porta e Cancello**), quake detection fisica (**MPU6050/LSM6DSOX**), sintesi vocale, **Automation Engine OO**, meteo/news/calendario live, monitoraggio GPU e dashboard WebSocket real-time.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -36,6 +37,24 @@ La differenza rispetto ai sistemi già esistenti:
 
 ---
 
+## Presentazione Arduino Day 2026
+
+M.A.Y.A. è stato presentato all'**Arduino Day 2026** come prototipo completo di casa intelligente: una smart home fisica in miniatura coordinata da un assistente AI, con dashboard live e dispositivi reali controllati da Arduino.
+
+Durante l'esposizione il progetto ha mostrato:
+
+- una **casa fisica interattiva**, non solo una simulazione software;
+- una **dashboard HUD live** per visualizzare stato casa, scene, meteo, news, calendario e telemetria;
+- controllo reale di **luci, NeoPixel RGB, porta, cancello, buzzer, speaker e sensori**;
+- scene domotiche complete come `buongiorno`, `buonanotte`, `piove`, `ospiti in arrivo`, `film`, `relax` e `allarme`;
+- un'idea chiara e comunicabile: **il PC ragiona, Arduino agisce**.
+
+Il valore principale emerso nella demo è stato l'effetto integrato: plastico, AI, hardware e interfaccia non lavorano come pezzi separati, ma come un unico sistema. Anche davanti a un pubblico non tecnico, il funzionamento è risultato comprensibile perché ogni comando produceva una conseguenza visibile sulla casa e sulla dashboard.
+
+> **Caption portfolio:** M.A.Y.A. presented at Arduino Day 2026: an AI-powered smart home prototype combining a physical interactive model, Arduino-controlled devices and a live HUD dashboard.
+
+---
+
 ## Architettura
 
 ```mermaid
@@ -45,7 +64,7 @@ flowchart TD
         direction LR
         MIC["🎤 Microfono\nWakeWord hey_maya\n+ Whisper STT"]
         WEB["🌐 Dashboard HUD\nWebSocket /ws"]
-        REST["🔌 REST API\nFastAPI /chat /scene /status"]
+        REST["🔌 HTTP API\nFastAPI / · /health\n/api/news/live-streams · /shutdown"]
     end
 
     %% ── AGENT CORE ─────────────────────────────────────────────────────────
@@ -71,12 +90,12 @@ flowchart TD
     end
 
     %% ── TOOL MANAGER ────────────────────────────────────────────────────────
-    subgraph TM["🛠️ ToolManager — 18 tool"]
+    subgraph TM["🛠️ ToolManager — 17 tool core + network opt-in"]
         direction LR
         HW_T["🔌 Hardware\narduino · mqtt · display"]
         INFO["📡 Info\nweather · news · wikipedia\nsearch · trading"]
         UTIL["🧰 Utility\ncalendar · notes · timer\ntranslate · code_gen · system"]
-        ENT["🎵 Entertainment\nspotify · sys_monitor · network"]
+        ENT["🎵 Entertainment\nspotify · sys_monitor\nnetwork solo opt-in"]
     end
 
     %% ── ARDUINO ─────────────────────────────────────────────────────────────
@@ -103,7 +122,7 @@ flowchart TD
         MEM["🧩 MemoryManager\nChromaDB + Ollama embed\nmemoria semantica conversazioni"]
         WSM["📺 WebSocketManager\nbroadcast real-time\nstats · sensori · scene"]
         PROA["🔍 ProactiveManager\nGroq llama-3.1-8b\nanomalie · promemoria · orario"]
-        HEAL["🩹 SelfHealer\nGroq llama-3.3-70b\nauto-patch tool in plugins/"]
+        HEAL["🩹 SelfHealer\nmanual/opt-in\npatch tool in plugins/"]
         PREF["📊 PreferenceLearner\nuso scene · orari · tool\ndata/user_preferences.json"]
     end
 
@@ -283,11 +302,14 @@ MAYA include un meccanismo di sicurezza basato su accelerometro fisico (LSM6DSOX
 - **Voice I/O Integrato** — STT via `faster-whisper` (small) e TTS via `Piper` (voce Paola) con VAD adattivo.
 - **Memoria Semantica Vettoriale** — ChromaDB per recupero contesto a lungo termine + sliding window.
 - **Dashboard HUD Dinamica** — idle con orologio e particelle; work con orb 3D Three.js; 11 chip scene più controllo OFF con feedback visivo live (`scene_executed`), pannelli Meteo, Notizie, Stato Casa, Calendario, Spotify, ottimizzata graficamente in modalità PWA per iPhone 13 (notches, safe-areas e tap highlight rimossi).
+- **News italiane + internazionali** — aggregazione RSS bilanciata: le fonti `MONDO` restano visibili anche quando il feed italiano è più denso; il testo viene decodificato e ripulito prima della dashboard.
+- **Live news sempre live** — i riquadri YouTube usano solo canali live; se il primario non risponde, `/api/news/live-streams` seleziona un fallback live.
 - **Google Calendar Sync** — OAuth2 con token locale; mostra solo il calendario selezionato via `GOOGLE_CALENDAR_ID` nel `.env`.
 - **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout.
 - **Stato Casa Live** — pannello aggiornato in tempo reale: luci, servos, strisce NeoPixel RGB, buzzer, speaker, temperatura, umidità.
 - **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` publishes ai client ogni 30 s.
-- **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud → parser keyword offline.
+- **Safety by default** — `self_healer.py`, `plugin_loader.py` e `network_tool.py` sono disattivati di default e richiedono flag esplicite (`DISABLE_SELF_HEALER=false`, `PLUGIN_LOADER_ENABLED=true`/`DEV_MODE=true`, `NETWORK_TOOL_ENABLED=true`).
+- **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud se configurato → parser keyword/offline per i comandi diretti.
 - **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente le card della dashboard via WebSocket.
 
 ---
@@ -302,7 +324,7 @@ MAYA include un meccanismo di sicurezza basato su accelerometro fisico (LSM6DSOX
 | Hardware | PySerial + Arduino Uno R4 WiFi (C++) |
 | Finanza | CoinGecko API + yfinance |
 | Meteo | Open-Meteo API (geocoding + forecast) |
-| Notizie | feedparser (RSS Feed ANSA) |
+| Notizie | feedparser (RSS ANSA + Google News Mondo in italiano + extra feed opzionali) |
 | Ricerca | DuckDuckGo Search |
 | Traduzione | deep-translator (Google Translate backend) |
 | Monitoraggio | psutil + GPUtil (monitoraggio CPU/RAM/GPU) |
@@ -348,7 +370,7 @@ maya/
 ├── tools/
 │   ├── arduino_tool.py        # Seriale USB → Arduino (auto-discovery + sim mode)
 │   ├── mqtt_tool.py           # Controllo multi-room via MQTT
-│   ├── network_tool.py        # TCP client + server (secondo PC)
+│   ├── network_tool.py        # TCP legacy secondo PC, disattivato di default (NETWORK_TOOL_ENABLED=true)
 │   ├── system_tool.py         # Comandi OS (shutdown, browser, screenshot, volume)
 │   ├── calendar_tool.py       # Calendario locale JSON + Google Calendar OAuth2
 │   ├── weather_tool.py        # Open-Meteo geocoding + forecast
@@ -396,7 +418,7 @@ maya/
 │   └── preload.js
 │
 ├── tests/                     # Test di integrazione e unitari (pytest)
-├── plugins/                   # Patch generate a runtime dal SelfHealer
+├── plugins/                   # Plugin caricati solo con PLUGIN_LOADER_ENABLED=true o DEV_MODE=true
 ├── requirements.txt           # Dipendenze Python
 ├── .env.example               # Template configurazione ambiente
 └── .gitignore
@@ -435,6 +457,8 @@ ARDUINO_PORT=AUTO          # oppure COM3, COM4, /dev/ttyACM0, ecc.
 ASSISTANT_NAME=MAYA
 DEFAULT_WEATHER_LOCATION=Roma
 NEWS_FEED_URL=https://www.ansa.it/sito/ansait_rss.xml
+NEWS_WORLD_FEED_URL=https://news.google.com/rss/headlines/section/topic/WORLD?hl=it&gl=IT&ceid=IT:it
+NEWS_EXTRA_FEEDS=
 ```
 
 Variabili **opzionali**:
@@ -452,6 +476,13 @@ MODEL_CHITCHAT=llama3.2
 DASHBOARD_UI_SCALE=1.0      # es. 1.25 o 1.5 per ingrandire l'interfaccia
 DASHBOARD_COLUMNS=4         # numero colonne card domotiche (default 3)
 DASHBOARD_DENSITY=compact   # oppure numero px (es. 8) per il gap tra card
+
+# Sicurezza / sviluppo: default consigliati per demo
+DISABLE_SELF_HEALER=true
+PLUGIN_LOADER_ENABLED=false
+DEV_MODE=false
+NETWORK_TOOL_ENABLED=false
+MEMORY_TOPIC_SUMMARIES_ENABLED=false
 ```
 
 ### 3. Download modelli Ollama
@@ -519,6 +550,24 @@ La dashboard si apre automaticamente su `http://127.0.0.1:8000`.
 
 ---
 
+## HTTP API
+
+Route FastAPI realmente esposte:
+
+| Metodo | Path | Uso |
+|---|---|---|
+| `GET` | `/` | Dashboard `static/maya_dashboard.html` |
+| `GET` | `/sw.js` | Service worker PWA |
+| `GET` | `/manifest.json` | Manifest PWA |
+| `GET` | `/health` | Health check semplice |
+| `GET` | `/api/news/live-streams` | Selezione canali live news con fallback live |
+| `POST` | `/shutdown` | Spegnimento controllato processo/hardware |
+| `WS` | `/ws` | Comandi, stream risposta, stato live dashboard |
+
+> Non sono presenti endpoint REST `/chat`, `/scene` o `/status`: i comandi passano dal WebSocket `/ws` e dalle azioni tool consentite dalla dashboard.
+
+---
+
 ## WebSocket API
 
 Il frontend si connette a `ws://127.0.0.1:8000/ws`.
@@ -546,7 +595,7 @@ Il frontend si connette a `ws://127.0.0.1:8000/ws`.
 ```json
 { "type": "command", "text": "accendi la luce" }
 { "type": "tool",    "action": { "tool": "trading", "operation": "overview" } }
-{ "type": "tool",    "action": { "tool": "calendar", "operation": "list" } }
+{ "type": "tool",    "action": { "tool": "calendar", "action": "list" } }
 ```
 
 ---
@@ -673,9 +722,9 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 | 16/05/2026 | Verifica 1 | Schema scelto, hardware collegato, dashboard aperta, ≥ 1 dispositivo risponde | ✅ |
 | 23/05/2026 | Verifica 2 | Flusso completo: comando → LLM → Arduino → feedback real-time sulla dashboard | ✅ |
 | 30/05/2026 | Verifica 3 | Demo stabile, correzione bug, prova con pubblico interno, video di backup pronto | ✅ |
-| 04/06/2026 | Arduino Day | Presentazione finale, rifinitura ed esposizione del plastico. **Niente nuove funzioni** | 🚀 (Pronto) |
+| 04/06/2026 | Arduino Day | Presentazione finale ed esposizione del prototipo davanti al pubblico | ✅ Presentato |
 
-> **Milestone Completate** ✅ — Allarmi sismici e interazione vocale testati, 132/132 test passati con successo.
+> **Milestone Completate** ✅ — Prototipo presentato all'Arduino Day 2026 con plastico fisico, dashboard HUD live, scene domotiche, meteo/news/calendario, allarmi sismici e controllo Arduino real-time.
 
 ---
 
@@ -683,6 +732,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 
 ### ✅ Completati
 
+- [x] **Presentazione Arduino Day 2026** — prototipo esposto con plastico fisico, dashboard HUD live e controllo Arduino real-time.
 - [x] **Architettura agentica ReAct con routing ibrido** — agenti e pianificazione locale basati su modelli LLM offline.
 - [x] **Voce bidirezionale (Whisper STT locale + Piper TTS)** — trascrizione e sintesi vocale ad alta velocità con streaming.
 - [x] **Memoria semantica (ChromaDB + embedding Ollama)** — conservazione e richiamo intelligente dei turni passati.
@@ -690,7 +740,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Dashboard HUD bimodale con orb 3D e slider animato** — interfaccia grafica responsive e animata per l'utente.
 - [x] **Panoramica trading live (CoinGecko + yfinance)** — tracciamento real-time di stock e crypto preferite.
 - [x] **Meteo HUD con mappa Leaflet e previsioni** — widget meteo interattivo e geolocalizzato.
-- [x] **Notizie HUD con articolo in evidenza + ticker** — feed aggregator con riepilogo vocale intelligente.
+- [x] **Notizie HUD con articolo in evidenza + ticker** — feed aggregator italiano + mondo, immagini opzionali, ticker leggibile e testo decodificato.
 - [x] **Firmware Arduino JSON 115200 baud** — controllo completo di LED, NeoPixel, 2 Servomotori, Buzzer, DHT11.
 - [x] **Integrazione Accelerometro & Quake Detection** — rilevamento automatico sismico e attivazione allarmi dedicati.
 - [x] **Protocollo telemetria automatica da DHT11** — invio automatico dei dati sensore ogni 5 s.
@@ -716,10 +766,12 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **`_send_sync` Arduino** — attesa della reale risposta fisica della scheda tramite eventi sincroni (zero sleep arbitrari).
 - [x] **`broadcast_state` throttle** — limitazione della frequenza dei controlli Ollama a 30s per preservare le prestazioni.
 - [x] **`mqtt_tool` non-blocking** — pubblicazione dei messaggi MQTT in thread paralleli non bloccanti.
-- [x] **News streams paralleli** — caricamento asincrono concorrente delle fonti di notizie per dimezzare la latenza.
+- [x] **News live con fallback** — canali YouTube live selezionati dal backend; se un primario è offline viene usato un fallback live.
+- [x] **Meteo con fallback provider** — Open-Meteo primario con fallback `wttr.in` per ridurre gli errori in demo.
+- [x] **Alias vocali post-demo** — normalizzazione di trascrizioni come `alarme`, `all'armi` e `allarmi` verso la scena `allarme`.
 - [x] **WiFi secrets** — spostamento delle credenziali Wi-Fi sensibili in un file `secrets.h` dedicato ed escluso da git.
 - [x] **Struttura root pulita** — refactoring e riorganizzazione dei file per rispettare il design architetturale del progetto.
-- [x] **Self-Healing automatico (`self_healer.py`)** — modulo di auto-riparazione dei tool via LLM Groq che scrive patch hot-reload in `plugins/` in caso di errori consecutivi senza fermare il sistema.
+- [x] **Self-Healing opt-in (`self_healer.py`)** — modulo di auto-riparazione disponibile solo se abilitato manualmente; disattivato di default per la demo.
 - [x] **Proattività contestuale avanzata (`proactive_manager.py`)** — rilevamento attivo e suggerimenti intelligenti basati su anomalie fisiche dei sensori, promemoria, orario e memoria storica.
 - [x] **Apprendimento statistico delle preferenze utente (`preference_learner.py`)** — monitoraggio delle abitudini con persistenza in `data/user_preferences.json` e iniezione nel prompt.
 - [x] **Risoluzione blocco asincrono Voice Manager** — conversione a letture non bloccanti con `await asyncio.sleep`.
@@ -729,12 +781,15 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Refactoring `main.py`** — riduzione del codice ad un thin entrypoint pulito con logica spostata nel modulo `core/`.
 - [x] **Rimozione relè e attuatori statici legacy** — l'intero sistema utilizza i NeoPixel multi-zona e i due servo dedicati.
 
-### 🔲 In corso / Prossimi
+### 🔲 Backlog post-demo
 
+Queste attività non erano necessarie per la presentazione Arduino Day; sono idee raccolte per evolvere il prototipo dopo l'esposizione.
+
+- [ ] **Robustezza voce in ambienti rumorosi** — push-to-talk, microfono direzionale/lavalier, comandi demo più corti e conferma visiva del comando rilevato.
+- [ ] **Fallback demo da dashboard** — pulsanti rapidi per scene critiche (`Film`, `Notte`, `Allarme`, `Reset`) indipendenti dalla voce.
 - [ ] **Trigger da processi OS** — `app_opened:vscode` / `app_opened:spotify` rilevati via `psutil` nel `ProactiveManager` → pubblica su `EventBus` per attivare automazioni contestuali.
 - [ ] **Trigger Wi-Fi telefono** — monitor DHCP lease → `bus.publish("phone_joined_wifi" | "phone_left_wifi")` per automazioni presenze.
-- [ ] **Multi-room multi-board MQTT** — Espansione del protocollo MQTT per gestire schede Arduino R4 WiFi multiple allocate in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
-- [ ] **Suite di test asincroni end-to-end** — Consolidamento e riscrittura dei test di integrazione per validare il comportamento dei moduli asincroni (`proactive_manager`, `self_healer`, `automation_engine`) simulando risposte hardware e interruzioni di rete.
+- [ ] **Multi-room multi-board MQTT** — espansione del protocollo MQTT per gestire più schede Arduino R4 WiFi in stanze diverse, con aggregazione automatica dello stato sulla dashboard centralizzata.
 
 ---
 
