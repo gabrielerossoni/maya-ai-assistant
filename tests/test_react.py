@@ -345,10 +345,11 @@ async def test_react_default_max_steps_is_two(agent, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_react_rate_limit_returns_voice_reply(agent):
+async def test_react_rate_limit_returns_voice_reply(agent, monkeypatch):
     agent = AgentCore()
     agent.memory.add_turn = AsyncMock()
     agent.memory.get_context = AsyncMock(return_value="")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
 
     async def fake_groq(*args, **kwargs):
         agent._last_groq_error_status = 429
