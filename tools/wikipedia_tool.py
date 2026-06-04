@@ -2,34 +2,15 @@
 
 import wikipedia
 
+from tools.param_utils import resolve_alias
+
 
 class WikipediaTool:
     def initialize(self):
         wikipedia.set_lang("it")
 
     def execute(self, action: dict) -> dict:
-        query = (
-            action.get("query")
-            or action.get("q")
-            or action.get("topic")
-            or action.get("title")
-            or action.get("value")
-            or action.get("input")
-        )
-
-        parametro = action.get("parametro")
-
-        if not query and isinstance(parametro, dict):
-            query = (
-                parametro.get("query")
-                or parametro.get("q")
-                or parametro.get("topic")
-                or parametro.get("title")
-                or parametro.get("value")
-            )
-
-        if not query and isinstance(parametro, str):
-            query = parametro
+        query = resolve_alias(action, ("query", "q", "topic", "title", "value", "input"), allow_legacy_string=True)
 
         if not query:
             return {

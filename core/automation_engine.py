@@ -299,11 +299,22 @@ class Automation:
 
     def matches_input(self, text: str) -> bool:
         """Controlla se il testo attiva questa automazione (nome o alias)."""
-        lower = text.lower().strip()
+
+        def tokenize(value: str) -> tuple[str, ...]:
+            return tuple(re.findall(r"\w+", value.lower().strip(), flags=re.UNICODE))
+
+        text_tokens = tokenize(text)
 
         def phrase_matches(phrase: str) -> bool:
-            escaped = re.escape(phrase.lower().strip())
-            return bool(re.search(rf"(?<!\w){escaped}(?!\w)", lower))
+            phrase_tokens = tokenize(phrase)
+            if not phrase_tokens:
+                return False
+            phrase_len = len(phrase_tokens)
+            if phrase_len > len(text_tokens):
+                return False
+            return any(
+                text_tokens[i : i + phrase_len] == phrase_tokens for i in range(len(text_tokens) - phrase_len + 1)
+            )
 
         if phrase_matches(self.name):
             return True

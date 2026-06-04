@@ -29,6 +29,26 @@ def test_hard_route_light_room_color_without_verb(agent):
     }
 
 
+def test_hard_route_light_question_stays_in_reasoning(agent):
+    action = agent._hard_route_light_command("Come posso riparare una luce?")
+
+    assert action is None
+
+
+def test_hard_route_light_command_with_comparison_context_still_routes(agent):
+    action = agent._hard_route_light_command("metti la luce giardino blu come prima")
+
+    assert action["target"] == "rgb3"
+    assert action["value"] is not None
+
+
+def test_hard_route_light_color_with_natural_come_phrase_still_routes(agent):
+    action = agent._hard_route_light_command("voglio vedere come sta la luce giardino blu")
+
+    assert action["target"] == "rgb3"
+    assert action["value"] is not None
+
+
 def test_hard_route_light_compound_color_uses_exact_room_target(agent):
     action = agent._hard_route_light_command("luce fuori nero mezzanotte")
 

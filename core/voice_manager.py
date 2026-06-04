@@ -89,6 +89,8 @@ class VoiceManager:
         # Ultimo stato inviato / da mostrare in dashboard (sincrono su reconnect e stats).
         self._dashboard_voice_status: str = "IDLE"
         self._loop_ready = threading.Event()
+        self._audio_recovery_attempts = 0
+        self._max_audio_recovery_attempts = max(1, int(os.environ.get("MAYA_AUDIO_RECOVERY_MAX_ATTEMPTS", "5")))
 
     def set_loop_ready(self):
         """Segnala che il loop è pronto per i broadcast."""
@@ -342,6 +344,7 @@ class VoiceManager:
             traceback.print_exc()
 
     def start(self):
+        self._audio_recovery_attempts = 0
         self.is_running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
@@ -366,14 +369,43 @@ class VoiceManager:
         except Exception:
             pass
 
+    def _sleep_while_running(self, delay: float) -> bool:
+        deadline = time.monotonic() + max(0.0, delay)
+        while getattr(self, "is_running", True):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return True
+            time.sleep(min(0.25, remaining))
+        return False
+
     def _recover_audio_input(self, audio, stream, error: Exception):
-        print(f"[VOICE] Errore microfono: {error}. Riavvio stream audio...")
+        attempts = self._audio_recovery_attempts
+        delay = min(8.0, 0.5 * (2**attempts))
+        print(f"[VOICE] Errore microfono: {error}. Riavvio stream audio tra {delay:.1f}s...")
         self._broadcast("IDLE")
         self._close_audio_input(audio, stream)
-        time.sleep(0.5)
-        audio, stream = self._open_audio_input()
-        self._calibrate_vad_from_stream(stream)
-        return audio, stream
+        if not self._sleep_while_running(delay):
+            return None
+
+        new_audio = None
+        new_stream = None
+        try:
+            new_audio, new_stream = self._open_audio_input()
+            self._calibrate_vad_from_stream(new_stream)
+        except Exception as recover_error:
+            self._close_audio_input(new_audio, new_stream)
+            max_attempts = self._max_audio_recovery_attempts
+            self._audio_recovery_attempts = min(attempts + 1, max_attempts)
+            if self._audio_recovery_attempts >= max_attempts:
+                print(f"[VOICE] Recupero microfono interrotto dopo {self._audio_recovery_attempts} tentativi.")
+                self.is_running = False
+                self._broadcast("MIC_ERROR")
+            else:
+                print(f"[VOICE] Recupero microfono fallito: {recover_error}")
+            return None
+
+        self._audio_recovery_attempts = 0
+        return new_audio, new_stream
 
     def _run_loop(self):
         audio = None
@@ -398,11 +430,12 @@ class VoiceManager:
                 try:
                     pcm = self._record_utterance_pcm(stream)
                 except OSError as e:
-                    try:
-                        audio, stream = self._recover_audio_input(audio, stream, e)
-                    except Exception as recover_error:
-                        print(f"[VOICE] Recupero microfono fallito: {recover_error}")
-                        time.sleep(1.0)
+                    recovered = self._recover_audio_input(audio, stream, e)
+                    if recovered is None:
+                        if not self.is_running:
+                            break
+                        continue
+                    audio, stream = recovered
                     continue
                 if not pcm or not self.is_running:
                     self._broadcast("IDLE")
@@ -440,11 +473,12 @@ class VoiceManager:
                     try:
                         self._handle_voice_command(stream)
                     except OSError as e:
-                        try:
-                            audio, stream = self._recover_audio_input(audio, stream, e)
-                        except Exception as recover_error:
-                            print(f"[VOICE] Recupero microfono fallito: {recover_error}")
-                            time.sleep(1.0)
+                        recovered = self._recover_audio_input(audio, stream, e)
+                        if recovered is None:
+                            if not self.is_running:
+                                break
+                            continue
+                        audio, stream = recovered
                         continue
 
                 self._broadcast("IDLE")

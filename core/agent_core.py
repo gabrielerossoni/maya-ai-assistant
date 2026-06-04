@@ -62,7 +62,7 @@ Struttura:
   "intent": "cosa vuole l'utente",
   "layout": "uno tra [orb, weather, map, browser, news, dashboard, chat]",
   "layout_params": {"chiave": "valore"},
-  "actions": [{"tool": "nome_tool", "parametro": "valore"}],
+  "actions": [{"tool": "nome_tool", "...": "parametri canonici del tool"}],
   "reply": "Tua risposta discorsiva e naturale in italiano"
 }
 REGOLE LAYOUT:
@@ -105,6 +105,7 @@ REGOLE CRITICHE:
 2. FORMATO: Rispondi SOLO con il JSON, nessun altro testo.
 3. Se l'utente chiede il valore di una moneta, usa sempre 'trading' con operation 'price'.
 4. Se usi un tool informativo (trading, weather, search, news), nella tua "reply" NON inventare MAI dati o cifre. Dì solo che stai recuperando le informazioni (es: "Certamente, controllo subito..."). I dati reali verranno aggiunti automaticamente dopo.
+5. Parametri tool: metti i parametri canonici al primo livello dell'action (es. {"tool":"translate","text":"ciao","target":"en"}). Non annidare i parametri in "parametro" se il tool ha un formato specifico. "parametro" Ã¨ solo compatibilitÃ  legacy: stringa singola, o dict legacy che il sistema puÃ² leggere ma che non devi generare.
 """
 
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
@@ -760,6 +761,16 @@ class AgentCore:
         is_on = bool(re.search(r"\b(accendi|attiva|metti|imposta)\b", text))
         is_off = bool(re.search(r"\b(spegni|spegner\w*|disattiva|togli|stop|ferma)\b", text))
         color_value = self._rgb_value_from_text(text, default=None)
+        has_help_context = bool(
+            re.search(r"\b(come|cosa|che cosa)\s+(posso|faccio|fare|riparare|aggiustare)\b", text)
+            or re.search(r"\b(perche|perché|come mai|quanto|quale|quali|cos['’]?e|mi spieghi|spiegami)\b", text)
+            or re.search(
+                r"\b(riparare|riparo|aggiustare|aggiusto|funziona|rotto|rotta|guasto|guasta|problema|tutorial)\b",
+                text,
+            )
+        )
+        if has_help_context and not (is_on or is_off):
+            return None
         if is_off:
             value = 0
         elif color_value is not None:

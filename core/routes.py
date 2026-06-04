@@ -186,29 +186,64 @@ async def _youtube_live_channel_available(client: httpx.AsyncClient, channel_id:
 async def _select_news_live_streams(groups=None, checker=None):
     groups = groups or _NEWS_LIVE_GROUPS
     checker = checker or _youtube_live_channel_available
+    check_timeout = float(os.environ.get("MAYA_NEWS_LIVE_CHECK_TIMEOUT", "4.0"))
+    check_concurrency = max(1, int(os.environ.get("MAYA_NEWS_LIVE_CHECK_CONCURRENCY", "4")))
 
     async with httpx.AsyncClient(
         timeout=3.0,
         headers={"User-Agent": "MAYA-dashboard/1.0"},
         follow_redirects=True,
     ) as client:
+        unique_sources = []
+        seen_sources = set()
+        for group in groups:
+            for candidate in group:
+                src = candidate["src"]
+                if src not in seen_sources:
+                    unique_sources.append(src)
+                    seen_sources.add(src)
+
+        semaphore = asyncio.Semaphore(check_concurrency)
+
+        async def _check_channel(src):
+            async with semaphore:
+                try:
+                    return src, await asyncio.wait_for(checker(client, src), timeout=check_timeout)
+                except (asyncio.TimeoutError, httpx.HTTPError):
+                    return src, False
+
+        availability = dict(await asyncio.gather(*(_check_channel(src) for src in unique_sources)))
         selected = []
         used = set()
 
-        async def _select_group(group, used_sources):
+        def _select_group(group, used_sources):
+            if not group:
+                return None
+
             for index, candidate in enumerate(group):
                 if candidate["src"] in used_sources:
                     continue
-                if await checker(client, candidate["src"]):
+                if availability.get(candidate["src"]):
                     return {**candidate, "fallback": index > 0}
 
-            fallback = next((candidate for candidate in group[1:] if candidate["src"] not in used_sources), None)
+            fallback = next(
+                (
+                    candidate
+                    for index, candidate in enumerate(group)
+                    if index > 0 and candidate["src"] not in used_sources
+                ),
+                None,
+            )
             if fallback is None:
-                fallback = next((candidate for candidate in group if candidate["src"] not in used_sources), group[0])
-            return {**fallback, "fallback": True, "unchecked": True}
+                fallback = next((candidate for candidate in group if candidate["src"] not in used_sources), None)
+            if fallback is None:
+                return None
+            return {**fallback, "fallback": True, "unavailable": True}
 
         for group in groups:
-            stream = await _select_group(group, used)
+            stream = _select_group(group, used)
+            if stream is None:
+                continue
             selected.append(stream)
             used.add(stream["src"])
 
