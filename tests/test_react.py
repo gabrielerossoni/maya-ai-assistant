@@ -79,6 +79,19 @@ def test_hard_route_turns_off_all_lights_without_room(agent):
     }
 
 
+def test_hard_route_wake_light_on_defaults_to_visible_white(agent):
+    action = agent._hard_route_light_command("Maya, accendi la luce")
+
+    assert action == {
+        "tool": "arduino",
+        "op": "BATCH",
+        "actions": [
+            {"op": "SET", "target": "light", "value": 1},
+            {"op": "SET", "target": "rgb", "value": {"r": 255, "g": 255, "b": 255}, "effect": 0},
+        ],
+    }
+
+
 def test_react_arduino_rgb_action_is_scoped_to_requested_room(agent):
     action = agent._normalize_arduino_action_for_request(
         {"tool": "arduino", "op": "SET", "target": "rgb", "value": {"r": 120, "g": 70, "b": 35}},
@@ -101,6 +114,27 @@ async def test_process_hard_routes_light_before_automation(agent):
     assert action["target"] == "rgb3"
     assert action["value"] == {"r": 0, "g": 0, "b": 20}
     assert "scena" not in "".join(tokens).lower()
+
+
+@pytest.mark.asyncio
+async def test_process_wake_light_on_uses_direct_visible_white_batch(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent.tool_manager.execute = AsyncMock(return_value={"status": "ok", "state": {"light": True}})
+
+    tokens = []
+    async for token in agent.process("maya accendi la luce"):
+        tokens.append(token)
+
+    action = agent.tool_manager.execute.call_args.args[0]
+    assert action == {
+        "tool": "arduino",
+        "op": "BATCH",
+        "actions": [
+            {"op": "SET", "target": "light", "value": 1},
+            {"op": "SET", "target": "rgb", "value": {"r": 255, "g": 255, "b": 255}, "effect": 0},
+        ],
+    }
+    assert "".join(tokens).strip() == "Luce accesa."
 
 
 @pytest.mark.asyncio

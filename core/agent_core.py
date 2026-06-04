@@ -230,6 +230,15 @@ class AgentCore:
         normalized = re.sub(r"[^\w\s']", " ", normalized)
         return re.sub(r"\s+", " ", normalized).strip()
 
+    def _strip_wake_prefix(self, text: str) -> str:
+        clean = str(text or "").strip()
+        return re.sub(
+            r"^(?:(?:ok|okay|ehi|hey|eh|e)\s+)?(?:maya|maia|maja)\b\s*[,:\-]?\s*",
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        ).strip()
+
     def _is_chitchat_input(self, text: str) -> bool:
         lower = self._normalize_router_text(text)
         if not lower:
@@ -296,7 +305,7 @@ class AgentCore:
 
     async def _route_intent_uncached(self, user_input: str) -> str:
         """Determina l'intent dell'utente con logica ibrida: Hard Routing + LLM."""
-        lower = user_input.lower()
+        lower = self._strip_wake_prefix(user_input).lower()
         words = lower.split()
         word_count = len(words)
 
@@ -666,7 +675,7 @@ class AgentCore:
         actions = []
         reply = "Comando eseguito."
 
-        clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower).strip()
+        clean = self._strip_wake_prefix(lower)
         direct = self._parse_direct_arduino_command(clean)
         if direct:
             action, ok_reply, _ = direct
@@ -743,7 +752,7 @@ class AgentCore:
         Comandi luce deterministici.
         Evita che il modello spenga tutte le luci quando viene citata una stanza.
         """
-        text = user_input.lower().strip()
+        text = self._strip_wake_prefix(user_input).lower().strip()
 
         if not re.search(r"\b(luce|luci|led|lampad[ae]|illuminazione|rgb)\b", text):
             return None
@@ -810,6 +819,16 @@ class AgentCore:
                 "target": "rgb",
                 "value": value,
                 "effect": effect,
+            }
+
+        if is_on:
+            return {
+                "tool": "arduino",
+                "op": "BATCH",
+                "actions": [
+                    {"op": "SET", "target": "light", "value": 1},
+                    {"op": "SET", "target": "rgb", "value": {"r": 255, "g": 255, "b": 255}, "effect": 0},
+                ],
             }
 
         # Default: luce principale, non tutte
@@ -1322,7 +1341,7 @@ class AgentCore:
         # 0. Fast path: comandi Spotify diretti (bypass routing)
         lower_input = user_input.strip().lower()
         # Rimuovi prefissi vocali comuni
-        _clean = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", lower_input).strip()
+        _clean = self._strip_wake_prefix(lower_input)
 
         hard_action = self._hard_route_light_command(_clean)
         if hard_action:
@@ -1331,11 +1350,13 @@ class AgentCore:
                 await self._broadcast_arduino_state(result.get("state", {}))
                 if hard_action.get("op") == "BATCH":
                     values = [item.get("value") for item in hard_action.get("actions", []) if isinstance(item, dict)]
-                    reply = (
-                        "Luci spente."
-                        if values and all(value == 0 for value in values)
-                        else "Ho aggiornato tutte le luci."
-                    )
+                    targets = [item.get("target") for item in hard_action.get("actions", []) if isinstance(item, dict)]
+                    if values and all(value == 0 for value in values):
+                        reply = "Luci spente."
+                    elif targets == ["light", "rgb"]:
+                        reply = "Luce accesa."
+                    else:
+                        reply = "Ho aggiornato tutte le luci."
                 else:
                     target = hard_action.get("target")
                     if target == "rgb3":

@@ -120,6 +120,13 @@ class ContextManager:
             self._save()
             self._save_timer = None
 
+    def close(self):
+        with self._lock:
+            if self._save_timer is not None:
+                self._save_timer.cancel()
+                self._save_timer = None
+            self._save()
+
     def set_scene(self, scene_name: str | None):
         self.set("active_scene", scene_name)
 

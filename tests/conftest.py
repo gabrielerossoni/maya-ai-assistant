@@ -27,17 +27,21 @@ def tmp_data_dir(tmp_path):
 @pytest.fixture
 def fresh_context(tmp_data_dir, monkeypatch):
     """ContextManager fresco, senza stato persistente su disco."""
+    from core.context_manager import ContextManager
+
+    if ContextManager._instance is not None:
+        ContextManager._instance.close()
+
     state_path = str(tmp_data_dir / "context_state.json")
     monkeypatch.setattr("core.context_manager._STATE_PATH", state_path)
     # Reset singleton
-    from core.context_manager import ContextManager
-
     ContextManager._instance = None
     ctx = ContextManager()
     # Patch all module-level references to the global context singleton
     monkeypatch.setattr("core.context_manager.context", ctx)
     monkeypatch.setattr("core.automation_engine.context", ctx)
     yield ctx
+    ctx.close()
     ContextManager._instance = None
 
 
