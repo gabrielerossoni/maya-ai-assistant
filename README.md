@@ -913,6 +913,14 @@ Progetto sviluppato da studenti dell'**ITIS di Crema** per l'**Arduino Day 2026*
 
 ---
 
+## Ringraziamenti speciali
+
+Un ringraziamento speciale ai professori **Giuseppe Piloni** e **Donatella Tacca** per il supporto, la disponibilità e l'attenzione dedicata al progetto.
+
+Un grazie anche a **Martina Ghidotti** per l'aiuto nella realizzazione della casa fisica, e a tutte le persone che hanno contribuito, osservato, commentato o semplicemente apprezzato M.A.Y.A. durante il percorso e la presentazione all'Arduino Day 2026.
+
+---
+
 <p align="center">
   <strong>M.A.Y.A.</strong> — Un cervello per la casa, non l'ennesimo chatbot.<br>
   <em>ITIS di Crema • Arduino Day 2026</em>
