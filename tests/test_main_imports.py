@@ -317,3 +317,12 @@ def test_lifespan_closes_context_manager():
 
     assert "from core.context_manager import context as home_context" in src
     assert "home_context.close()" in src
+
+
+def test_keyboard_interrupt_shutdown_is_handled_cleanly():
+    with open("main.py", encoding="utf-8") as f:
+        src = f.read()
+
+    assert "except asyncio.CancelledError:" in src
+    assert "except KeyboardInterrupt:" in src
+    assert "Arresto richiesto da tastiera" in src

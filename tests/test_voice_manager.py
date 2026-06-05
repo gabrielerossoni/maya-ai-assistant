@@ -1,4 +1,5 @@
 import sys
+import concurrent.futures
 from types import SimpleNamespace
 
 sys.modules.setdefault("pyaudio", SimpleNamespace(paInt16=8, PyAudio=lambda: None))
@@ -116,6 +117,43 @@ def test_recover_audio_input_reopens_microphone_stream(monkeypatch):
     assert statuses == ["IDLE"]
     assert sleeps == [0.5]
     assert calibrated == [new_stream]
+
+
+def test_broadcast_ignores_cancelled_future(monkeypatch, capsys):
+    vm = _bare_voice_manager()
+    vm._loop_ready = SimpleNamespace(is_set=lambda: True)
+    vm.socket_manager = None
+    vm.agent = SimpleNamespace(loop=object())
+
+    class Future:
+        def result(self):
+            raise concurrent.futures.CancelledError()
+
+        def add_done_callback(self, callback):
+            callback(self)
+
+    def fake_run_coroutine_threadsafe(coro, _loop):
+        coro.close()
+        return Future()
+
+    monkeypatch.setattr("core.voice_manager.asyncio.run_coroutine_threadsafe", fake_run_coroutine_threadsafe)
+
+    vm._broadcast("IDLE")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_broadcast_skips_closed_loop(monkeypatch):
+    vm = _bare_voice_manager()
+    vm._loop_ready = SimpleNamespace(is_set=lambda: True)
+    vm.socket_manager = None
+    vm.agent = SimpleNamespace(loop=SimpleNamespace(is_closed=lambda: True))
+    called = []
+    monkeypatch.setattr("core.voice_manager.asyncio.run_coroutine_threadsafe", lambda *_args: called.append(True))
+
+    vm._broadcast("IDLE")
+
+    assert called == []
 
 
 def test_recover_audio_input_closes_partial_reopen_on_calibration_failure(monkeypatch):

@@ -1,3 +1,5 @@
+import json
+
 from tools.param_utils import resolve_alias
 from tools.translate_tool import TranslateTool
 from tools.wikipedia_tool import WikipediaTool
@@ -52,3 +54,17 @@ def test_wikipedia_prefers_query_over_legacy_parametro(monkeypatch):
     assert result["status"] == "ok"
     assert result["query"] == "Roma"
     assert result["message"] == "summary:Roma"
+
+
+def test_wikipedia_json_decode_error_is_friendly(monkeypatch):
+    monkeypatch.setattr(
+        "tools.wikipedia_tool.wikipedia.summary",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(json.JSONDecodeError("bad", "", 0)),
+    )
+
+    result = WikipediaTool().execute({"query": "porione"})
+
+    assert result == {
+        "status": "error",
+        "message": "Wikipedia non disponibile: risposta non valida dal servizio.",
+    }

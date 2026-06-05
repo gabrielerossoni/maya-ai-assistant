@@ -315,7 +315,10 @@ async def lifespan(app: FastAPI):
         pass
 
     try:
-        yield
+        try:
+            yield
+        except asyncio.CancelledError:
+            pass
     finally:
         # Shutdown
         print("\n[SYSTEM] Spegnimento in corso...")
@@ -453,6 +456,8 @@ if __name__ == "__main__":
             port=_http_port,
             log_level="warning",
         )
+    except KeyboardInterrupt:
+        print("\n[MAYA] Arresto richiesto da tastiera.")
     except OSError as e:
         if getattr(e, "winerror", None) == 10048 or getattr(e, "errno", None) in (
             10048,

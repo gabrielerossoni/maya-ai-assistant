@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import os
 import queue
 import re
@@ -321,7 +322,7 @@ class VoiceManager:
                 return
 
         loop = self._voice_event_loop()
-        if not loop:
+        if not loop or getattr(loop, "is_closed", lambda: False)():
             return
         try:
             fut = asyncio.run_coroutine_threadsafe(self.broadcast_status(self._dashboard_voice_status), loop)
@@ -329,6 +330,8 @@ class VoiceManager:
             def _log_err(f):
                 try:
                     f.result()
+                except (asyncio.CancelledError, concurrent.futures.CancelledError):
+                    return
                 except Exception as e:
                     import traceback
 

@@ -1,6 +1,7 @@
 """wikipedia_tool.py - Ricerca su Wikipedia"""
 
 import wikipedia
+import json
 
 from tools.param_utils import resolve_alias
 
@@ -49,8 +50,14 @@ class WikipediaTool:
                 "message": f"Nessuna pagina trovata per '{query}'.",
             }
 
+        except json.JSONDecodeError:
+            return {
+                "status": "error",
+                "message": "Wikipedia non disponibile: risposta non valida dal servizio.",
+            }
+
         except Exception as e:
             return {
                 "status": "error",
-                "message": str(e),
+                "message": f"Wikipedia non disponibile: {e}",
             }
