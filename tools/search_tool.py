@@ -20,7 +20,7 @@ class SearchTool:
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
-                    message=r"This package \(`duckduckgo_search`\) has been renamed to `ddgs`.*",
+                    message=r".*duckduckgo_search.*renamed.*ddgs.*",
                     category=RuntimeWarning,
                 )
                 with DDGS() as ddgs:

@@ -341,6 +341,8 @@ class AgentCore:
             "imposta",
             "metti",
             "suona",
+            "spieni",
+            "spenni",
         ]
         domotic_objects = [
             "luce",
@@ -759,7 +761,7 @@ class AgentCore:
             return None
 
         is_on = bool(re.search(r"\b(accendi|attiva|metti|imposta)\b", text))
-        is_off = bool(re.search(r"\b(spegni|spegner\w*|disattiva|togli|stop|ferma)\b", text))
+        is_off = bool(re.search(r"\b(spegni|spegner\w*|spieni|spenni|disattiva|togli|stop|ferma)\b", text))
         color_value = self._rgb_value_from_text(text, default=None)
         has_help_context = bool(
             re.search(r"\b(come|cosa|che cosa)\s+(posso|faccio|fare|riparare|aggiustare)\b", text)
@@ -1065,7 +1067,7 @@ class AgentCore:
         open_words = r"(apri|aprire|alza)"
         close_words = r"(chiudi|chiudere|abbassa)"
         on_words = r"(accendi|attiva|metti|imposta)"
-        off_words = r"(spegni|disattiva|stop|ferma)"
+        off_words = r"(spegni|spieni|spenni|disattiva|stop|ferma)"
 
         if re.search(r"\b(stato|status)\b", text) and re.search(r"\b(arduino|casa|domotica|dispositivi)\b", text):
             return (
@@ -1215,7 +1217,7 @@ class AgentCore:
         return None
 
     def _parse_direct_calendar_command(self, text: str) -> tuple[dict | None, str] | None:
-        if re.search(r"\b(prossim[oi]|mostra|vedi|leggi|lista|elenca)\b", text) and re.search(
+        if re.search(r"\b(prossim[oi]|mostra|vedi|leggi|lista|elenca|cos[' ]?ho|cosa ho|ho)\b", text) and re.search(
             r"\b(calendario|eventi|agenda)\b", text
         ):
             return ({"tool": "calendar", "action": "list"}, "Ecco i prossimi eventi.")
@@ -1360,6 +1362,99 @@ class AgentCore:
             parts.append(f"vento {round(float(wind))} km/h")
         return ", ".join(parts) + "."
 
+    def _parse_direct_news_command(self, text: str) -> dict | None:
+        if re.search(r"\b(news|notizie|ultime notizie)\b", text) and re.search(
+            r"\b(dimmi|dammi|leggi|racconta|mostra|ultime|oggi|giorno)\b", text
+        ):
+            return {"tool": "news", "limit": 5}
+        return None
+
+    async def _run_direct_news_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") != "ok":
+            return f"Non riesco a recuperare le notizie: {result.get('message', 'servizio non disponibile')}"
+        if self.socket_manager and "news" in result:
+            await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
+        return result.get("message", "Ecco le ultime notizie.")
+
+    def _parse_direct_trading_command(self, text: str) -> dict | None:
+        if not re.search(r"\b(prezzo|quanto vale|valore|quotazione|vale)\b", text):
+            return None
+
+        assets = {
+            "bitcoin": ("btc", "crypto"),
+            "btc": ("btc", "crypto"),
+            "ethereum": ("eth", "crypto"),
+            "eth": ("eth", "crypto"),
+            "xrp": ("xrp", "crypto"),
+            "ripple": ("xrp", "crypto"),
+            "solana": ("sol", "crypto"),
+            "sol": ("sol", "crypto"),
+            "dogecoin": ("doge", "crypto"),
+            "doge": ("doge", "crypto"),
+            "spy": ("spy", "stock"),
+            "s&p500": ("spy", "stock"),
+            "s&p 500": ("spy", "stock"),
+            "sp500": ("spy", "stock"),
+            "nasdaq": ("qqq", "stock"),
+            "apple": ("aapl", "stock"),
+            "aapl": ("aapl", "stock"),
+            "tesla": ("tsla", "stock"),
+            "tsla": ("tsla", "stock"),
+            "nvidia": ("nvda", "stock"),
+            "nvda": ("nvda", "stock"),
+            "microsoft": ("msft", "stock"),
+            "msft": ("msft", "stock"),
+        }
+        for name, (symbol, asset_type) in assets.items():
+            if name in {"s&p500", "s&p 500"}:
+                matched = re.search(r"\bs\s*&\s*p\s*500\b", text)
+            else:
+                matched = re.search(rf"\b{re.escape(name)}\b", text)
+            if matched:
+                return {"tool": "trading", "operation": "price", "symbol": symbol, "asset_type": asset_type}
+        return None
+
+    async def _run_direct_trading_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") != "ok":
+            return f"Non riesco a recuperare il prezzo: {result.get('message', 'servizio non disponibile')}"
+        if self.socket_manager and isinstance(result.get("data"), dict):
+            await self.socket_manager.broadcast({"type": "trading", **result["data"]})
+        return result.get("message", "Prezzo recuperato.")
+
+    def _parse_direct_knowledge_command(self, text: str) -> dict | None:
+        patterns = [
+            r"\b(?:parlami|raccontami)\s+di\s+(.+)$",
+            r"\bdimmi\s+(?:qualcosa|tutto)\s+su\s+(.+)$",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                query = match.group(1).strip(" .,!?:;")
+                if query:
+                    return {"tool": "wikipedia", "query": query, "sentences": 4}
+        return None
+
+    async def _run_direct_knowledge_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") == "ok":
+            return result.get("message", "")
+
+        search_result = await self.tool_manager.execute({"tool": "search", "query": action.get("query", "")})
+        if search_result.get("status") == "ok":
+            return search_result.get("message", "")
+        return f"Non riesco a recuperare informazioni su {action.get('query', 'questo argomento')}."
+
+    def _capabilities_reply(self, text: str) -> str | None:
+        if not re.search(r"\b(cosa|che|tutto)\b.*\b(puoi fare|sai fare|funzioni|capacita)\b", text):
+            return None
+        return (
+            "Posso controllare luci, RGB, cancellino, porta, buzzer e scene; leggere meteo, news, calendario, "
+            "timer, note, traduzioni, ricerche web, Wikipedia, prezzi crypto e azioni; controllare Spotify e "
+            "mostrare pannelli dashboard."
+        )
+
     async def _undo_last_reversible_command(self) -> str:
         item = self._last_reversible_command
         self._last_reversible_command = None
@@ -1445,6 +1540,29 @@ class AgentCore:
         if direct_weather:
             reply = await self._run_direct_weather_command(direct_weather)
             yield await self._reply_fast(reply, {"type": "weather", "params": {}})
+            return
+
+        direct_news = self._parse_direct_news_command(_clean)
+        if direct_news:
+            reply = await self._run_direct_news_command(direct_news)
+            yield await self._reply_fast(reply, {"type": "news", "params": {}})
+            return
+
+        direct_trading = self._parse_direct_trading_command(_clean)
+        if direct_trading:
+            reply = await self._run_direct_trading_command(direct_trading)
+            yield await self._reply_fast(reply, {"type": "dashboard", "params": {"panel": "trading"}})
+            return
+
+        direct_knowledge = self._parse_direct_knowledge_command(_clean)
+        if direct_knowledge:
+            reply = await self._run_direct_knowledge_command(direct_knowledge)
+            yield await self._reply_fast(reply, {"type": "chat", "params": {}})
+            return
+
+        capabilities_reply = self._capabilities_reply(_clean)
+        if capabilities_reply:
+            yield await self._reply_fast(capabilities_reply, {"type": "dashboard", "params": {}})
             return
 
         if re.search(r"\b(annulla|undo|ripristina)\b", _clean) and re.search(

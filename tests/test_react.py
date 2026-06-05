@@ -14,7 +14,10 @@ from core.agent_core import AgentCore
 
 @pytest.fixture
 def agent():
-    return AgentCore()
+    instance = AgentCore()
+    instance.memory.add_turn = AsyncMock()
+    instance.memory.get_context = AsyncMock(return_value="")
+    return instance
 
 
 def test_hard_route_light_room_color_without_verb(agent):
@@ -213,6 +216,67 @@ def test_direct_weather_does_not_steal_home_sensor_temperature(agent):
     agent = AgentCore()
 
     assert agent._parse_direct_weather_command("temperatura casa") is None
+
+
+@pytest.mark.asyncio
+async def test_process_direct_news_phrase_calls_news_tool(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent.tool_manager.execute = AsyncMock(return_value={"status": "ok", "message": "Ecco le ultime notizie."})
+
+    tokens = []
+    async for token in agent.process("dimmi le news!"):
+        tokens.append(token)
+
+    assert agent.tool_manager.execute.call_args.args[0] == {"tool": "news", "limit": 5}
+    assert "".join(tokens) == "Ecco le ultime notizie."
+
+
+@pytest.mark.asyncio
+async def test_process_direct_bitcoin_price_calls_trading_tool(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent.tool_manager.execute = AsyncMock(return_value={"status": "ok", "message": "Il prezzo di BTC e' $100.00."})
+
+    tokens = []
+    async for token in agent.process("dimmi quanto vale Bitcoin"):
+        tokens.append(token)
+
+    assert agent.tool_manager.execute.call_args.args[0] == {
+        "tool": "trading",
+        "operation": "price",
+        "symbol": "btc",
+        "asset_type": "crypto",
+    }
+    assert "BTC" in "".join(tokens)
+
+
+@pytest.mark.asyncio
+async def test_process_direct_knowledge_uses_wikipedia_before_llm(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent.tool_manager.execute = AsyncMock(return_value={"status": "ok", "message": "Manzoni bio."})
+
+    tokens = []
+    async for token in agent.process("parlami di Alessandro Manzoni."):
+        tokens.append(token)
+
+    assert agent.tool_manager.execute.call_args.args[0] == {
+        "tool": "wikipedia",
+        "query": "alessandro manzoni",
+        "sentences": 4,
+    }
+    assert "".join(tokens) == "Manzoni bio."
+
+
+@pytest.mark.asyncio
+async def test_process_calendar_possession_phrase_lists_events(agent):
+    agent.memory.add_turn = AsyncMock()
+    agent.tool_manager.execute = AsyncMock(return_value={"status": "ok", "message": "Nessun evento."})
+
+    tokens = []
+    async for token in agent.process("cos'ho nel calendario?"):
+        tokens.append(token)
+
+    assert agent.tool_manager.execute.call_args.args[0] == {"tool": "calendar", "action": "list"}
+    assert "".join(tokens) == "Nessun evento."
 
 
 @pytest.mark.asyncio

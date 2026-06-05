@@ -1,7 +1,10 @@
 """wikipedia_tool.py - Ricerca su Wikipedia"""
 
-import wikipedia
 import json
+from urllib.parse import quote
+
+import requests
+import wikipedia
 
 from tools.param_utils import resolve_alias
 
@@ -51,13 +54,43 @@ class WikipediaTool:
             }
 
         except json.JSONDecodeError:
-            return {
-                "status": "error",
-                "message": "Wikipedia non disponibile: risposta non valida dal servizio.",
-            }
+            return self._fallback_rest_summary(query, sentences)
 
         except Exception as e:
             return {
                 "status": "error",
                 "message": f"Wikipedia non disponibile: {e}",
             }
+
+    def _fallback_rest_summary(self, query: str, sentences: int) -> dict:
+        try:
+            url = f"https://it.wikipedia.org/api/rest_v1/page/summary/{quote(query.replace(' ', '_'))}"
+            response = requests.get(url, headers={"User-Agent": "MAYA/1.0"}, timeout=8)
+            response.raise_for_status()
+            data = response.json()
+            summary = str(data.get("extract") or "").strip()
+            if not summary:
+                return {
+                    "status": "error",
+                    "message": f"Nessun riassunto Wikipedia trovato per '{query}'.",
+                }
+            parts = _split_sentences(summary)
+            if parts:
+                summary = " ".join(parts[:sentences]).strip()
+            return {
+                "status": "ok",
+                "message": summary,
+                "query": query,
+                "source": "wikipedia-rest",
+            }
+        except Exception:
+            return {
+                "status": "error",
+                "message": "Wikipedia non disponibile: risposta non valida dal servizio.",
+            }
+
+
+def _split_sentences(text: str) -> list[str]:
+    import re
+
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
