@@ -12,6 +12,14 @@
 ![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
 ![CI](https://img.shields.io/github/actions/workflow/status/gabrielerossoni/maya-ai-assistant/ci.yml?style=for-the-badge&label=CI&logo=githubactions&logoColor=white)
 
+<p align="center">
+  <img src="static/template.png" alt="M.A.Y.A. dashboard HUD preview" width="100%">
+</p>
+
+<p align="center">
+  <em>Dashboard HUD live di M.A.Y.A. con orb centrale, navigazione rapida e interfaccia scura in stile control room.</em>
+</p>
+
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servomotori, strisce LED NeoPixel, buzzer, speaker e sensori di telemetria.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, presentato all'**Arduino Day 2026**.
 

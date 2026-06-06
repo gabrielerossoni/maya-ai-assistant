@@ -2,10 +2,10 @@
 news_tool.py - Lettore di notizie RSS per dashboard e risposte vocali.
 """
 
+import asyncio
 import html
 import os
 import re
-import asyncio
 from collections import defaultdict
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser

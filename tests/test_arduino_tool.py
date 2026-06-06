@@ -6,7 +6,6 @@ import pytest
 from core.automation_engine import build_default_automations
 from tools.arduino_tool import VALID_TARGETS, ArduinoTool
 
-
 FIRMWARE = Path(__file__).resolve().parents[1] / "arduino" / "maya_controller" / "maya_controller.ino"
 
 
