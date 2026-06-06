@@ -38,4 +38,3 @@ async def test_broadcast_state_offloads_gpu_stats(monkeypatch):
 
     assert calls == [broadcasters.get_gpu_stats]
     assert payloads and payloads[0]["gpu_available"] is False
-

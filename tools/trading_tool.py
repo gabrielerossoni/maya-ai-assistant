@@ -70,10 +70,7 @@ class TradingTool:
 
     def _crypto_price(self, symbol: str, raw_symbol: str) -> dict:
         coin_id = CRYPTO_ID_ALIASES.get(symbol.lower(), symbol.lower())
-        url = (
-            "https://api.coingecko.com/api/v3/simple/price"
-            f"?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
-        )
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
         res = requests.get(url, timeout=10).json()
         if coin_id not in res:
             return {"status": "error", "message": f"Criptovaluta '{raw_symbol}' non trovata."}

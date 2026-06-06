@@ -165,7 +165,7 @@ def test_firmware_mqtt_requires_command_token_before_apply():
     assert "bool isAuthorizedMqttCommand" in src
     auth_start = src.index("bool isAuthorizedMqttCommand")
     auth_body = src[auth_start : src.index("void handleMqttCommand", auth_start)]
-    assert "cmd[\"token\"]" in auth_body
+    assert 'cmd["token"]' in auth_body
     assert "strcmp(token, MQTT_COMMAND_TOKEN)" in auth_body
 
     handler_start = src.rindex("void handleMqttCommand")

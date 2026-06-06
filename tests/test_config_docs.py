@@ -27,4 +27,3 @@ def test_single_presentation_artifact_exists():
 
     assert (docs / "MAYA_presentazione.html").exists()
     assert not (docs / "Presentazione_Maya.html").exists()
-
