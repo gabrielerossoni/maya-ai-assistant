@@ -61,6 +61,13 @@ def test_wikipedia_json_decode_error_is_friendly(monkeypatch):
         "tools.wikipedia_tool.wikipedia.summary",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(json.JSONDecodeError("bad", "", 0)),
     )
+    # Mockiamo anche il fallback per farlo fallire, altrimenti otterremmo "ok" tramite REST
+    import requests
+
+    monkeypatch.setattr(
+        "tools.wikipedia_tool.requests.get",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(requests.RequestException("No internet")),
+    )
 
     result = WikipediaTool().execute({"query": "porione"})
 

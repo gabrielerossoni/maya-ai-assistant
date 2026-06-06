@@ -23,7 +23,7 @@
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servomotori, strisce LED NeoPixel, buzzer, speaker e sensori di telemetria.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, presentato all'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** 5 Giugno 2026 — **Versione definitiva post Arduino Day 2026**. M.A.Y.A. è stato presentato come prototipo di smart home AI con plastico fisico interattivo, dashboard HUD live e controllo hardware tramite Arduino. Restano operativi firmware **Arduino Uno R4 WiFi**, **NeoPixel a 3 zone**, doppio servo (**Porta e Cancello**), quake detection fisica (**MPU6050/LSM6DSOX**), sintesi vocale, **Automation Engine OO**, meteo/news/calendario live, monitoraggio GPU e dashboard WebSocket real-time.
+> **Ultimo aggiornamento:** 6 Giugno 2026 — **Versione definitiva post Arduino Day 2026**. M.A.Y.A. è stato presentato come prototipo di smart home AI con plastico fisico interattivo, dashboard HUD live e controllo hardware tramite Arduino. Restano operativi firmware **Arduino Uno R4 WiFi**, **NeoPixel a 3 zone**, doppio servo (**Porta e Cancello**), quake detection fisica (**MPU6050/LSM6DSOX**), sintesi vocale, **Automation Engine OO**, meteo/news/calendario live, monitoraggio GPU e dashboard WebSocket real-time.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -319,6 +319,7 @@ MAYA include un meccanismo di sicurezza basato su accelerometro fisico (LSM6DSOX
 - **Safety by default** — tunnel pubblico ngrok, `self_healer.py`, `code_generator`, `plugin_loader.py` e `network_tool.py` sono disattivati di default e richiedono flag esplicite (`MAYA_NGROK_ENABLED=true`, `DISABLE_SELF_HEALER=false`, `CODE_GENERATOR_ENABLED=true`, `PLUGIN_LOADER_ENABLED=true`/`DEV_MODE=true`, `NETWORK_TOOL_ENABLED=true`).
 - **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud se configurato → parser keyword/offline per i comandi diretti.
 - **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente le card della dashboard via WebSocket.
+- **Wikipedia Robust Fallback** — gestione intelligente degli errori nel `WikipediaTool`: in caso di fallimento della libreria (es. `JSONDecodeError`), il sistema esegue un fallback automatico verso le API REST di Wikipedia per assicurare la continuità del servizio.
 
 ---
 
@@ -791,6 +792,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Sync Audio/Orb** — sincronizzazione tra animazione dell'orb e output audio TTS.
 - [x] **Refactoring `main.py`** — riduzione del codice ad un thin entrypoint pulito con logica spostata nel modulo `core/`.
 - [x] **Rimozione relè e attuatori statici legacy** — l'intero sistema utilizza i NeoPixel multi-zona e i due servo dedicati.
+- [x] **Wikipedia Robust Fallback** — implementazione di un sistema di recupero dati via REST in caso di eccezioni nella libreria `wikipedia` standard.
 
 ### 🔲 Backlog post-demo
 

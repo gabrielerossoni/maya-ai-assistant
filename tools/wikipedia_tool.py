@@ -54,9 +54,6 @@ class WikipediaTool:
                 "message": f"Nessuna pagina trovata per '{query}'.",
             }
 
-        except json.JSONDecodeError:
-            return self._fallback_rest_summary(query, sentences)
-
         except Exception:
             return self._fallback_rest_summary(query, sentences)
 
