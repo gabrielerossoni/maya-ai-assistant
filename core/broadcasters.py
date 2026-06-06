@@ -296,7 +296,7 @@ async def broadcast_state(agent, manager, MODELS):
         and arduino_tool.connection is not None
         and getattr(arduino_tool.connection, "is_open", False)
     )
-    gpu_stats = get_gpu_stats()
+    gpu_stats = await asyncio.to_thread(get_gpu_stats)
     state_payload = {
         "type": "state",
         "cmdCount": len(agent.memory.turns) // 2 if hasattr(agent, "memory") else 0,

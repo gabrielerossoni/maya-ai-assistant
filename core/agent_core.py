@@ -62,7 +62,7 @@ Struttura:
   "intent": "cosa vuole l'utente",
   "layout": "uno tra [orb, weather, map, browser, news, dashboard, chat]",
   "layout_params": {"chiave": "valore"},
-  "actions": [{"tool": "nome_tool", "parametro": "valore"}],
+  "actions": [{"tool": "nome_tool", "...": "parametri canonici del tool"}],
   "reply": "Tua risposta discorsiva e naturale in italiano"
 }
 REGOLE LAYOUT:
@@ -79,7 +79,7 @@ NON aggiungere testo fuori dal JSON.
 4. NO INVENZIONE: Non inventare mai dati. Se usi un tool informativo, scrivi nella reply che stai controllando.
 5. MEMORIA SEMANTICA: Riceverai blocchi di testo marcati come "CONTESTO PASSATO RILEVANTE". Questi sono ricordi recuperati dal database vettoriale. Usali per rispondere a domande su fatti passati o per coerenza a lungo termine.
 6. ReAct LOOP: Puoi eseguire azioni multiple in sequenza. Se il risultato di un tool non è sufficiente, chiedi un altro tool nel prossimo step. Quando hai l'informazione finale, fornisci la "reply" senza "actions".
-7. TOOL GENERATION: Puoi generare nuovi tool Python scrivendo codice nel tool 'code_generator'. Il codice deve essere salvato in 'plugins/'.
+7. TOOL GENERATION: Il tool 'code_generator' e' disabilitato di default. Usalo solo se CODE_GENERATOR_ENABLED=true o DEV_MODE=true.
 
 Tool disponibili:
 - arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/brightness/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); brightness: 0-255; buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
@@ -97,7 +97,7 @@ Tool disponibili:
 - spotify: controllo Spotify reale (command: play_pause/play/pause/next/prev/current/volume_up/volume_down/volume/search, "query" per cercare brano, "level" 0-100 per volume)
 - mqtt: controllo multi-room (room, device, state)
 - sys_monitor: statistiche cpu/ram
-- code_generator: genera nuovi tool (filename, code)
+- code_generator: genera nuovi tool (filename, code) solo se abilitato esplicitamente
 - none: risposta solo testuale
 
 REGOLE CRITICHE:
@@ -105,6 +105,7 @@ REGOLE CRITICHE:
 2. FORMATO: Rispondi SOLO con il JSON, nessun altro testo.
 3. Se l'utente chiede il valore di una moneta, usa sempre 'trading' con operation 'price'.
 4. Se usi un tool informativo (trading, weather, search, news), nella tua "reply" NON inventare MAI dati o cifre. Dì solo che stai recuperando le informazioni (es: "Certamente, controllo subito..."). I dati reali verranno aggiunti automaticamente dopo.
+5. Parametri tool: metti i parametri canonici al primo livello dell'action (es. {"tool":"translate","text":"ciao","target":"en"}). Non annidare i parametri in "parametro" se il tool ha un formato specifico. "parametro" Ã¨ solo compatibilitÃ  legacy: stringa singola, o dict legacy che il sistema puÃ² leggere ma che non devi generare.
 """
 
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
@@ -340,6 +341,8 @@ class AgentCore:
             "imposta",
             "metti",
             "suona",
+            "spieni",
+            "spenni",
         ]
         domotic_objects = [
             "luce",
@@ -758,8 +761,18 @@ class AgentCore:
             return None
 
         is_on = bool(re.search(r"\b(accendi|attiva|metti|imposta)\b", text))
-        is_off = bool(re.search(r"\b(spegni|spegner\w*|disattiva|togli|stop|ferma)\b", text))
+        is_off = bool(re.search(r"\b(spegni|spegner\w*|spieni|spenni|disattiva|togli|stop|ferma)\b", text))
         color_value = self._rgb_value_from_text(text, default=None)
+        has_help_context = bool(
+            re.search(r"\b(come|cosa|che cosa)\s+(posso|faccio|fare|riparare|aggiustare)\b", text)
+            or re.search(r"\b(perche|perché|come mai|quanto|quale|quali|cos['’]?e|mi spieghi|spiegami)\b", text)
+            or re.search(
+                r"\b(riparare|riparo|aggiustare|aggiusto|funziona|rotto|rotta|guasto|guasta|problema|tutorial)\b",
+                text,
+            )
+        )
+        if has_help_context and not (is_on or is_off):
+            return None
         if is_off:
             value = 0
         elif color_value is not None:
@@ -1054,7 +1067,7 @@ class AgentCore:
         open_words = r"(apri|aprire|alza)"
         close_words = r"(chiudi|chiudere|abbassa)"
         on_words = r"(accendi|attiva|metti|imposta)"
-        off_words = r"(spegni|disattiva|stop|ferma)"
+        off_words = r"(spegni|spieni|spenni|disattiva|stop|ferma)"
 
         if re.search(r"\b(stato|status)\b", text) and re.search(r"\b(arduino|casa|domotica|dispositivi)\b", text):
             return (
@@ -1204,7 +1217,7 @@ class AgentCore:
         return None
 
     def _parse_direct_calendar_command(self, text: str) -> tuple[dict | None, str] | None:
-        if re.search(r"\b(prossim[oi]|mostra|vedi|leggi|lista|elenca)\b", text) and re.search(
+        if re.search(r"\b(prossim[oi]|mostra|vedi|leggi|lista|elenca|cos[' ]?ho|cosa ho|ho)\b", text) and re.search(
             r"\b(calendario|eventi|agenda)\b", text
         ):
             return ({"tool": "calendar", "action": "list"}, "Ecco i prossimi eventi.")
@@ -1349,6 +1362,125 @@ class AgentCore:
             parts.append(f"vento {round(float(wind))} km/h")
         return ", ".join(parts) + "."
 
+    def _parse_direct_news_command(self, text: str) -> dict | None:
+        if re.search(r"\b(news|notizie|ultime notizie)\b", text) and re.search(
+            r"\b(dimmi|dammi|leggi|racconta|mostra|ultime|oggi|giorno)\b", text
+        ):
+            return {"tool": "news", "limit": 5}
+        return None
+
+    async def _run_direct_news_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") != "ok":
+            return f"Non riesco a recuperare le notizie: {result.get('message', 'servizio non disponibile')}"
+        if self.socket_manager and "news" in result:
+            await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
+        return result.get("message", "Ecco le ultime notizie.")
+
+    def _parse_direct_trading_command(self, text: str) -> dict | None:
+        if not re.search(r"\b(prezzo|quanto vale|valore|quotazione|vale)\b", text):
+            return None
+
+        assets = {
+            "bitcoin": ("btc", "crypto"),
+            "btc": ("btc", "crypto"),
+            "ethereum": ("eth", "crypto"),
+            "eth": ("eth", "crypto"),
+            "xrp": ("xrp", "crypto"),
+            "ripple": ("xrp", "crypto"),
+            "solana": ("sol", "crypto"),
+            "sol": ("sol", "crypto"),
+            "dogecoin": ("doge", "crypto"),
+            "doge": ("doge", "crypto"),
+            "spy": ("spy", "stock"),
+            "s&p500": ("spy", "stock"),
+            "s&p 500": ("spy", "stock"),
+            "sp500": ("spy", "stock"),
+            "nasdaq": ("qqq", "stock"),
+            "apple": ("aapl", "stock"),
+            "aapl": ("aapl", "stock"),
+            "tesla": ("tsla", "stock"),
+            "tsla": ("tsla", "stock"),
+            "nvidia": ("nvda", "stock"),
+            "nvda": ("nvda", "stock"),
+            "microsoft": ("msft", "stock"),
+            "msft": ("msft", "stock"),
+        }
+        for name, (symbol, asset_type) in assets.items():
+            if name in {"s&p500", "s&p 500"}:
+                matched = re.search(r"\bs\s*&\s*p\s*500\b", text)
+            else:
+                matched = re.search(rf"\b{re.escape(name)}\b", text)
+            if matched:
+                return {"tool": "trading", "operation": "price", "symbol": symbol, "asset_type": asset_type}
+        return None
+
+    async def _run_direct_trading_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") != "ok":
+            return f"Non riesco a recuperare il prezzo: {result.get('message', 'servizio non disponibile')}"
+        if self.socket_manager and isinstance(result.get("data"), dict):
+            await self.socket_manager.broadcast({"type": "trading", **result["data"]})
+        return result.get("message", "Prezzo recuperato.")
+
+    def _parse_direct_knowledge_command(self, text: str) -> dict | None:
+        patterns = [
+            r"\b(?:parlami|raccontami)\s+di\s+(.+)$",
+            r"\bdimmi\s+(?:qualcosa|tutto)\s+su\s+(.+)$",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if match:
+                query = match.group(1).strip(" .,!?:;")
+                if query:
+                    return {"tool": "wikipedia", "query": self._normalize_knowledge_query(query), "sentences": 3}
+        return None
+
+    def _normalize_knowledge_query(self, query: str) -> str:
+        aliases = {
+            "napoleone": "Napoleone Bonaparte",
+            "napoleone bonaparte": "Napoleone Bonaparte",
+            "manzoni": "Alessandro Manzoni",
+            "alessandro manzoni": "Alessandro Manzoni",
+        }
+        key = re.sub(r"\s+", " ", query.strip().lower())
+        return aliases.get(key, query.strip())
+
+    def _format_knowledge_reply(self, text: str) -> str:
+        clean = re.sub(r"\s+", " ", str(text or "")).strip()
+        clean = re.sub(r"\[[^\]]+\]", "", clean).strip()
+        if len(clean) <= 520:
+            return clean
+        sentences = re.split(r"(?<=[.!?])\s+", clean)
+        reply = ""
+        for sentence in sentences:
+            if not sentence:
+                continue
+            candidate = f"{reply} {sentence}".strip()
+            if len(candidate) > 520:
+                break
+            reply = candidate
+        return reply or clean[:517].rstrip() + "..."
+
+    async def _run_direct_knowledge_command(self, action: dict) -> str:
+        result = await self.tool_manager.execute(action)
+        if result.get("status") == "ok":
+            return self._format_knowledge_reply(result.get("message", ""))
+
+        search_result = await self.tool_manager.execute({"tool": "search", "query": action.get("query", "")})
+        if search_result.get("status") == "ok":
+            return self._format_knowledge_reply(search_result.get("message", ""))
+        return f"Non riesco a recuperare informazioni su {action.get('query', 'questo argomento')}."
+
+    def _capabilities_reply(self, text: str) -> str | None:
+        if not re.search(r"\b(cosa|che|tutto)\b.*\b(puoi fare|sai fare|funzioni|capacita)\b", text):
+            return None
+        return (
+            "Posso controllare luci, RGB, cancellino, porta, buzzer e scene; leggere meteo, news, calendario, "
+            "timer, note, traduzioni, ricerche web, Wikipedia, prezzi crypto e azioni; controllare Spotify e "
+            "mostrare pannelli dashboard."
+        )
+
     async def _undo_last_reversible_command(self) -> str:
         item = self._last_reversible_command
         self._last_reversible_command = None
@@ -1388,6 +1520,7 @@ class AgentCore:
         lower_input = user_input.strip().lower()
         # Rimuovi prefissi vocali comuni
         _clean = self._strip_wake_prefix(lower_input)
+        _clean_original = self._strip_wake_prefix(user_input.strip())
 
         hard_action = self._hard_route_light_command(_clean)
         if hard_action:
@@ -1434,6 +1567,29 @@ class AgentCore:
         if direct_weather:
             reply = await self._run_direct_weather_command(direct_weather)
             yield await self._reply_fast(reply, {"type": "weather", "params": {}})
+            return
+
+        direct_news = self._parse_direct_news_command(_clean)
+        if direct_news:
+            reply = await self._run_direct_news_command(direct_news)
+            yield await self._reply_fast(reply, {"type": "news", "params": {}})
+            return
+
+        direct_trading = self._parse_direct_trading_command(_clean)
+        if direct_trading:
+            reply = await self._run_direct_trading_command(direct_trading)
+            yield await self._reply_fast(reply, {"type": "dashboard", "params": {"panel": "trading"}})
+            return
+
+        direct_knowledge = self._parse_direct_knowledge_command(_clean_original)
+        if direct_knowledge:
+            reply = await self._run_direct_knowledge_command(direct_knowledge)
+            yield await self._reply_fast(reply, {"type": "chat", "params": {}})
+            return
+
+        capabilities_reply = self._capabilities_reply(_clean)
+        if capabilities_reply:
+            yield await self._reply_fast(capabilities_reply, {"type": "dashboard", "params": {}})
             return
 
         if re.search(r"\b(annulla|undo|ripristina)\b", _clean) and re.search(

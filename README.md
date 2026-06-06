@@ -12,10 +12,18 @@
 ![Last Commit](https://img.shields.io/github/last-commit/gabrielerossoni/maya-ai-assistant?style=for-the-badge)
 ![CI](https://img.shields.io/github/actions/workflow/status/gabrielerossoni/maya-ai-assistant/ci.yml?style=for-the-badge&label=CI&logo=githubactions&logoColor=white)
 
+<p align="center">
+  <img src="static/template.png" alt="M.A.Y.A. dashboard HUD preview" width="100%">
+</p>
+
+<p align="center">
+  <em>Dashboard HUD live di M.A.Y.A. con orb centrale, navigazione rapida e interfaccia scura in stile control room.</em>
+</p>
+
 **Sistema domotico intelligente per una casa fisica interattiva**, con dashboard HUD dinamica e controllo centralizzato di luci, servomotori, strisce LED NeoPixel, buzzer, speaker e sensori di telemetria.  
 Costruito su **Ollama** + **FastAPI** con architettura agentica **Planner → Executor → Validator**, presentato all'**Arduino Day 2026**.
 
-> **Ultimo aggiornamento:** 5 Giugno 2026 — **Versione definitiva post Arduino Day 2026**. M.A.Y.A. è stato presentato come prototipo di smart home AI con plastico fisico interattivo, dashboard HUD live e controllo hardware tramite Arduino. Restano operativi firmware **Arduino Uno R4 WiFi**, **NeoPixel a 3 zone**, doppio servo (**Porta e Cancello**), quake detection fisica (**MPU6050/LSM6DSOX**), sintesi vocale, **Automation Engine OO**, meteo/news/calendario live, monitoraggio GPU e dashboard WebSocket real-time.
+> **Ultimo aggiornamento:** 6 Giugno 2026 — **Versione definitiva post Arduino Day 2026**. M.A.Y.A. è stato presentato come prototipo di smart home AI con plastico fisico interattivo, dashboard HUD live e controllo hardware tramite Arduino. Restano operativi firmware **Arduino Uno R4 WiFi**, **NeoPixel a 3 zone**, doppio servo (**Porta e Cancello**), quake detection fisica (**MPU6050/LSM6DSOX**), sintesi vocale, **Automation Engine OO**, meteo/news/calendario live, monitoraggio GPU e dashboard WebSocket real-time.
 
 > *Elaborato da Gabriele Rossoni e Marcello Patrini — 4IB, ITIS di Crema*
 
@@ -308,9 +316,10 @@ MAYA include un meccanismo di sicurezza basato su accelerometro fisico (LSM6DSOX
 - **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout.
 - **Stato Casa Live** — pannello aggiornato in tempo reale: luci, servos, strisce NeoPixel RGB, buzzer, speaker, temperatura, umidità.
 - **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` publishes ai client ogni 30 s.
-- **Safety by default** — `self_healer.py`, `plugin_loader.py` e `network_tool.py` sono disattivati di default e richiedono flag esplicite (`DISABLE_SELF_HEALER=false`, `PLUGIN_LOADER_ENABLED=true`/`DEV_MODE=true`, `NETWORK_TOOL_ENABLED=true`).
+- **Safety by default** — tunnel pubblico ngrok, `self_healer.py`, `code_generator`, `plugin_loader.py` e `network_tool.py` sono disattivati di default e richiedono flag esplicite (`MAYA_NGROK_ENABLED=true`, `DISABLE_SELF_HEALER=false`, `CODE_GENERATOR_ENABLED=true`, `PLUGIN_LOADER_ENABLED=true`/`DEV_MODE=true`, `NETWORK_TOOL_ENABLED=true`).
 - **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud se configurato → parser keyword/offline per i comandi diretti.
 - **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente le card della dashboard via WebSocket.
+- **Wikipedia Robust Fallback** — gestione intelligente degli errori nel `WikipediaTool`: in caso di fallimento della libreria (es. `JSONDecodeError`), il sistema esegue un fallback automatico verso le API REST di Wikipedia per assicurare la continuità del servizio.
 
 ---
 
@@ -479,10 +488,13 @@ DASHBOARD_DENSITY=compact   # oppure numero px (es. 8) per il gap tra card
 
 # Sicurezza / sviluppo: default consigliati per demo
 DISABLE_SELF_HEALER=true
+CODE_GENERATOR_ENABLED=false
 PLUGIN_LOADER_ENABLED=false
 DEV_MODE=false
+MAYA_NGROK_ENABLED=false
 NETWORK_TOOL_ENABLED=false
 MEMORY_TOPIC_SUMMARIES_ENABLED=false
+MAYA_WHISPER_DEVICE=auto     # usa CUDA se disponibile, altrimenti CPU; forza cuda solo su host NVIDIA configurati
 ```
 
 ### 3. Download modelli Ollama
@@ -780,6 +792,7 @@ In caso di fallback (Ollama non disponibile), `_fallback_parse()` gestisce le ke
 - [x] **Sync Audio/Orb** — sincronizzazione tra animazione dell'orb e output audio TTS.
 - [x] **Refactoring `main.py`** — riduzione del codice ad un thin entrypoint pulito con logica spostata nel modulo `core/`.
 - [x] **Rimozione relè e attuatori statici legacy** — l'intero sistema utilizza i NeoPixel multi-zona e i due servo dedicati.
+- [x] **Wikipedia Robust Fallback** — implementazione di un sistema di recupero dati via REST in caso di eccezioni nella libreria `wikipedia` standard.
 
 ### 🔲 Backlog post-demo
 
@@ -910,6 +923,14 @@ Progetto sviluppato da studenti dell'**ITIS di Crema** per l'**Arduino Day 2026*
 
 [![GitHub gabrielerossoni](https://img.shields.io/badge/GitHub-gabrielerossoni-181717?style=flat-square&logo=github)](https://github.com/gabrielerossoni)
 [![GitHub Marcello1408](https://img.shields.io/badge/GitHub-Marcello1408-181717?style=flat-square&logo=github)](https://github.com/Marcello1408)
+
+---
+
+## Ringraziamenti speciali
+
+Un ringraziamento speciale ai professori **Giuseppe Piloni** e **Donatella Tacca** per il supporto, la disponibilità e l'attenzione dedicata al progetto.
+
+Un grazie anche a **Martina Ghidotti** per l'aiuto nella realizzazione della casa fisica, e a tutte le persone che hanno contribuito, osservato, commentato o semplicemente apprezzato M.A.Y.A. durante il percorso e la presentazione all'Arduino Day 2026.
 
 ---
 

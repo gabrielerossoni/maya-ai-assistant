@@ -60,7 +60,10 @@ class WeatherTool:
                     self._update_context_weather(cached_data["data"].get("icon"))
                 return cached_data
 
-        result = self._execute_uncached(action)
+        try:
+            result = self._execute_uncached(action)
+        except Exception as e:
+            return {"status": "error", "message": f"Meteo non disponibile. {e}"}
         if result.get("status") == "ok" and "data" in result:
             self._cache[cache_key] = (result, now)
             self._update_context_weather(result["data"].get("icon"))

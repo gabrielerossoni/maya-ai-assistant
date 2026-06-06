@@ -189,5 +189,7 @@ static/.prettierrc
 data/credentials.json
 data/token.json
 
-# Arduino secrets
+# Arduino
 arduino/*/secrets.h
+arduino/libraries/
+.tools/arduino-cli/
