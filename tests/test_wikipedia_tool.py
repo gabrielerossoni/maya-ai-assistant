@@ -21,3 +21,27 @@ def test_wikipedia_tool_uses_rest_fallback_on_json_error(monkeypatch):
     assert result["status"] == "ok"
     assert result["source"] == "wikipedia-rest"
     assert "I promessi sposi" in result["message"]
+
+
+def test_wikipedia_tool_searches_best_title_for_generic_query(monkeypatch):
+    monkeypatch.setattr(
+        "tools.wikipedia_tool.wikipedia.summary",
+        MagicMock(side_effect=json.JSONDecodeError("bad", "{}", 0)),
+    )
+    search_response = MagicMock()
+    search_response.json.return_value = {"query": {"search": [{"title": "Fotosintesi clorofilliana"}]}}
+    search_response.raise_for_status.return_value = None
+    summary_response = MagicMock()
+    summary_response.json.return_value = {
+        "title": "Fotosintesi clorofilliana",
+        "extract": "La fotosintesi clorofilliana e' un processo biologico. Produce glucosio e ossigeno.",
+    }
+    summary_response.raise_for_status.return_value = None
+    mock_get = MagicMock(side_effect=[search_response, summary_response])
+    monkeypatch.setattr("tools.wikipedia_tool.requests.get", mock_get)
+
+    result = WikipediaTool().execute({"query": "fotosintesi", "sentences": 1})
+
+    assert result["status"] == "ok"
+    assert result["title"] == "Fotosintesi clorofilliana"
+    assert result["message"] == "La fotosintesi clorofilliana e' un processo biologico."

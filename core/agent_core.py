@@ -1429,21 +1429,47 @@ class AgentCore:
             r"\bdimmi\s+(?:qualcosa|tutto)\s+su\s+(.+)$",
         ]
         for pattern in patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, flags=re.IGNORECASE)
             if match:
                 query = match.group(1).strip(" .,!?:;")
                 if query:
-                    return {"tool": "wikipedia", "query": query, "sentences": 4}
+                    return {"tool": "wikipedia", "query": self._normalize_knowledge_query(query), "sentences": 3}
         return None
+
+    def _normalize_knowledge_query(self, query: str) -> str:
+        aliases = {
+            "napoleone": "Napoleone Bonaparte",
+            "napoleone bonaparte": "Napoleone Bonaparte",
+            "manzoni": "Alessandro Manzoni",
+            "alessandro manzoni": "Alessandro Manzoni",
+        }
+        key = re.sub(r"\s+", " ", query.strip().lower())
+        return aliases.get(key, query.strip())
+
+    def _format_knowledge_reply(self, text: str) -> str:
+        clean = re.sub(r"\s+", " ", str(text or "")).strip()
+        clean = re.sub(r"\[[^\]]+\]", "", clean).strip()
+        if len(clean) <= 520:
+            return clean
+        sentences = re.split(r"(?<=[.!?])\s+", clean)
+        reply = ""
+        for sentence in sentences:
+            if not sentence:
+                continue
+            candidate = f"{reply} {sentence}".strip()
+            if len(candidate) > 520:
+                break
+            reply = candidate
+        return reply or clean[:517].rstrip() + "..."
 
     async def _run_direct_knowledge_command(self, action: dict) -> str:
         result = await self.tool_manager.execute(action)
         if result.get("status") == "ok":
-            return result.get("message", "")
+            return self._format_knowledge_reply(result.get("message", ""))
 
         search_result = await self.tool_manager.execute({"tool": "search", "query": action.get("query", "")})
         if search_result.get("status") == "ok":
-            return search_result.get("message", "")
+            return self._format_knowledge_reply(search_result.get("message", ""))
         return f"Non riesco a recuperare informazioni su {action.get('query', 'questo argomento')}."
 
     def _capabilities_reply(self, text: str) -> str | None:
@@ -1494,6 +1520,7 @@ class AgentCore:
         lower_input = user_input.strip().lower()
         # Rimuovi prefissi vocali comuni
         _clean = self._strip_wake_prefix(lower_input)
+        _clean_original = self._strip_wake_prefix(user_input.strip())
 
         hard_action = self._hard_route_light_command(_clean)
         if hard_action:
@@ -1554,7 +1581,7 @@ class AgentCore:
             yield await self._reply_fast(reply, {"type": "dashboard", "params": {"panel": "trading"}})
             return
 
-        direct_knowledge = self._parse_direct_knowledge_command(_clean)
+        direct_knowledge = self._parse_direct_knowledge_command(_clean_original)
         if direct_knowledge:
             reply = await self._run_direct_knowledge_command(direct_knowledge)
             yield await self._reply_fast(reply, {"type": "chat", "params": {}})

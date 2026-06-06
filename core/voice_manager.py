@@ -539,6 +539,44 @@ class VoiceManager:
         parts = re.split(r"(?<=[.!?])\s+|\n[-*]\s*|\n{2,}", text)
         return [p.strip().lstrip("-").lstrip("*").strip() for p in parts if p.strip()]
 
+    def _prepare_tts_text(self, text: str) -> str:
+        clean = re.sub(r"https?://\S+", "", str(text or ""))
+        clean = re.sub(r"\[[^\]]+\]", "", clean)
+        clean = clean.replace("“", '"').replace("”", '"').replace("’", "'")
+        clean = re.sub(r"\s+", " ", clean).strip()
+        return clean
+
+    def _tts_chunks(self, text: str, max_chars: int = 260) -> list[str]:
+        clean = self._prepare_tts_text(text)
+        if not clean:
+            return []
+        if len(clean) <= max_chars:
+            return [clean]
+
+        chunks = []
+        current = ""
+        for part in re.split(r"(?<=[.!?;:])\s+|,\s+", clean):
+            part = part.strip()
+            if not part:
+                continue
+            candidate = f"{current}, {part}".strip(", ") if current else part
+            if len(candidate) <= max_chars:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current)
+                current = ""
+            while len(part) > max_chars:
+                split_at = part.rfind(" ", 0, max_chars)
+                if split_at < 80:
+                    split_at = max_chars
+                chunks.append(part[:split_at].strip())
+                part = part[split_at:].strip()
+            current = part
+        if current:
+            chunks.append(current)
+        return chunks
+
     async def _process_voice_text(self, text: str):
         self._broadcast("PROCESSING")
         # Mostra il testo trascritto sulla dashboard
@@ -641,22 +679,28 @@ class VoiceManager:
         """Sintetizza e riproduce una singola frase (usato dal TTS pipeline worker)."""
         if not os.path.exists(self.piper_exe):
             return
-        try:
-            import uuid
+        for chunk in self._tts_chunks(text):
+            try:
+                import uuid
 
-            os.makedirs("voice", exist_ok=True)
-            output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
-            command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
-            subprocess.run(
-                command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            self._broadcast("SPEAKING")
-            self._play_wav(output_wav)
-        except Exception as e:
-            print(f"[VOICE] Errore TTS raw: {e}")
-        finally:
-            if not self.is_speaking:
-                self._broadcast("IDLE")
+                os.makedirs("voice", exist_ok=True)
+                output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
+                command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
+                subprocess.run(
+                    command,
+                    input=chunk.encode("utf-8"),
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                self._broadcast("SPEAKING")
+                self._play_wav(output_wav)
+            except Exception as e:
+                print(f"[VOICE] Errore TTS raw: {e}")
+                break
+            finally:
+                if not self.is_speaking:
+                    self._broadcast("IDLE")
 
     def speak(self, text):
         if not os.path.exists(self.piper_exe):
@@ -671,15 +715,20 @@ class VoiceManager:
             import uuid
 
             os.makedirs("voice", exist_ok=True)
-            output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
-            # Comando per Piper: passa il testo e genera il wav
-            command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
-            subprocess.run(
-                command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            for chunk in self._tts_chunks(text):
+                output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
+                # Comando per Piper: passa il testo e genera il wav
+                command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
+                subprocess.run(
+                    command,
+                    input=chunk.encode("utf-8"),
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
 
-            # Riproduzione controllata via PyAudio (niente lettore multimediale)
-            self._play_wav(output_wav)
+                # Riproduzione controllata via PyAudio (niente lettore multimediale)
+                self._play_wav(output_wav)
 
         except Exception as e:
             print(f"[VOICE] Errore TTS: {e}")

@@ -260,10 +260,31 @@ async def test_process_direct_knowledge_uses_wikipedia_before_llm(agent):
 
     assert agent.tool_manager.execute.call_args.args[0] == {
         "tool": "wikipedia",
-        "query": "alessandro manzoni",
-        "sentences": 4,
+        "query": "Alessandro Manzoni",
+        "sentences": 3,
     }
     assert "".join(tokens) == "Manzoni bio."
+
+
+def test_direct_knowledge_aliases_common_short_names(agent):
+    assert agent._parse_direct_knowledge_command("parlami di Napoleone") == {
+        "tool": "wikipedia",
+        "query": "Napoleone Bonaparte",
+        "sentences": 3,
+    }
+    assert agent._parse_direct_knowledge_command("parlami di Manzoni") == {
+        "tool": "wikipedia",
+        "query": "Alessandro Manzoni",
+        "sentences": 3,
+    }
+
+
+def test_direct_knowledge_preserves_generic_query(agent):
+    assert agent._parse_direct_knowledge_command("parlami di Fotosintesi Clorofilliana") == {
+        "tool": "wikipedia",
+        "query": "Fotosintesi Clorofilliana",
+        "sentences": 3,
+    }
 
 
 @pytest.mark.asyncio

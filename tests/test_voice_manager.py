@@ -1,5 +1,5 @@
-import sys
 import concurrent.futures
+import sys
 from types import SimpleNamespace
 
 sys.modules.setdefault("pyaudio", SimpleNamespace(paInt16=8, PyAudio=lambda: None))
@@ -64,6 +64,25 @@ def test_speak_raw_returns_dashboard_to_idle_when_standalone(monkeypatch):
     vm._speak_raw("ciao")
 
     assert statuses == ["SPEAKING", "IDLE"]
+
+
+def test_speak_raw_splits_long_text_before_piper(monkeypatch):
+    vm = _bare_voice_manager()
+    vm._broadcast = lambda _status: None
+    vm._play_wav = lambda _: None
+    calls = []
+    monkeypatch.setattr("core.voice_manager.os.path.exists", lambda _: True)
+    monkeypatch.setattr("core.voice_manager.os.makedirs", lambda *_args, **_kwargs: None)
+
+    def fake_run(_command, input, **_kwargs):
+        calls.append(input.decode("utf-8"))
+
+    monkeypatch.setattr("core.voice_manager.subprocess.run", fake_run)
+
+    vm._speak_raw("Questa e' una frase molto lunga. " * 20)
+
+    assert len(calls) > 1
+    assert all(len(call) <= 260 for call in calls)
 
 
 def test_start_resets_audio_recovery_attempts(monkeypatch):
