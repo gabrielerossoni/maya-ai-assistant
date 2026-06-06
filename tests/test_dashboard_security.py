@@ -261,6 +261,40 @@ class TestDirectToolAllowlist:
         assert "target Arduino" in reason
 
 
+class TestDashboardSessionAuth:
+    def test_dashboard_websocket_uses_runtime_token(self, html):
+        assert "MAYA_DASHBOARD_TOKEN" in html
+        assert "/ws?token=" in html
+
+    def test_websocket_auth_rejects_missing_or_bad_token(self, monkeypatch):
+        from core.routes import _is_valid_dashboard_token
+
+        monkeypatch.setenv("MAYA_DASHBOARD_TOKEN", "known-token")
+
+        assert not _is_valid_dashboard_token(None)
+        assert not _is_valid_dashboard_token("wrong-token")
+        assert _is_valid_dashboard_token("known-token")
+
+    def test_websocket_origin_allows_only_local_dashboard(self):
+        from core.routes import _is_allowed_dashboard_origin
+
+        assert _is_allowed_dashboard_origin("http://127.0.0.1:8000", "127.0.0.1:8000")
+        assert _is_allowed_dashboard_origin("http://localhost:8000", "127.0.0.1:8000")
+        assert not _is_allowed_dashboard_origin("https://evil.example", "127.0.0.1:8000")
+
+    @pytest.mark.asyncio
+    async def test_served_dashboard_injects_runtime_token(self, monkeypatch):
+        from core.routes import get_dashboard
+
+        monkeypatch.setenv("MAYA_DASHBOARD_TOKEN", "known-token")
+
+        response = await get_dashboard()
+        body = response.body.decode("utf-8")
+
+        assert "known-token" in body
+        assert "__MAYA_DASHBOARD_TOKEN__" not in body
+
+
 class TestSceneControls:
     def test_night_scene_is_single_dashboard_chip(self, html):
         assert 'id="chip-notte"' not in html

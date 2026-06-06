@@ -74,10 +74,15 @@ class ToolManager:
             "spotify": SpotifyTool(),
             "display": DisplayTool(),
             "sys_monitor": SysMonitorTool(),
-            "code_generator": CodeGeneratorTool(),
             "mqtt": MqttTool(),
             "none": _NoOpTool(),
         }
+        if os.getenv("CODE_GENERATOR_ENABLED", os.getenv("DEV_MODE", "false")).strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            self.tools["code_generator"] = CodeGeneratorTool()
         if os.getenv("NETWORK_TOOL_ENABLED", "false").strip().lower() in ("1", "true", "yes"):
             self.tools["network"] = NetworkTool()
         else:

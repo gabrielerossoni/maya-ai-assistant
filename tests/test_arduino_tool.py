@@ -158,6 +158,22 @@ def test_firmware_melody_stop_helper_resets_shared_state():
     assert src.count("stopMelody();") >= 2
 
 
+def test_firmware_mqtt_requires_command_token_before_apply():
+    src = FIRMWARE.read_text(encoding="utf-8")
+
+    assert "MQTT_COMMAND_TOKEN" in src
+    assert "bool isAuthorizedMqttCommand" in src
+    auth_start = src.index("bool isAuthorizedMqttCommand")
+    auth_body = src[auth_start : src.index("void handleMqttCommand", auth_start)]
+    assert "cmd[\"token\"]" in auth_body
+    assert "strcmp(token, MQTT_COMMAND_TOKEN)" in auth_body
+
+    handler_start = src.rindex("void handleMqttCommand")
+    handler_body = src[handler_start : src.index("void applyCommand", handler_start)]
+    assert "isAuthorizedMqttCommand(cmd)" in handler_body
+    assert handler_body.index("isAuthorizedMqttCommand(cmd)") < handler_body.index("applyCommand(")
+
+
 def test_execute_rejects_unknown_target_and_bad_op(real_tool, monkeypatch):
     called = False
 

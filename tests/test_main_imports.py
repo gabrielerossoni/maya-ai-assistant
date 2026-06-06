@@ -27,6 +27,13 @@ def test_import_ngrok_manager():
     assert hasattr(mod, "start_ngrok")
 
 
+def test_ngrok_is_opt_in_by_default(monkeypatch):
+    mod = importlib.import_module("main")
+    monkeypatch.delenv("MAYA_NGROK_ENABLED", raising=False)
+
+    assert mod._env_enabled("MAYA_NGROK_ENABLED") is False
+
+
 def test_import_server_utils():
     mod = importlib.import_module("core.server_utils")
     assert hasattr(mod, "pick_http_port")

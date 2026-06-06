@@ -4162,9 +4162,11 @@
         // =============================================
         // WEBSOCKET
         // =============================================
+        window.MAYA_DASHBOARD_TOKEN = "__MAYA_DASHBOARD_TOKEN__";
         function initWS() {
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${proto}//${location.host}/ws`);
+            const token = encodeURIComponent(window.MAYA_DASHBOARD_TOKEN || '');
+            ws = new WebSocket(`${proto}//${location.host}/ws?token=${token}`);
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
                 if (d.type === 'history' && d.turns) {

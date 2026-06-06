@@ -38,6 +38,10 @@
 #include <WiFiS3.h>
 #include <string.h>
 
+#ifndef MQTT_COMMAND_TOKEN
+#define MQTT_COMMAND_TOKEN ""
+#endif
+
 // ── WiFi Credentials ──────────────────────────
 const char *SSID = WIFI_HOTSPOT_SSID;      // Configura il tuo SSID
 const char *WIFI_PASS = WIFI_HOTSPOT_PASS; // Configura la password
@@ -416,8 +420,21 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 }
 
 // ── Handle MQTT Command ───────────────────────
+bool isAuthorizedMqttCommand(JsonDocument &cmd) {
+  const char *token = cmd["token"] | "";
+  if (strlen(MQTT_COMMAND_TOKEN) == 0) {
+    return false;
+  }
+  return strcmp(token, MQTT_COMMAND_TOKEN) == 0;
+}
+
 void handleMqttCommand(JsonDocument &cmd) {
   int id = cmd["id"] | -1;
+  if (!isAuthorizedMqttCommand(cmd)) {
+    sendError(id, "unauthorized");
+    return;
+  }
+
   const char *cmdOp = cmd["cmd"] | "";
   const char *target = cmd["target"] | "";
 

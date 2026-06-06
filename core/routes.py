@@ -4,12 +4,15 @@ Estratto da main.py per ridurre la complessità del punto di ingresso.
 """
 
 import asyncio
+import hmac
 import os
+import secrets
 import time
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 import core.broadcasters as _bc
 from core.broadcasters import (
@@ -51,6 +54,8 @@ _NEWS_LIVE_GROUPS = [
     ],
 ]
 _news_live_cache = {"ts": 0.0, "streams": []}
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 _DIRECT_TOOL_ALLOWLIST = {
     "arduino": {
@@ -128,11 +133,52 @@ def _validate_direct_tool_action(action: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def get_dashboard_token() -> str:
+    token = os.environ.get("MAYA_DASHBOARD_TOKEN", "").strip()
+    if not token:
+        token = secrets.token_urlsafe(32)
+        os.environ["MAYA_DASHBOARD_TOKEN"] = token
+    return token
+
+
+def _is_valid_dashboard_token(token: str | None) -> bool:
+    if not token:
+        return False
+    expected = get_dashboard_token()
+    return hmac.compare_digest(str(token), expected)
+
+
+def _is_allowed_dashboard_origin(origin: str | None, host: str | None) -> bool:
+    if not origin or not host:
+        return False
+    try:
+        origin_url = urlparse(origin)
+    except Exception:
+        return False
+    origin_host = (origin_url.hostname or "").lower()
+    request_host = host.split(":", 1)[0].strip("[]").lower()
+    if not origin_host or not request_host:
+        return False
+    if origin_host == request_host:
+        return True
+    return origin_host in _LOOPBACK_HOSTS and request_host in _LOOPBACK_HOSTS
+
+
+def _is_trusted_websocket(websocket: WebSocket) -> bool:
+    token = websocket.query_params.get("token")
+    origin = websocket.headers.get("origin")
+    host = websocket.headers.get("host")
+    return _is_valid_dashboard_token(token) and _is_allowed_dashboard_origin(origin, host)
+
+
 # ---------------------------------------------------------------------------
 # HTTP routes
 # ---------------------------------------------------------------------------
 async def get_dashboard():
-    return FileResponse("static/maya_dashboard.html")
+    with open("static/maya_dashboard.html", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__MAYA_DASHBOARD_TOKEN__", get_dashboard_token())
+    return HTMLResponse(html)
 
 
 async def get_service_worker():
@@ -267,6 +313,9 @@ async def get_news_live_streams():
 async def websocket_endpoint(websocket: WebSocket, agent, manager, voice_manager, MODELS):
     global _log_filter_applied
     try:
+        if not _is_trusted_websocket(websocket):
+            await websocket.close(code=1008)
+            return
         await manager.connect(websocket)
 
         # Applica il filtro log al primo collegamento del client (una sola volta)

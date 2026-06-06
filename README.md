@@ -308,7 +308,7 @@ MAYA include un meccanismo di sicurezza basato su accelerometro fisico (LSM6DSOX
 - **Electron Desktop Wrapper** — finestra nativa senza browser, icona MAYA nella taskbar, F12 alwaysOnTop, Escape per reset layout.
 - **Stato Casa Live** — pannello aggiornato in tempo reale: luci, servos, strisce NeoPixel RGB, buzzer, speaker, temperatura, umidità.
 - **Telemetria Automatica** — DHT11 invia temperatura e umidità ogni 5 s; `sensor_broadcaster` publishes ai client ogni 30 s.
-- **Safety by default** — `self_healer.py`, `plugin_loader.py` e `network_tool.py` sono disattivati di default e richiedono flag esplicite (`DISABLE_SELF_HEALER=false`, `PLUGIN_LOADER_ENABLED=true`/`DEV_MODE=true`, `NETWORK_TOOL_ENABLED=true`).
+- **Safety by default** — tunnel pubblico ngrok, `self_healer.py`, `code_generator`, `plugin_loader.py` e `network_tool.py` sono disattivati di default e richiedono flag esplicite (`MAYA_NGROK_ENABLED=true`, `DISABLE_SELF_HEALER=false`, `CODE_GENERATOR_ENABLED=true`, `PLUGIN_LOADER_ENABLED=true`/`DEV_MODE=true`, `NETWORK_TOOL_ENABLED=true`).
 - **Graceful Degradation** — senza Arduino → card dashboard mostrano `—` (nessun dato fittizio); `OLLAMA_ENABLED=false` → Groq cloud se configurato → parser keyword/offline per i comandi diretti.
 - **Broadcast stato real-time** — ogni comando vocale/testuale aggiorna immediatamente le card della dashboard via WebSocket.
 
@@ -479,8 +479,10 @@ DASHBOARD_DENSITY=compact   # oppure numero px (es. 8) per il gap tra card
 
 # Sicurezza / sviluppo: default consigliati per demo
 DISABLE_SELF_HEALER=true
+CODE_GENERATOR_ENABLED=false
 PLUGIN_LOADER_ENABLED=false
 DEV_MODE=false
+MAYA_NGROK_ENABLED=false
 NETWORK_TOOL_ENABLED=false
 MEMORY_TOPIC_SUMMARIES_ENABLED=false
 MAYA_WHISPER_DEVICE=auto     # usa CUDA se disponibile, altrimenti CPU; forza cuda solo su host NVIDIA configurati

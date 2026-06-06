@@ -17,7 +17,7 @@ import webbrowser
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, Header, HTTPException, WebSocket
 from fastapi.staticfiles import StaticFiles
 
 from core.agent_core import MODELS, AgentCore
@@ -37,6 +37,7 @@ from core.ollama_manager import ensure_ollama_running
 from core.plugin_loader import PluginLoader
 from core.proactive_manager import ProactiveManager
 from core.routes import (
+    _is_valid_dashboard_token,
     get_dashboard,
     get_manifest,
     get_news_live_streams,
@@ -58,6 +59,16 @@ _shutdown_started = False
 
 def _env_enabled(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in ("1", "true", "yes")
+
+
+def _authorize_shutdown(pid: int | None, token: str | None, header_token: str | None) -> bool:
+    if pid is not None:
+        if pid == os.getpid():
+            return True
+        raise HTTPException(status_code=403, detail="wrong_pid")
+    if _is_valid_dashboard_token(token) or _is_valid_dashboard_token(header_token):
+        return True
+    raise HTTPException(status_code=403, detail="shutdown_not_authorized")
 
 
 async def shutdown_hardware(reason: str = "shutdown"):
@@ -127,8 +138,12 @@ async def lifespan(app: FastAPI):
 
     await agent.initialize()
 
-    # Avvia ngrok
-    ngrok_url = await asyncio.to_thread(start_ngrok, http_port)
+    # Avvia ngrok solo su opt-in esplicito.
+    if _env_enabled("MAYA_NGROK_ENABLED"):
+        ngrok_url = await asyncio.to_thread(start_ngrok, http_port)
+    else:
+        ngrok_url = None
+        print("[NGROK] Tunnel disattivato (MAYA_NGROK_ENABLED=false).")
     if ngrok_url:
         print(f"\n{'=' * 50}")
         print(f"  \U0001f310 MAYA pubblica su: {ngrok_url}")
@@ -386,9 +401,8 @@ async def _news_live_streams():
 
 
 @app.post("/shutdown")
-async def _shutdown(pid: int | None = None):
-    if pid is not None and pid != os.getpid():
-        return {"status": "wrong_pid", "pid": os.getpid()}
+async def _shutdown(pid: int | None = None, token: str | None = None, x_maya_token: str | None = Header(default=None)):
+    _authorize_shutdown(pid, token, x_maya_token)
     await shutdown_hardware("http_shutdown")
 
     def _stop_process():
