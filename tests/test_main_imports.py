@@ -3,6 +3,7 @@ Smoke test: verifica che i moduli estratti da main.py importino correttamente.
 Se questo test passa, il refactoring non ha rotto nulla a livello di import.
 """
 
+import asyncio
 import importlib
 import os
 import sys
@@ -24,6 +25,13 @@ def test_import_ollama_manager():
 def test_import_ngrok_manager():
     mod = importlib.import_module("core.ngrok_manager")
     assert hasattr(mod, "start_ngrok")
+
+
+def test_ngrok_is_opt_in_by_default(monkeypatch):
+    mod = importlib.import_module("main")
+    monkeypatch.delenv("MAYA_NGROK_ENABLED", raising=False)
+
+    assert mod._env_enabled("MAYA_NGROK_ENABLED") is False
 
 
 def test_import_server_utils():
@@ -90,7 +98,7 @@ async def test_news_live_streams_fallback_when_primary_offline():
 
 
 @pytest.mark.asyncio
-async def test_news_live_streams_uses_non_primary_when_all_unverified():
+async def test_news_live_streams_marks_fallback_unavailable_when_all_offline():
     mod = importlib.import_module("core.routes")
 
     async def checker(_client, _channel_id):
@@ -106,7 +114,33 @@ async def test_news_live_streams_uses_non_primary_when_all_unverified():
         checker=checker,
     )
 
-    assert streams == [{"src": "fallback-live", "label": "FALLBACK", "fallback": True, "unchecked": True}]
+    assert streams == [{"src": "fallback-live", "label": "FALLBACK", "fallback": True, "unavailable": True}]
+
+
+@pytest.mark.asyncio
+async def test_news_live_streams_does_not_borrow_from_other_groups():
+    mod = importlib.import_module("core.routes")
+
+    async def checker(_client, channel_id):
+        return channel_id == "other-live"
+
+    streams = await mod._select_news_live_streams(
+        groups=[
+            [
+                {"src": "offline-a", "label": "OFFLINE A"},
+                {"src": "offline-b", "label": "OFFLINE B"},
+            ],
+            [
+                {"src": "other-live", "label": "OTHER LIVE"},
+            ],
+        ],
+        checker=checker,
+    )
+
+    assert streams == [
+        {"src": "offline-b", "label": "OFFLINE B", "fallback": True, "unavailable": True},
+        {"src": "other-live", "label": "OTHER LIVE", "fallback": False},
+    ]
 
 
 @pytest.mark.asyncio
@@ -138,6 +172,105 @@ async def test_news_live_streams_are_unique_across_slots():
 
     assert [stream["src"] for stream in streams] == ["a", "b", "c"]
     assert len({stream["src"] for stream in streams}) == len(streams)
+
+
+@pytest.mark.asyncio
+async def test_news_live_streams_checks_each_unique_channel_once():
+    mod = importlib.import_module("core.routes")
+    calls = []
+
+    async def checker(_client, channel_id):
+        calls.append(channel_id)
+        return channel_id == "b"
+
+    await mod._select_news_live_streams(
+        groups=[
+            [
+                {"src": "a", "label": "A"},
+                {"src": "b", "label": "B"},
+            ],
+            [
+                {"src": "b", "label": "B"},
+                {"src": "a", "label": "A"},
+            ],
+        ],
+        checker=checker,
+    )
+
+    assert sorted(calls) == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_news_live_streams_uses_configurable_check_concurrency(monkeypatch):
+    mod = importlib.import_module("core.routes")
+    monkeypatch.setenv("MAYA_NEWS_LIVE_CHECK_CONCURRENCY", "2")
+    active = 0
+    max_active = 0
+
+    async def checker(_client, _channel_id):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return False
+
+    await mod._select_news_live_streams(
+        groups=[
+            [
+                {"src": "a", "label": "A"},
+                {"src": "b", "label": "B"},
+                {"src": "c", "label": "C"},
+                {"src": "d", "label": "D"},
+            ],
+        ],
+        checker=checker,
+    )
+
+    assert max_active == 2
+
+
+@pytest.mark.asyncio
+async def test_news_live_streams_skips_empty_groups():
+    mod = importlib.import_module("core.routes")
+
+    async def checker(_client, channel_id):
+        return channel_id == "a"
+
+    streams = await mod._select_news_live_streams(
+        groups=[
+            [],
+            [
+                {"src": "a", "label": "A"},
+            ],
+        ],
+        checker=checker,
+    )
+
+    assert streams == [{"src": "a", "label": "A", "fallback": False}]
+
+
+@pytest.mark.asyncio
+async def test_news_live_streams_times_out_slow_channel(monkeypatch):
+    mod = importlib.import_module("core.routes")
+    monkeypatch.setenv("MAYA_NEWS_LIVE_CHECK_TIMEOUT", "0.01")
+
+    async def checker(_client, channel_id):
+        if channel_id == "slow":
+            await asyncio.sleep(1.0)
+        return channel_id == "fast"
+
+    streams = await mod._select_news_live_streams(
+        groups=[
+            [
+                {"src": "slow", "label": "SLOW"},
+                {"src": "fast", "label": "FAST"},
+            ],
+        ],
+        checker=checker,
+    )
+
+    assert streams == [{"src": "fast", "label": "FAST", "fallback": True}]
 
 
 @pytest.mark.asyncio
@@ -183,3 +316,20 @@ def test_main_module_importable():
     assert hasattr(mod, "agent")
     assert hasattr(mod, "voice_manager")
     assert hasattr(mod, "lifespan")
+
+
+def test_lifespan_closes_context_manager():
+    with open("main.py", encoding="utf-8") as f:
+        src = f.read()
+
+    assert "from core.context_manager import context as home_context" in src
+    assert "home_context.close()" in src
+
+
+def test_keyboard_interrupt_shutdown_is_handled_cleanly():
+    with open("main.py", encoding="utf-8") as f:
+        src = f.read()
+
+    assert "except asyncio.CancelledError:" in src
+    assert "except KeyboardInterrupt:" in src
+    assert "Arresto richiesto da tastiera" in src

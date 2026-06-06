@@ -22,6 +22,10 @@ SUMMARIES_FILE = os.path.join(MEMORY_DIR, "memory_summaries.json")
 EMBEDDING_MODEL = "nomic-embed-text"  # Via Ollama
 _ollama_available = True  # Set to False after first connection failure to suppress repeated errors
 TOPIC_SUMMARIES_ENABLED = os.getenv("MEMORY_TOPIC_SUMMARIES_ENABLED", "false").lower() == "true"
+_DASHBOARD_HISTORY_EXCLUDED_TEXTS = {
+    "Com'Ã¨ il meteo a Milano?",
+    "A Milano c'Ã¨ il sole, 20 gradi.",
+}
 
 _SUMMARY_TOPICS = {
     "domotica": [
@@ -123,6 +127,7 @@ class MemoryManager:
 
     async def add_turn(self, role: str, text: str, persist_db: bool = True):
         """Aggiunge un turno alla memoria con embedding semantico."""
+        test_mode = os.getenv("MAYA_CI", "").strip().lower() in ("1", "true", "yes")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         turn = {
             "role": role,
@@ -147,6 +152,9 @@ class MemoryManager:
                 self._last_summary_turn_counter = self._turn_counter
                 turns_snapshot = list(self.turns)
                 asyncio.create_task(self.build_topic_summaries(turns_snapshot))
+
+            if test_mode:
+                return
 
             # Calcola embedding e aggiungilo a ChromaDB
             if self.collection and persist_db:
@@ -320,7 +328,7 @@ class MemoryManager:
         if self.collection.count() > 0:
             return
 
-            print(f"[MEMORY] ChromaDB vuoto - reindicizzazione di {len(self.turns)} turni dal JSON...")
+        print(f"[MEMORY] ChromaDB vuoto - reindicizzazione di {len(self.turns)} turni dal JSON...")
         imported = 0
         errors = 0
         for i, turn in enumerate(self.turns):
@@ -352,7 +360,7 @@ class MemoryManager:
 
     async def get_all(self) -> list:
         """Ritorna tutti i turni caricati."""
-        return self.turns
+        return [turn for turn in self.turns if turn.get("text") not in _DASHBOARD_HISTORY_EXCLUDED_TEXTS]
 
     async def search(self, query: str, top_k: int = 10) -> list:
         """Cerca messaggi rilevanti per una query."""

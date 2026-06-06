@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import os
 import queue
 import re
@@ -89,6 +90,8 @@ class VoiceManager:
         # Ultimo stato inviato / da mostrare in dashboard (sincrono su reconnect e stats).
         self._dashboard_voice_status: str = "IDLE"
         self._loop_ready = threading.Event()
+        self._audio_recovery_attempts = 0
+        self._max_audio_recovery_attempts = max(1, int(os.environ.get("MAYA_AUDIO_RECOVERY_MAX_ATTEMPTS", "5")))
 
     def set_loop_ready(self):
         """Segnala che il loop è pronto per i broadcast."""
@@ -319,7 +322,7 @@ class VoiceManager:
                 return
 
         loop = self._voice_event_loop()
-        if not loop:
+        if not loop or getattr(loop, "is_closed", lambda: False)():
             return
         try:
             fut = asyncio.run_coroutine_threadsafe(self.broadcast_status(self._dashboard_voice_status), loop)
@@ -327,6 +330,8 @@ class VoiceManager:
             def _log_err(f):
                 try:
                     f.result()
+                except (asyncio.CancelledError, concurrent.futures.CancelledError):
+                    return
                 except Exception as e:
                     import traceback
 
@@ -342,6 +347,7 @@ class VoiceManager:
             traceback.print_exc()
 
     def start(self):
+        self._audio_recovery_attempts = 0
         self.is_running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
@@ -366,14 +372,43 @@ class VoiceManager:
         except Exception:
             pass
 
+    def _sleep_while_running(self, delay: float) -> bool:
+        deadline = time.monotonic() + max(0.0, delay)
+        while getattr(self, "is_running", True):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return True
+            time.sleep(min(0.25, remaining))
+        return False
+
     def _recover_audio_input(self, audio, stream, error: Exception):
-        print(f"[VOICE] Errore microfono: {error}. Riavvio stream audio...")
+        attempts = self._audio_recovery_attempts
+        delay = min(8.0, 0.5 * (2**attempts))
+        print(f"[VOICE] Errore microfono: {error}. Riavvio stream audio tra {delay:.1f}s...")
         self._broadcast("IDLE")
         self._close_audio_input(audio, stream)
-        time.sleep(0.5)
-        audio, stream = self._open_audio_input()
-        self._calibrate_vad_from_stream(stream)
-        return audio, stream
+        if not self._sleep_while_running(delay):
+            return None
+
+        new_audio = None
+        new_stream = None
+        try:
+            new_audio, new_stream = self._open_audio_input()
+            self._calibrate_vad_from_stream(new_stream)
+        except Exception as recover_error:
+            self._close_audio_input(new_audio, new_stream)
+            max_attempts = self._max_audio_recovery_attempts
+            self._audio_recovery_attempts = min(attempts + 1, max_attempts)
+            if self._audio_recovery_attempts >= max_attempts:
+                print(f"[VOICE] Recupero microfono interrotto dopo {self._audio_recovery_attempts} tentativi.")
+                self.is_running = False
+                self._broadcast("MIC_ERROR")
+            else:
+                print(f"[VOICE] Recupero microfono fallito: {recover_error}")
+            return None
+
+        self._audio_recovery_attempts = 0
+        return new_audio, new_stream
 
     def _run_loop(self):
         audio = None
@@ -398,11 +433,12 @@ class VoiceManager:
                 try:
                     pcm = self._record_utterance_pcm(stream)
                 except OSError as e:
-                    try:
-                        audio, stream = self._recover_audio_input(audio, stream, e)
-                    except Exception as recover_error:
-                        print(f"[VOICE] Recupero microfono fallito: {recover_error}")
-                        time.sleep(1.0)
+                    recovered = self._recover_audio_input(audio, stream, e)
+                    if recovered is None:
+                        if not self.is_running:
+                            break
+                        continue
+                    audio, stream = recovered
                     continue
                 if not pcm or not self.is_running:
                     self._broadcast("IDLE")
@@ -440,11 +476,12 @@ class VoiceManager:
                     try:
                         self._handle_voice_command(stream)
                     except OSError as e:
-                        try:
-                            audio, stream = self._recover_audio_input(audio, stream, e)
-                        except Exception as recover_error:
-                            print(f"[VOICE] Recupero microfono fallito: {recover_error}")
-                            time.sleep(1.0)
+                        recovered = self._recover_audio_input(audio, stream, e)
+                        if recovered is None:
+                            if not self.is_running:
+                                break
+                            continue
+                        audio, stream = recovered
                         continue
 
                 self._broadcast("IDLE")
@@ -501,6 +538,44 @@ class VoiceManager:
         """Divide il testo in frasi complete (separatori: . ! ? e a-capo con elenco)."""
         parts = re.split(r"(?<=[.!?])\s+|\n[-*]\s*|\n{2,}", text)
         return [p.strip().lstrip("-").lstrip("*").strip() for p in parts if p.strip()]
+
+    def _prepare_tts_text(self, text: str) -> str:
+        clean = re.sub(r"https?://\S+", "", str(text or ""))
+        clean = re.sub(r"\[[^\]]+\]", "", clean)
+        clean = clean.replace("“", '"').replace("”", '"').replace("’", "'")
+        clean = re.sub(r"\s+", " ", clean).strip()
+        return clean
+
+    def _tts_chunks(self, text: str, max_chars: int = 260) -> list[str]:
+        clean = self._prepare_tts_text(text)
+        if not clean:
+            return []
+        if len(clean) <= max_chars:
+            return [clean]
+
+        chunks = []
+        current = ""
+        for part in re.split(r"(?<=[.!?;:])\s+|,\s+", clean):
+            part = part.strip()
+            if not part:
+                continue
+            candidate = f"{current}, {part}".strip(", ") if current else part
+            if len(candidate) <= max_chars:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current)
+                current = ""
+            while len(part) > max_chars:
+                split_at = part.rfind(" ", 0, max_chars)
+                if split_at < 80:
+                    split_at = max_chars
+                chunks.append(part[:split_at].strip())
+                part = part[split_at:].strip()
+            current = part
+        if current:
+            chunks.append(current)
+        return chunks
 
     async def _process_voice_text(self, text: str):
         self._broadcast("PROCESSING")
@@ -604,22 +679,28 @@ class VoiceManager:
         """Sintetizza e riproduce una singola frase (usato dal TTS pipeline worker)."""
         if not os.path.exists(self.piper_exe):
             return
-        try:
-            import uuid
+        for chunk in self._tts_chunks(text):
+            try:
+                import uuid
 
-            os.makedirs("voice", exist_ok=True)
-            output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
-            command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
-            subprocess.run(
-                command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            self._broadcast("SPEAKING")
-            self._play_wav(output_wav)
-        except Exception as e:
-            print(f"[VOICE] Errore TTS raw: {e}")
-        finally:
-            if not self.is_speaking:
-                self._broadcast("IDLE")
+                os.makedirs("voice", exist_ok=True)
+                output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
+                command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
+                subprocess.run(
+                    command,
+                    input=chunk.encode("utf-8"),
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                self._broadcast("SPEAKING")
+                self._play_wav(output_wav)
+            except Exception as e:
+                print(f"[VOICE] Errore TTS raw: {e}")
+                break
+            finally:
+                if not self.is_speaking:
+                    self._broadcast("IDLE")
 
     def speak(self, text):
         if not os.path.exists(self.piper_exe):
@@ -634,15 +715,20 @@ class VoiceManager:
             import uuid
 
             os.makedirs("voice", exist_ok=True)
-            output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
-            # Comando per Piper: passa il testo e genera il wav
-            command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
-            subprocess.run(
-                command, input=text.encode("utf-8"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            for chunk in self._tts_chunks(text):
+                output_wav = f"voice/response_{uuid.uuid4().hex}.wav"
+                # Comando per Piper: passa il testo e genera il wav
+                command = [self.piper_exe, "--model", self.piper_model, "--output_file", output_wav]
+                subprocess.run(
+                    command,
+                    input=chunk.encode("utf-8"),
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
 
-            # Riproduzione controllata via PyAudio (niente lettore multimediale)
-            self._play_wav(output_wav)
+                # Riproduzione controllata via PyAudio (niente lettore multimediale)
+                self._play_wav(output_wav)
 
         except Exception as e:
             print(f"[VOICE] Errore TTS: {e}")

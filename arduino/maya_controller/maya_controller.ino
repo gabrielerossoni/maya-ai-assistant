@@ -38,6 +38,10 @@
 #include <WiFiS3.h>
 #include <string.h>
 
+#ifndef MQTT_COMMAND_TOKEN
+#define MQTT_COMMAND_TOKEN ""
+#endif
+
 // ── WiFi Credentials ──────────────────────────
 const char *SSID = WIFI_HOTSPOT_SSID;      // Configura il tuo SSID
 const char *WIFI_PASS = WIFI_HOTSPOT_PASS; // Configura la password
@@ -416,8 +420,21 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 }
 
 // ── Handle MQTT Command ───────────────────────
+bool isAuthorizedMqttCommand(JsonDocument &cmd) {
+  const char *token = cmd["token"] | "";
+  if (strlen(MQTT_COMMAND_TOKEN) == 0) {
+    return false;
+  }
+  return strcmp(token, MQTT_COMMAND_TOKEN) == 0;
+}
+
 void handleMqttCommand(JsonDocument &cmd) {
   int id = cmd["id"] | -1;
+  if (!isAuthorizedMqttCommand(cmd)) {
+    sendError(id, "unauthorized");
+    return;
+  }
+
   const char *cmdOp = cmd["cmd"] | "";
   const char *target = cmd["target"] | "";
 
@@ -495,15 +512,14 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       }
       servoPos = newPos;
       servoTargetPos = newPos;
-      servoPhysicalPos = newPos;
       if (!servo1Attached) {
         myServo.attach(SERVO_PIN);
         servo1Attached = true;
+        myServo.write(servoPhysicalPos);
       }
       lastServo1AttachMs = millis();
       servo1HoldDurationMs = 0;
       lastServo1StepMs = 0;
-      myServo.write(servoTargetPos);
     }
     if (!quiet) sendResponse(id, true);
 
@@ -517,15 +533,14 @@ void applyCommand(int id, bool isSET, const char *target, JsonObject doc, bool q
       }
       servo2Pos = newPos2;
       servo2TargetPos = newPos2;
-      servo2PhysicalPos = newPos2;
       if (!servo2Attached) {
         myServo2.attach(SERVO2_PIN);
         servo2Attached = true;
+        myServo2.write(servo2PhysicalPos);
       }
       lastServo2AttachMs = millis();
       servo2HoldDurationMs = 0;
       lastServo2StepMs = 0;
-      myServo2.write(servo2TargetPos);
     }
     if (!quiet) sendResponse(id, true);
 
@@ -792,16 +807,20 @@ void publishTelemetry() {
 }
 
 // ── Melody functions ───────────────────────────
+void stopMelody() {
+  noTone(SPEAKER_PIN);
+  currentMelody[0] = '\0';
+  melodyNoteIndex = -1;
+  noteStartMs = 0;
+  melodyStopAtMs = 0;
+  noteDuration = 0;
+}
+
 void startMelody(const char *name) {
   // Stop any currently playing tone before switching melody
   noTone(SPEAKER_PIN);
   if (strcmp(name, "off") == 0 || strcmp(name, "stop") == 0) {
-    noTone(SPEAKER_PIN);
-    currentMelody[0] = '\0';
-    melodyNoteIndex = -1;
-    noteStartMs = 0;
-    melodyStopAtMs = 0;
-    noteDuration = 0;
+    stopMelody();
     return;
   }
   strncpy(currentMelody, name, sizeof(currentMelody) - 1);
@@ -818,12 +837,7 @@ void updateMelody() {
 
   unsigned long now = millis();
   if (melodyStopAtMs > 0 && now >= melodyStopAtMs) {
-    noTone(SPEAKER_PIN);
-    currentMelody[0] = '\0';
-    melodyNoteIndex = -1;
-    melodyStopAtMs = 0;
-    noteStartMs = 0;
-    noteDuration = 0;
+    stopMelody();
     return;
   }
   if (now - noteStartMs < noteDuration)

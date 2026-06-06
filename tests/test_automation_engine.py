@@ -101,6 +101,12 @@ class TestResolve:
         assert result is not None
         assert result.name == "buonanotte"
 
+    def test_resolve_multitoken_alias_at_end_of_input(self, engine):
+        engine.register(_simple_automation("buonanotte", aliases=["vado a dormire"]))
+        result = engine.resolve("ok maya vado a dormire")
+        assert result is not None
+        assert result.name == "buonanotte"
+
     def test_resolve_no_match(self, engine):
         engine.register(_simple_automation("buonanotte"))
         result = engine.resolve("che tempo fa domani?")
@@ -110,6 +116,24 @@ class TestResolve:
         engine.register(_simple_automation("buonanotte", aliases=["notte"]))
         result = engine.resolve("luce fuori nero mezzanotte")
         assert result is None
+
+    def test_resolve_alias_matches_italian_apostrophe_punctuation(self, engine):
+        engine.register(_simple_automation("allarme", aliases=["all armi"]))
+        result = engine.resolve("vai all'armi!")
+        assert result is not None
+        assert result.name == "allarme"
+
+    def test_resolve_alias_matches_mixed_punctuation_tokens(self, engine):
+        engine.register(_simple_automation("focus", aliases=["deep work"]))
+        result = engine.resolve("attiva deep-work.")
+        assert result is not None
+        assert result.name == "focus"
+
+    def test_resolve_alias_with_underscore(self, engine):
+        engine.register(_simple_automation("low_scene", aliases=["low_scene"]))
+        result = engine.resolve("attiva low_scene")
+        assert result is not None
+        assert result.name == "low_scene"
 
     def test_resolve_modalita_notte_alias(self, engine):
         engine.register(_simple_automation("buonanotte", aliases=["modalità notte", "modalita notte"]))

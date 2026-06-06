@@ -6,9 +6,11 @@ Bypass: MAYA_SKIP_INSTANCE_GUARD=1
 from __future__ import annotations
 
 import atexit
+import json
 import os
 import socket
 import tempfile
+import time
 
 
 def pid_file_path() -> str:
@@ -64,12 +66,37 @@ class InstanceGuard:
             return False
 
     def _write_pid(self) -> None:
+        self._write_metadata({"pid": os.getpid(), "port": None, "started_at": time.time()})
+
+    def update_port(self, port: int) -> None:
+        self._write_metadata({"pid": os.getpid(), "port": int(port), "started_at": time.time()})
+
+    def _write_metadata(self, metadata: dict) -> None:
         tmp = PID_FILE + ".tmp"
         with open(tmp, "w", encoding="ascii") as f:
-            f.write(str(os.getpid()))
+            f.write(json.dumps(metadata, separators=(",", ":")))
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, PID_FILE)
+
+
+def _read_pid_metadata() -> dict:
+    with open(PID_FILE, encoding="ascii") as f:
+        raw = f.read().strip()
+    if not raw:
+        raise ValueError("PID file vuoto")
+    if raw.startswith("{"):
+        data = json.loads(raw)
+        pid = int(data.get("pid", 0))
+        if pid <= 0:
+            raise ValueError("PID non positivo")
+        port = data.get("port")
+        return {"pid": pid, "port": int(port) if port is not None else None, "raw": raw}
+
+    pid = int(raw)
+    if pid <= 0:
+        raise ValueError("PID non positivo")
+    return {"pid": pid, "port": None, "raw": raw}
 
 
 def kill_existing() -> bool:
@@ -84,15 +111,16 @@ def kill_existing() -> bool:
         print(f"[KILL] Se porta {LOCK_PORT} è occupata, è un altro uso di quella porta o istanza senza PID file.")
         return False
 
-    with open(PID_FILE, encoding="ascii") as f:
-        raw = f.read().strip()
     try:
-        if not raw:
-            raise ValueError("PID file vuoto")
-        pid = int(raw)
-        if pid <= 0:
-            raise ValueError("PID non positivo")
-    except ValueError as e:
+        metadata = _read_pid_metadata()
+        pid = metadata["pid"]
+        port = metadata.get("port")
+    except (ValueError, json.JSONDecodeError, OSError) as e:
+        try:
+            with open(PID_FILE, encoding="ascii") as f:
+                raw = f.read().strip()
+        except OSError:
+            raw = ""
         preview = raw if raw else "(vuoto)"
         print(f"[KILL] PID file non valido ({PID_FILE}): contenuto malformato ({preview!r}) - {e}. Rimuovo il file.")
         try:
@@ -111,7 +139,7 @@ def kill_existing() -> bool:
 
     proc = psutil.Process(pid)
     print(f"[KILL] Termino PID {pid} ({proc.name()})…")
-    if _request_http_shutdown(pid):
+    if _request_http_shutdown(pid, port=port):
         try:
             proc.wait(timeout=10)
             print("[KILL] Processo terminato con shutdown ordinato.")
@@ -142,19 +170,20 @@ def kill_existing() -> bool:
     return True
 
 
-def _request_http_shutdown(pid: int) -> bool:
+def _request_http_shutdown(pid: int, port: int | None = None) -> bool:
     import urllib.error
     import urllib.request
 
     first = int(os.environ.get("MAYA_PORT", "8000"))
-    for port in range(first, first + 24):
-        url = f"http://127.0.0.1:{port}/shutdown?pid={pid}"
+    ports = [port] if port is not None else list(range(first, first + 24))
+    for candidate_port in ports:
+        url = f"http://127.0.0.1:{candidate_port}/shutdown?pid={pid}"
         req = urllib.request.Request(url, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=1.2) as res:
                 body = res.read(256).decode("utf-8", errors="ignore").replace(" ", "")
                 if res.status == 200 and '"status":"ok"' in body:
-                    print(f"[KILL] Richiesto shutdown ordinato su porta {port}.")
+                    print(f"[KILL] Richiesto shutdown ordinato su porta {candidate_port}.")
                     return True
         except (urllib.error.URLError, TimeoutError, OSError):
             continue

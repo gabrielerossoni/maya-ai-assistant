@@ -2,6 +2,8 @@
 search_tool.py - Ricerca Web tramite DuckDuckGo
 """
 
+import warnings
+
 from duckduckgo_search import DDGS
 
 
@@ -15,8 +17,14 @@ class SearchTool:
             return {"status": "error", "message": "Nessuna query di ricerca."}
 
         try:
-            with DDGS() as ddgs:
-                results = list(ddgs.text(query, region="it-it", safesearch="moderate", max_results=3))
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message=r".*duckduckgo_search.*renamed.*ddgs.*",
+                    category=RuntimeWarning,
+                )
+                with DDGS() as ddgs:
+                    results = list(ddgs.text(query, region="it-it", safesearch="moderate", max_results=3))
 
             if not results:
                 return {"status": "error", "message": "Nessun risultato trovato."}

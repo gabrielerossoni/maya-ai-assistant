@@ -10,6 +10,7 @@ import pytest
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.plugin_loader import PluginLoader
+from core.tool_manager import ToolManager
 from tools.code_generator_tool import CodeGeneratorTool
 
 
@@ -91,3 +92,22 @@ async def test_code_generator_rejects_path_traversal(tmp_path, monkeypatch):
 
     assert result["status"] == "error"
     assert not (tmp_path / "escape_tool.py").exists()
+
+
+def test_code_generator_not_registered_without_dev_mode(monkeypatch):
+    monkeypatch.delenv("DEV_MODE", raising=False)
+    monkeypatch.delenv("CODE_GENERATOR_ENABLED", raising=False)
+
+    manager = ToolManager()
+    manager.initialize()
+
+    assert "code_generator" not in manager.tools
+
+
+def test_code_generator_requires_explicit_opt_in(monkeypatch):
+    monkeypatch.setenv("CODE_GENERATOR_ENABLED", "true")
+
+    manager = ToolManager()
+    manager.initialize()
+
+    assert "code_generator" in manager.tools

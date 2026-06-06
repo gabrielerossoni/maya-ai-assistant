@@ -74,10 +74,15 @@ class ToolManager:
             "spotify": SpotifyTool(),
             "display": DisplayTool(),
             "sys_monitor": SysMonitorTool(),
-            "code_generator": CodeGeneratorTool(),
             "mqtt": MqttTool(),
             "none": _NoOpTool(),
         }
+        if os.getenv("CODE_GENERATOR_ENABLED", os.getenv("DEV_MODE", "false")).strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            self.tools["code_generator"] = CodeGeneratorTool()
         if os.getenv("NETWORK_TOOL_ENABLED", "false").strip().lower() in ("1", "true", "yes"):
             self.tools["network"] = NetworkTool()
         else:
@@ -109,8 +114,9 @@ class ToolManager:
             full_action.update(action["parametro"])
 
         try:
-            # Ogni tool ha un metodo execute(action) asincrono
-            if asyncio.iscoroutinefunction(tool.execute):
+            if hasattr(tool, "execute_async") and asyncio.iscoroutinefunction(tool.execute_async):
+                result = await tool.execute_async(full_action)
+            elif asyncio.iscoroutinefunction(tool.execute):
                 result = await tool.execute(full_action)
             else:
                 result = tool.execute(full_action)

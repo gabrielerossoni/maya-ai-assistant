@@ -1,6 +1,13 @@
 """wikipedia_tool.py - Ricerca su Wikipedia"""
 
+import json
+import re
+from urllib.parse import quote
+
+import requests
 import wikipedia
+
+from tools.param_utils import resolve_alias
 
 
 class WikipediaTool:
@@ -8,28 +15,7 @@ class WikipediaTool:
         wikipedia.set_lang("it")
 
     def execute(self, action: dict) -> dict:
-        query = (
-            action.get("query")
-            or action.get("q")
-            or action.get("topic")
-            or action.get("title")
-            or action.get("value")
-            or action.get("input")
-        )
-
-        parametro = action.get("parametro")
-
-        if not query and isinstance(parametro, dict):
-            query = (
-                parametro.get("query")
-                or parametro.get("q")
-                or parametro.get("topic")
-                or parametro.get("title")
-                or parametro.get("value")
-            )
-
-        if not query and isinstance(parametro, str):
-            query = parametro
+        query = resolve_alias(action, ("query", "q", "topic", "title", "value", "input"), allow_legacy_string=True)
 
         if not query:
             return {
@@ -68,8 +54,69 @@ class WikipediaTool:
                 "message": f"Nessuna pagina trovata per '{query}'.",
             }
 
-        except Exception as e:
+        except Exception:
+            return self._fallback_rest_summary(query, sentences)
+
+    def _fallback_rest_summary(self, query: str, sentences: int) -> dict:
+        try:
+            resolved_title = self._search_title(query)
+            title = resolved_title or query
+            data = self._page_summary(title)
+            summary = str(data.get("extract") or "").strip()
+            if not summary:
+                return {
+                    "status": "error",
+                    "message": f"Nessun riassunto Wikipedia trovato per '{query}'.",
+                }
+            parts = _split_sentences(summary)
+            if parts:
+                summary = " ".join(parts[:sentences]).strip()
+            return {
+                "status": "ok",
+                "message": summary,
+                "query": query,
+                "title": data.get("title") or title,
+                "source": "wikipedia-rest",
+            }
+        except Exception:
             return {
                 "status": "error",
-                "message": str(e),
+                "message": "Wikipedia non disponibile: risposta non valida dal servizio.",
             }
+
+    def _search_title(self, query: str) -> str | None:
+        url = "https://it.wikipedia.org/w/api.php"
+        response = requests.get(
+            url,
+            params={
+                "action": "query",
+                "list": "search",
+                "srsearch": query,
+                "srlimit": 1,
+                "format": "json",
+                "utf8": 1,
+            },
+            headers={"User-Agent": "MAYA/1.0"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Compatibilita' con test o risposte mockate che forniscono gia' un summary.
+        if data.get("extract"):
+            return None
+
+        results = data.get("query", {}).get("search", [])
+        if not results:
+            return None
+        return str(results[0].get("title") or "").strip() or None
+
+    def _page_summary(self, title: str) -> dict:
+        url = f"https://it.wikipedia.org/api/rest_v1/page/summary/{quote(title.replace(' ', '_'))}"
+        response = requests.get(url, headers={"User-Agent": "MAYA/1.0"}, timeout=8)
+        response.raise_for_status()
+        return response.json()
+
+
+def _split_sentences(text: str) -> list[str]:
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]

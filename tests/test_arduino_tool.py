@@ -1,9 +1,12 @@
 import json
+from pathlib import Path
 
 import pytest
 
 from core.automation_engine import build_default_automations
 from tools.arduino_tool import VALID_TARGETS, ArduinoTool
+
+FIRMWARE = Path(__file__).resolve().parents[1] / "arduino" / "maya_controller" / "maya_controller.ino"
 
 
 class ReplyingConnection:
@@ -123,6 +126,51 @@ def test_execute_normalizes_op_and_speaker_alias(real_tool, monkeypatch):
 
     assert result["status"] == "ok"
     assert captured == [("SET", "buzzer2", None, {"melody": "notify"})]
+
+
+def test_firmware_servo_set_uses_smooth_motion_targets():
+    src = FIRMWARE.read_text(encoding="utf-8")
+
+    assert "servoTargetPos = newPos;" in src
+    assert "servo2TargetPos = newPos2;" in src
+    assert "servoPhysicalPos = newPos;" not in src
+    assert "servo2PhysicalPos = newPos2;" not in src
+    assert "myServo.write(servoTargetPos);" not in src
+    assert "myServo2.write(servo2TargetPos);" not in src
+
+
+def test_firmware_melody_stop_helper_resets_shared_state():
+    src = FIRMWARE.read_text(encoding="utf-8")
+
+    assert "void stopMelody()" in src
+    start = src.index("void stopMelody()")
+    stop_body = src[start : src.index("void startMelody", start)]
+    for expected in [
+        "noTone(SPEAKER_PIN);",
+        "currentMelody[0] = '\\0';",
+        "melodyNoteIndex = -1;",
+        "noteStartMs = 0;",
+        "melodyStopAtMs = 0;",
+        "noteDuration = 0;",
+    ]:
+        assert expected in stop_body
+    assert src.count("stopMelody();") >= 2
+
+
+def test_firmware_mqtt_requires_command_token_before_apply():
+    src = FIRMWARE.read_text(encoding="utf-8")
+
+    assert "MQTT_COMMAND_TOKEN" in src
+    assert "bool isAuthorizedMqttCommand" in src
+    auth_start = src.index("bool isAuthorizedMqttCommand")
+    auth_body = src[auth_start : src.index("void handleMqttCommand", auth_start)]
+    assert 'cmd["token"]' in auth_body
+    assert "strcmp(token, MQTT_COMMAND_TOKEN)" in auth_body
+
+    handler_start = src.rindex("void handleMqttCommand")
+    handler_body = src[handler_start : src.index("void applyCommand", handler_start)]
+    assert "isAuthorizedMqttCommand(cmd)" in handler_body
+    assert handler_body.index("isAuthorizedMqttCommand(cmd)") < handler_body.index("applyCommand(")
 
 
 def test_execute_rejects_unknown_target_and_bad_op(real_tool, monkeypatch):
