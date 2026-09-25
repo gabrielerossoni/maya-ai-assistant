@@ -8,7 +8,6 @@ __pycache__/
 .antigravitycli/
 .codex/
 graphify-out/
-.graphifyignore
 
 # C extensions
 *.so
@@ -193,7 +192,3 @@ static/.prettierrc
 data/credentials.json
 data/token.json
 
-# Arduino
-arduino/*/secrets.h
-arduino/libraries/
-.tools/arduino-cli/

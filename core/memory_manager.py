@@ -11,9 +11,12 @@ import time
 from datetime import datetime
 from typing import Optional
 
-import chromadb
 import httpx
-from chromadb.config import Settings
+
+try:
+    import chromadb
+except ImportError:  # Semantic memory is optional; JSON memory remains available.
+    chromadb = None
 
 MEMORY_DIR = "data"
 METADATA_FILE = os.path.join(MEMORY_DIR, "memory_metadata.json")
@@ -36,7 +39,6 @@ _SUMMARY_TOPICS = {
         "speaker",
         "accendi",
         "spegni",
-        "arduino",
         "mqtt",
         "rgb",
         "buzzer",
@@ -63,6 +65,8 @@ class MemoryManager:
 
     def _init_chroma(self):
         """Inizializza ChromaDB con persistenza su disco."""
+        if chromadb is None:
+            return
         os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
 
         try:

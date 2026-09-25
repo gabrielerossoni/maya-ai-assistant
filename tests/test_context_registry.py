@@ -2,7 +2,7 @@
 test_context_registry.py - Test per ContextManager e DeviceRegistry.
 
 Copre: get/set, persistenza, time_slot, matches(), snapshot,
-conflict detection, update_from_arduino_state.
+conflict detection, update_from_state.
 """
 
 import json
@@ -107,13 +107,13 @@ class TestDeviceRegistry:
         assert vals["light"] is True
         assert vals["rgb"] == [255, 0, 0]
 
-    def test_update_from_arduino_state(self, fresh_registry):
+    def test_update_from_state(self, fresh_registry):
         state = {"light": False, "servo": 45, "servo2": 90}
-        fresh_registry.update_from_arduino_state(state, scene="hardware")
+        fresh_registry.update_from_state(state, scene="integration")
         assert fresh_registry.get_value("light") is False
         assert fresh_registry.get_value("servo") == 45
         entry = fresh_registry.get_entry("servo2")
-        assert entry["last_set_by"] == "hardware"
+        assert entry["last_set_by"] == "integration"
 
     def test_conflict_detection(self, fresh_registry):
         fresh_registry.update("light", True, scene="buonanotte")

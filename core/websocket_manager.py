@@ -32,7 +32,7 @@ class WebSocketManager:
         """Invia un dizionario JSON a tutti i client connessi (thread-safe)."""
         # Cache message state for new connections
         msg_type = message.get("type")
-        if msg_type in ["news", "weather", "spotify", "arduino_event"]:
+        if msg_type in ["news", "weather", "spotify", "mqtt_state", "mqtt_telemetry"]:
             self.state_cache[msg_type] = message
 
         # Crea snapshot della lista per iterare in sicurezza

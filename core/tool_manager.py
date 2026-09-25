@@ -4,24 +4,25 @@ Riceve azioni dal planner e le instrada al tool corretto.
 """
 
 import asyncio
-import inspect
+import importlib
 import os
 
-from tools.arduino_tool import ArduinoTool
-from tools.calendar_tool import CalendarTool
-from tools.display_tool import DisplayTool
-from tools.mqtt_tool import MqttTool
-from tools.network_tool import NetworkTool
-from tools.news_tool import NewsTool
-from tools.notes_tool import NotesTool
-from tools.search_tool import SearchTool
-from tools.spotify_tool import SpotifyTool
-from tools.sys_monitor_tool import SysMonitorTool
-from tools.system_tool import SystemTool
-from tools.timer_tool import TimerTool
-from tools.weather_tool import WeatherTool
-
 from .token_juice import compress_tool_output
+
+
+_TOOL_SPECS = {
+    "system": ("tools.system_tool", "SystemTool"),
+    "calendar": ("tools.calendar_tool", "CalendarTool"),
+    "weather": ("tools.weather_tool", "WeatherTool"),
+    "news": ("tools.news_tool", "NewsTool"),
+    "notes": ("tools.notes_tool", "NotesTool"),
+    "timer": ("tools.timer_tool", "TimerTool"),
+    "search": ("tools.search_tool", "SearchTool"),
+    "spotify": ("tools.spotify_tool", "SpotifyTool"),
+    "display": ("tools.display_tool", "DisplayTool"),
+    "sys_monitor": ("tools.sys_monitor_tool", "SysMonitorTool"),
+    "mqtt": ("tools.mqtt_tool", "MqttTool"),
+}
 
 
 class ToolManager:
@@ -52,24 +53,21 @@ class ToolManager:
         return False
 
     def initialize(self):
-        """Istanzia e registra tutti i tool."""
-        self.tools = {
-            "arduino": ArduinoTool(),
-            "system": SystemTool(),
-            "calendar": CalendarTool(),
-            "weather": WeatherTool(),
-            "news": NewsTool(),
-            "notes": NotesTool(),
-            "timer": TimerTool(),
-            "search": SearchTool(),
-            "spotify": SpotifyTool(),
-            "display": DisplayTool(),
-            "sys_monitor": SysMonitorTool(),
-            "mqtt": MqttTool(),
-            "none": _NoOpTool(),
-        }
+        """Istanzia i tool disponibili senza rendere obbligatorie le integrazioni opzionali."""
+        self.tools = {"none": _NoOpTool()}
+        for name, (module_name, class_name) in _TOOL_SPECS.items():
+            try:
+                module = importlib.import_module(module_name)
+                self.tools[name] = getattr(module, class_name)()
+            except Exception as exc:
+                print(f"  [x] Tool '{name}' non disponibile: {exc}")
+
         if os.getenv("NETWORK_TOOL_ENABLED", "false").strip().lower() in ("1", "true", "yes"):
-            self.tools["network"] = NetworkTool()
+            try:
+                module = importlib.import_module("tools.network_tool")
+                self.tools["network"] = module.NetworkTool()
+            except Exception as exc:
+                print(f"  [x] Tool 'network' non disponibile: {exc}")
         else:
             print("[TOOLS] network disattivato (NETWORK_TOOL_ENABLED=false).")
 

@@ -55,7 +55,6 @@ def fresh_registry(tmp_data_dir, monkeypatch):
     DeviceRegistry._instance = None
     reg = DeviceRegistry()
     monkeypatch.setattr("core.device_registry.registry", reg)
-    monkeypatch.setattr("core.automation_engine.registry", reg)
     yield reg
     DeviceRegistry._instance = None
 

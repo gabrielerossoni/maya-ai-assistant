@@ -86,11 +86,8 @@ class DeviceRegistry:
         with self._lock:
             return {k: v["value"] for k, v in self._devices.items()}
 
-    def update_from_arduino_state(self, state: dict, scene: str = "hardware"):
-        """
-        Aggiorna il registro da uno stato Arduino ricevuto via seriale.
-        state = {"light": False, "servo": 0, "rgb1": [0,0,0], ...}
-        """
+    def update_from_state(self, state: dict, scene: str = "integration"):
+        """Aggiorna il registro da uno stato ricevuto da un'integrazione."""
         for device, value in state.items():
             self.update(device, value, scene=scene)
 

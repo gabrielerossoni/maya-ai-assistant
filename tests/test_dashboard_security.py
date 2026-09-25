@@ -178,15 +178,10 @@ class TestReDoS:
         assert r"re.findall(r\".*?\s|.*$\"" not in src
         assert 're.findall(r".*?\\s|.*$"' not in src
 
-    def test_spotify_regex_bounded(self):
-        """La regex spotify deve avere una lunghezza massima per evitare ReDoS."""
-        src = self._read_agent_core()
-        assert r"[^\n]{1,200}" in src
-
     def test_uses_split_tokenizer(self):
         """Il tokenizer deve usare .split() invece di re.findall."""
         src = self._read_agent_core()
-        assert "for w in final_reply.split()" in src
+        assert "final_reply.split()" in src
 
 
 # ── CI permissions ────────────────────────────────────────────────────────────
@@ -251,14 +246,6 @@ class TestDirectToolAllowlist:
 
         assert _validate_direct_tool_action({"tool": "calendar", "action": "list"})[0]
         assert _validate_direct_tool_action({"tool": "spotify", "command": "current"})[0]
-        assert _validate_direct_tool_action({"tool": "arduino", "op": "SET", "target": "light", "value": 1})[0]
-
-    def test_dashboard_blocks_unknown_arduino_target(self):
-        from core.routes import _validate_direct_tool_action
-
-        allowed, reason = _validate_direct_tool_action({"tool": "arduino", "op": "SET", "target": "../bad"})
-        assert not allowed
-        assert "target Arduino" in reason
 
 
 class TestDashboardSessionAuth:
@@ -341,8 +328,3 @@ class TestSceneControls:
         for label in ["ROSSO", "VERDE", "BLU", "VIOLA", "ARANCIO", "BIANCO"]:
             assert label in html
 
-    def test_rgb_cards_hold_to_turn_off(self, html):
-        assert "function setupRgbHoldControls" in html
-        assert "function turnRgbOff" in html
-        assert "rgbSuppressClick[dev] = true" in html
-        assert "sendArduinoAction({ op: 'SET', target: dev, value: 0 })" in html

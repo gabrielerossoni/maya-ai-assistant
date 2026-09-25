@@ -16,7 +16,6 @@ def test_env_loading():
         "MODEL_DOMOTIC",
         "MODEL_REASONING",
         "MODEL_CHITCHAT",
-        "ARDUINO_PORT",
         "REMOTE_HOST",
         "DEFAULT_WEATHER_LOCATION",
         "NEWS_FEED_URL",

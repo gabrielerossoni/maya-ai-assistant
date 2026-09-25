@@ -34,7 +34,6 @@ def test_import_broadcasters():
     assert hasattr(mod, "news_broadcaster")
     assert hasattr(mod, "stats_broadcaster")
     assert hasattr(mod, "spotify_broadcaster")
-    assert hasattr(mod, "sensor_broadcaster")
     assert hasattr(mod, "broadcast_state")
     assert hasattr(mod, "interactive_console")
     assert hasattr(mod, "execute_and_broadcast")
@@ -318,6 +317,6 @@ def test_keyboard_interrupt_shutdown_is_handled_cleanly():
     with open("main.py", encoding="utf-8") as f:
         src = f.read()
 
-    assert "except asyncio.CancelledError:" in src
-    assert "except KeyboardInterrupt:" in src
-    assert "Arresto richiesto da tastiera" in src
+    assert "async def shutdown_services" in src
+    assert 'await shutdown_services("lifespan")' in src
+    assert "install_signal_handlers(instance_guard)" in src

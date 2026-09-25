@@ -27,7 +27,7 @@ class ContextManager:
         "weather":      "clear" | "rain" | "cloud" | "snow" | "unknown",
         "activity":     "idle" | "working" | "gaming" | "sleeping" | "eating" | str,
         "active_scene": str | None,
-        "devices":      { "arduino": "online" | "offline", ... },
+        "devices":      { "mqtt": "online" | "offline", ... },
         "flags":        { "guests": bool, "children_sleeping": bool, ... },
         "last_updated": float,
     }

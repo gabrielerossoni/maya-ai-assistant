@@ -47,7 +47,7 @@ class MqttTool:
         pass
 
     def _on_message(self, client, userdata, msg):
-        """Riceve stato/telemetria da Arduino e lo propaga via WebSocket."""
+        """Riceve stato/telemetria MQTT e lo propaga via WebSocket."""
         if not self._ws_manager or not self._loop:
             return
 
@@ -64,7 +64,7 @@ class MqttTool:
             if kind == "state":
                 state = payload.get("state", {})
                 broadcast_payload = {
-                    "type": "arduino_state",
+                    "type": "mqtt_state",
                     "room": room,
                     "led": "on" if state.get("light") else "off",
                     "servo": state.get("servo", 0),
@@ -77,7 +77,7 @@ class MqttTool:
             elif kind == "telemetry":
                 # Payload: {"telemetry": {"temp": float, "humidity": float, "uptime_ms": long}}
                 broadcast_payload = {
-                    "type": "arduino_telemetry",
+                    "type": "mqtt_telemetry",
                     "room": room,
                     "data": payload.get("telemetry", {}),
                 }
@@ -101,9 +101,9 @@ class MqttTool:
         """
         room = action.get("room", os.getenv("MQTT_DEFAULT_ROOM", "studio"))
 
-        # Format detection: nuovo è più simile a Arduino
+        # Rilevamento del formato del payload MQTT.
         if "op" in action and "target" in action:
-            # Nuovo formato (simile a Arduino protocol)
+            # Formato strutturato corrente.
             op = action.get("op", "SET")
             target = action.get("target", "light")
             value = action.get("value", 0)

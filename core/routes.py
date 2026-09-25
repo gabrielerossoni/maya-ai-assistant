@@ -58,24 +58,7 @@ _news_live_cache = {"ts": 0.0, "streams": []}
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 _DIRECT_TOOL_ALLOWLIST = {
-    "arduino": {
-        "ops": {"SET", "GET"},
-        "targets": {
-            "light",
-            "servo",
-            "servo2",
-            "rgb",
-            "rgb1",
-            "rgb2",
-            "rgb3",
-            "neopixel",
-            "buzzer",
-            "buzzer2",
-            "speaker",
-            "sensor_read",
-            "status",
-        },
-    },
+    "mqtt": {"ops": {"SET", "GET"}},
     "calendar": {"actions": {"list"}},
     "spotify": {
         "commands": {
@@ -104,14 +87,11 @@ def _validate_direct_tool_action(action: dict) -> tuple[bool, str]:
     if rule is None:
         return False, f"tool diretto non consentito: {tool_name}"
 
-    if tool_name == "arduino":
-        op = str(action.get("op", "SET")).upper()
-        target = action.get("target")
-        if op not in rule["ops"]:
-            return False, f"operazione Arduino non consentita: {op}"
-        if target not in rule["targets"]:
-            return False, f"target Arduino non consentito: {target}"
-
+    if tool_name == "mqtt":
+        if str(action.get("op", "SET")).upper() not in rule["ops"]:
+            return False, "operazione MQTT non consentita"
+        if not isinstance(action.get("target"), str) or not action.get("target"):
+            return False, "target MQTT non valido"
     elif tool_name == "calendar":
         if action.get("action") not in rule["actions"]:
             return False, "solo la lettura calendario e' consentita via dashboard"

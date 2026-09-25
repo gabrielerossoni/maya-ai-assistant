@@ -1,17 +1,14 @@
-"""
-agent_core.py - Cuore dell'agente Jarvis
-Gestisce: LLM (Ollama), Planner, Executor, Validator
-"""
+"""Core orchestration for M.A.Y.A., without hardware-specific integrations."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import os
-import random
 import re
 import unicodedata
 from collections import OrderedDict
+from datetime import datetime, timedelta
 
 import httpx
 import ollama
@@ -19,937 +16,227 @@ from dotenv import load_dotenv
 
 from .automation_engine import Automation, AutomationEngine, build_default_automations
 from .automation_engine import engine as automation_engine
-from .context_manager import context as home_context
+from .memory.structured import StructuredMemory
 from .memory_manager import MemoryManager
 from .preference_learner import PreferenceLearner
 from .token_juice import compress_tool_output
 from .tool_manager import ToolManager
 
-# Carica variabili d'ambiente da .env
 load_dotenv()
-
-# Forza l'utilizzo di IPv4 per evitare problemi con localhost su Windows
 os.environ["OLLAMA_HOST"] = os.getenv("OLLAMA_HOST", "127.0.0.1")
 
 
 def is_ollama_enabled() -> bool:
-    """Controlla se Ollama è abilitato tramite variabile d'ambiente."""
-    return os.getenv("OLLAMA_ENABLED", "true").strip().lower() in ("1", "true", "yes")
+    return os.getenv("OLLAMA_ENABLED", "true").strip().lower() in {"1", "true", "yes"}
 
 
-# ----------------------------------------------
-# CONFIGURAZIONE
-# ----------------------------------------------
 MODELS = {
     "router": os.getenv("MODEL_ROUTER", "llama3.2:1b"),
     "domotic": os.getenv("MODEL_DOMOTIC", "phi4"),
     "reasoning": os.getenv("MODEL_REASONING", "mistral-small"),
     "chitchat": os.getenv("MODEL_CHITCHAT", "llama3.2"),
 }
-
 ACTIVE_MODEL = MODELS["router"]
 
-# Carica il prompt dal .env se disponibile, altrimenti usa il default
-DEFAULT_PROMPT = """Sei MAYA (Multitask Advanced Yielding Assistant), un assistente AI agentico evoluto.
-Il tuo compito è aiutare l'utente gestendo la casa, cercando informazioni e fornendo dati in tempo reale.
-
-REGOLE DI COMPORTAMENTO:
-1. TOOL USAGE: Usa i tool SOLO se strettamente necessario per rispondere. Se l'utente ti saluta o fa chiacchiere, rispondi normalmente senza attivare tool a caso.
-2. PERSONALITÀ: Sei sicura di te, un po' distaccata ma impeccabile nel servizio. Niente emoji eccessive, sii professionale e "tough".
-3. FORMATO JSON (OBBLIGATORIO): Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. È CRITICO che la chiave "reply" contenga la tua risposta completa per l'utente.
-Struttura:
-{
-  "intent": "cosa vuole l'utente",
-  "layout": "uno tra [orb, weather, map, browser, news, dashboard, chat]",
-  "layout_params": {"chiave": "valore"},
-  "actions": [{"tool": "nome_tool", "...": "parametri canonici del tool"}],
-  "reply": "Tua risposta discorsiva e naturale in italiano"
-}
-REGOLE LAYOUT:
-- weather: se l'utente chiede il meteo o previsioni (params: location).
-- map: se l'utente chiede una posizione geografica o indicazioni (params: query, zoom).
-- browser: se devi mostrare un sito web specifico o ricerca (params: url).
-- news: se l'utente chiede ultime notizie (params: category).
-- dashboard: per riepiloghi generali o stato casa.
-- chat: se l'utente vuole aprire la chat neurale, comunicare in modo esteso o visualizzare lo storico messaggi.
-- orb: default per chitchat o quando non serve un pannello specifico.
-
-SE NON HAI BISOGNO DI TOOL, lascia "actions" come lista vuota [].
-NON aggiungere testo fuori dal JSON.
-4. NO INVENZIONE: Non inventare mai dati. Se usi un tool informativo, scrivi nella reply che stai controllando.
-5. MEMORIA SEMANTICA: Riceverai blocchi di testo marcati come "CONTESTO PASSATO RILEVANTE". Questi sono ricordi recuperati dal database vettoriale. Usali per rispondere a domande su fatti passati o per coerenza a lungo termine.
-6. ReAct LOOP: Puoi eseguire azioni multiple in sequenza. Se il risultato di un tool non è sufficiente, chiedi un altro tool nel prossimo step. Quando hai l'informazione finale, fornisci la "reply" senza "actions".
-7. TOOL GENERATION: Il tool 'code_generator' e' disabilitato di default. Usalo solo se CODE_GENERATOR_ENABLED=true o DEV_MODE=true.
-
-Tool disponibili:
-- arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/brightness/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); brightness: 0-255; buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
-- calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
-- network: disattivato di default; non usarlo salvo riattivazione esplicita con NETWORK_TOOL_ENABLED=true
-- system: comandi OS (shutdown, open_browser, screenshot, stats)
-- weather: meteo (location)
-- news: ultime notizie (limit)
-- notes: liste e appunti (operation: add/remove/list, item, category: todo/spesa)
-- timer: sveglie (minutes, seconds, message)
-- search: ricerca web e concetti (query)
-- spotify: controllo Spotify reale (command: play_pause/play/pause/next/prev/current/volume_up/volume_down/volume/search, "query" per cercare brano, "level" 0-100 per volume)
-- mqtt: controllo multi-room (room, device, state)
-- sys_monitor: statistiche cpu/ram/gpu
-- none: risposta solo testuale
-
-REGOLE CRITICHE:
-1. NON RIFIUTARE MAI: Hai accesso a internet tramite i tool. Se l'utente chiede meteo o notizie, usa i tool dedicati.
-2. FORMATO: Rispondi SOLO con il JSON, nessun altro testo.
-3. Se usi un tool informativo (weather, search, news), nella tua "reply" NON inventare MAI dati o cifre. Dì solo che stai recuperando le informazioni (es: "Certamente, controllo subito..."). I dati reali verranno aggiunti automaticamente dopo.
-4. Parametri tool: metti i parametri canonici al primo livello dell'action (es. {"tool":"weather","location":"Milano"}). Non annidare i parametri in "parametro" se il tool ha un formato specifico. "parametro" è solo compatibilità legacy: stringa singola, o dict legacy che il sistema può leggere ma che non devi generare.
-"""
-
+DEFAULT_PROMPT = """Sei MAYA, un assistente personale locale e operativo.
+Rispondi esclusivamente con JSON valido contenente intent, layout, layout_params, actions e reply.
+Usa i tool solo quando servono. Non inventare dati restituiti dai tool.
+Tool disponibili: calendar, weather, news, notes, timer, search, spotify, system, mqtt,
+display, sys_monitor e none. MQTT e l'unico canale domotico.
+Le azioni devono avere il nome tool e i parametri canonici al primo livello.
+Quando non serve un tool usa actions=[] e una reply completa in italiano."""
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
 
-# ----------------------------------------------
-# PROMPT SPECIALISTICI
-# ----------------------------------------------
-
-ROUTER_PROMPT = """Classifica l'intent dell'utente in UNA parola.
-- DOMOTIC: se chiede METEO, NOTIZIE, RICERCHE WEB, LUCI, NOTE o CALENDARIO.
-- REASONING: se chiede CODICE, spiegazioni, analisi, riassunti, definizioni o conoscenza generale.
-- CHITCHAT: SOLO saluti, ringraziamenti, frasi sociali brevi o domande rivolte a MAYA tipo "come stai".
-
-Regola critica:
-- Domande tipo "chi e'", "che e'", "cos'e'", "dimmi chi e'", "parlami di", nomi di persone storiche/famose o richieste enciclopediche NON sono CHITCHAT: sono REASONING.
-
-Esempi:
-"Quanto vale S&P500?" -> DOMOTIC
-"Che tempo fa?" -> DOMOTIC
-"Scrivi un loop" -> REASONING
-"Chi e' Brad Pitt?" -> REASONING
-"Che e' Napoleone?" -> REASONING
-"Ciao come stai" -> CHITCHAT
-
-Rispondi SOLO con la categoria: DOMOTIC, REASONING o CHITCHAT."""
+ROUTER_PROMPT = """Classifica in una parola: DOMOTIC per tool, servizi, MQTT, meteo,
+notizie, calendario e note; CODING per richieste di codice; REASONING per conoscenza e
+analisi; CHITCHAT solo per conversazione sociale breve."""
 
 SPECIALIST_PROMPTS = {
-    "DOMOTIC": DEFAULT_PROMPT + "\nFOCUS: Sii estremamente concisa e usa i tool appropriati. Rispondi SEMPRE in JSON.",
-    "REASONING": DEFAULT_PROMPT
-    + "\nFOCUS: Fornisci risposte approfondite e strutturate. Se l'utente chiede CODICE, scrivi codice pulito e commentato.",
-    "CHITCHAT": DEFAULT_PROMPT
-    + "\nFOCUS: Sii amichevole ma professionale (personalità 'tough'). Mantieni le risposte brevi.",
+    "DOMOTIC": DEFAULT_PROMPT,
+    "CODING": DEFAULT_PROMPT + "\nPer il codice sii preciso e conciso.",
+    "REASONING": DEFAULT_PROMPT + "\nFornisci una risposta ragionata.",
+    "CHITCHAT": DEFAULT_PROMPT + "\nMantieni la risposta breve.",
 }
-
-# Messaggi di filler per il feedback durante l'elaborazione (zero latenza aggiuntiva)
-FILLER_MESSAGES = [
-    "Certamente, recupero i dati...",
-    "Un attimo, sto elaborando...",
-    "Controllo subito...",
-    "Accesso ai dati in corso...",
-    "Elaborazione in corso...",
-]
-
-_RGB_DEFAULT_SENTINEL = object()
 
 
 class AgentCore:
-    """
-    Cuore del sistema agentico.
-    Implementa il pattern Planner → Executor → Validator.
-    """
+    """Planner/executor with deterministic fast paths and a bounded ReAct loop."""
 
     def __init__(self):
         self.tool_manager = ToolManager()
         self.memory = MemoryManager()
+        self.structured_memory = StructuredMemory()
         self.learner = PreferenceLearner()
         self.automation_engine: AutomationEngine = automation_engine
-        self._last_layout = {"type": "orb", "params": {}}
-        self._last_final_data = ("", {"type": "orb", "params": {}})
         self.socket_manager = None
         self.voice_manager = None
+        self.loop = None
         self._intent_cache: OrderedDict[str, str] = OrderedDict()
+        self._last_layout = {"type": "orb", "params": {}}
+        self._last_final_data = ("", self._last_layout)
         self._current_task_layout: dict = {}
         self._current_task_final_data: dict = {}
-        self._last_reversible_command: dict | None = None
+        self._last_groq_error_status: int | None = None
 
     async def initialize(self):
-        """Inizializza tutti i componenti."""
         self.tool_manager.initialize()
+        self.structured_memory.initialize()
         self.memory.load()
         await self.memory.migrate_json_to_chroma()
-
-        # Pre-popola la cache intent con pattern comuni (zero latenza routing)
-        _warm = {
-            "accendi la luce": "DOMOTIC",
-            "spegni la luce": "DOMOTIC",
-            "apri la porta": "DOMOTIC",
-            "chiudi la porta": "DOMOTIC",
-            "che tempo fa": "DOMOTIC",
-            "meteo": "DOMOTIC",
-            "ultime notizie": "DOMOTIC",
-            "notizie": "DOMOTIC",
-            "quanto vale bitcoin": "DOMOTIC",
-            "prezzo btc": "DOMOTIC",
-            "spotify next": "DOMOTIC",
-            "spotify prev": "DOMOTIC",
-            "spotify play": "DOMOTIC",
-            "spotify pause": "DOMOTIC",
-            "spotify current": "DOMOTIC",
-            "spotify volume": "DOMOTIC",
-            "ciao": "CHITCHAT",
-            "ciao maya": "CHITCHAT",
-            "come stai": "CHITCHAT",
-            "hey": "CHITCHAT",
-            "buongiorno": "CHITCHAT",
-            "grazie": "CHITCHAT",
-        }
-        for k, v in _warm.items():
-            self._intent_cache[k] = v
-
-        # Inizializza il nuovo AutomationEngine
         self.automation_engine._tool_manager = self.tool_manager
         self.automation_engine.memory = self.memory
         self.automation_engine.socket_manager = self.socket_manager
-        self.automation_engine.voice_manager = getattr(self, "voice_manager", None)
+        self.automation_engine.voice_manager = self.voice_manager
         self.automation_engine.register_all(build_default_automations())
         asyncio.create_task(self.automation_engine.start_scheduler())
-        print("[AGENT] AutomationEngine pronto con", len(self.automation_engine.list_automations()), "automazioni.")
+        for text in ("che tempo fa", "meteo", "ultime notizie", "spotify next"):
+            self._intent_cache[text] = "DOMOTIC"
+        for text in ("ciao", "ciao maya", "grazie"):
+            self._intent_cache[text] = "CHITCHAT"
 
-        print("[AGENT] AgentCore pronto.\n")
-
-    # ── FASE 1: PLANNER ──────────────────────────────────
-    def _check_automation(self, user_input: str) -> "Automation | None":
-        """Controlla se l'input corrisponde a un'automazione predefinita."""
-        automation = self.automation_engine.resolve(user_input)
-        if automation:
-            print(f"[PLANNER] Engine: automazione '{automation.name}' rilevata")
-        return automation
+    def _check_automation(self, user_input: str) -> Automation | None:
+        return self.automation_engine.resolve(user_input)
 
     def _normalize_router_text(self, text: str) -> str:
-        normalized = unicodedata.normalize("NFKD", text.lower().replace("è", "e"))
-        normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
-        normalized = re.sub(r"[^\w\s']", " ", normalized)
-        return re.sub(r"\s+", " ", normalized).strip()
+        text = unicodedata.normalize("NFKD", text.lower())
+        text = "".join(ch for ch in text if not unicodedata.combining(ch))
+        return re.sub(r"\s+", " ", re.sub(r"[^\w\s']", " ", text)).strip()
 
     def _strip_wake_prefix(self, text: str) -> str:
-        clean = str(text or "").strip()
-        return re.sub(
-            r"^(?:(?:ok|okay|ehi|hey|eh|e)\s+)?(?:maya|maia|maja)\b\s*[,:\-]?\s*",
-            "",
-            clean,
-            flags=re.IGNORECASE,
-        ).strip()
+        return re.sub(r"^(?:hey\s+|ehi\s+)?maya[,:]?\s*", "", text, flags=re.IGNORECASE).strip()
 
     def _is_chitchat_input(self, text: str) -> bool:
-        lower = self._normalize_router_text(text)
-        if not lower:
-            return False
-
-        exact_phrases = {
-            "ciao",
-            "ciao maya",
-            "hey",
-            "hey maya",
-            "ehi",
-            "ehi maya",
-            "salve",
-            "buongiorno",
-            "buonasera",
-            "buonanotte",
-            "grazie",
-            "grazie maya",
-            "ok grazie",
-            "come stai",
-            "come va",
-            "tutto bene",
-            "che fai",
-        }
-        if lower in exact_phrases:
-            return True
-
-        return bool(
-            re.fullmatch(
-                r"(ciao|hey|ehi|salve|buongiorno|buonasera)\s+(maya\s+)?(come stai|come va|tutto bene)?",
-                lower,
-            )
-        )
+        normalized = self._normalize_router_text(text)
+        return bool(re.fullmatch(r"(?:ciao|hey|ehi|salve|buongiorno|buonasera|grazie)(?: maya)?(?: come stai| come va)?", normalized))
 
     def _is_knowledge_question(self, text: str) -> bool:
-        lower = self._normalize_router_text(text)
-        patterns = [
-            r"\b(chi|che|cosa|cos)\s+e\b",
-            r"\bcos\s*e\b",
-            r"\bdimmi\s+(chi|che|cosa|cos)\s+e\b",
-            r"\b(parlami|raccontami)\s+di\b",
-            r"\b(spiegami|spiega)\b",
-            r"\b(cosa significa|che significa|significato di)\b",
-            r"\b(definisci|definizione di)\b",
-            r"\b(perche|come mai)\b",
-        ]
-        return any(re.search(pattern, lower) for pattern in patterns)
+        normalized = self._normalize_router_text(text)
+        patterns = (
+            r"\b(?:chi|che|cosa|cos) e\b",
+            r"\b(?:parlami|raccontami) di\b",
+            r"\b(?:spiegami|spiega|definisci)\b",
+            r"\b(?:perche|come mai|cosa significa)\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
 
     async def _route_intent(self, user_input: str) -> str:
-        """Determina l'intent dell'utente con caching."""
-        cache_key = user_input.lower().strip()[:60]
-        if cache_key in self._intent_cache:
-            print(f"[ROUTER] Intent recuperato da cache: {self._intent_cache[cache_key]}")
-            self._intent_cache.move_to_end(cache_key)
-            return self._intent_cache[cache_key]
-
+        key = user_input.lower().strip()[:80]
+        if key in self._intent_cache:
+            self._intent_cache.move_to_end(key)
+            return self._intent_cache[key]
         intent = await self._route_intent_uncached(user_input)
-
-        self._intent_cache[cache_key] = intent
-        self._intent_cache.move_to_end(cache_key)
+        self._intent_cache[key] = intent
         if len(self._intent_cache) > 500:
             self._intent_cache.popitem(last=False)
         return intent
 
     async def _route_intent_uncached(self, user_input: str) -> str:
-        """Determina l'intent dell'utente con logica ibrida: Hard Routing + LLM."""
-        lower = self._strip_wake_prefix(user_input).lower()
-        words = lower.split()
-        word_count = len(words)
-
-        if self._is_knowledge_question(user_input):
+        text = self._normalize_router_text(self._strip_wake_prefix(user_input))
+        if self._is_knowledge_question(text):
             return "REASONING"
-
-        if self._is_chitchat_input(user_input):
+        if self._is_chitchat_input(text):
             return "CHITCHAT"
-
-        # --- 0. ECCEZIONI (MAI HARD-ROUTE) ---
-        # Se contiene citazioni, domande di spiegazione o è troppo lunga
-        never_hard_route = [
-            "parla di",
-            "spiegami",
-            "cosa pensi",
-            "perché",
-            "come mai",
-            "cosa significa",
-        ]
-        if any(x in lower for x in never_hard_route) or '"' in user_input or "'" in user_input or word_count > 12:
-            return await self._llm_routing(user_input)
-
-        # --- 1. HARD ROUTING: DOMOTIC ---
-        # Azione hardware esplicita: VERBO + OGGETTO
-        domotic_verbs = [
-            "accendi",
-            "spegni",
-            "apri",
-            "chiudi",
-            "attiva",
-            "disattiva",
-            "imposta",
-            "metti",
-            "suona",
-            "spieni",
-            "spenni",
-        ]
-        domotic_objects = [
-            "luce",
-            "luci",
-            "led",
-            "lampada",
-            "lampade",
-            "servo",
-            "porta",
-            "cancello",
-            "cancellino",
-            "campanello",
-            "rgb",
-            "neopixel",
-            "speaker",
-            "buzzer",
-            "soggiorno",
-            "camera",
-            "giardino",
-            "studio",
-            "luminosità",
-            "luminosita",
-        ]
-        if any(v in lower for v in domotic_verbs) and any(o in lower for o in domotic_objects):
+        if re.search(r"\b(?:scrivi|programma|codice|funzione|python|javascript|bug)\b", text):
+            return "CODING"
+        if re.search(r"\b(?:meteo|tempo fa|notizie|news|calendario|agenda|nota|spotify|mqtt|luce|luci|casa)\b", text):
             return "DOMOTIC"
-
-        # Finanza: PREZZO/QUANTO VALE + ASSET
-        crypto_verbs = ["prezzo", "quanto vale", "quotazione"]
-        crypto_assets = [
-            "bitcoin",
-            "btc",
-            "eth",
-            "ethereum",
-            "crypto",
-            "azioni",
-            "sp500",
-            "nasdaq",
-        ]
-        if any(v in lower for v in crypto_verbs) and any(a in lower for a in crypto_assets):
-            return "DOMOTIC"
-
-        # Meteo e News (già filtrati per lunghezza > 12 sopra)
-        if any(x in lower for x in ["meteo", "che tempo fa", "temperatura"]):
-            return "DOMOTIC"
-
-        if any(x in lower for x in ["ultime notizie", "che news", "cosa è successo oggi"]):
-            return "DOMOTIC"
-
-        # Spotify: comandi diretti (es. "spotify next", "spotify play")
-        spotify_direct = [
-            "spotify next",
-            "spotify prev",
-            "spotify play",
-            "spotify pause",
-            "spotify stop",
-            "spotify volume",
-            "spotify current",
-            "spotify devices",
-            "spotify set_device",
-            "spotify set_device_pc",
-            "spotify search",
-        ]
-        if any(lower.startswith(cmd) for cmd in spotify_direct):
-            return "DOMOTIC"
-
-        # Spotify: VERBO + OGGETTO
-        spotify_verbs = [
-            "metti",
-            "riproduci",
-            "play",
-            "pausa",
-            "prossimo brano",
-            "volume",
-        ]
-        spotify_objects = ["musica", "spotify", "canzone", "brano"]
-        if any(v in lower for v in spotify_verbs) and any(o in lower for o in spotify_objects):
-            return "DOMOTIC"
-
-        # Traduzione: deve andare sempre nei tool
-        if any(x in lower for x in ["traduci", "tradurre", "traduzione", "translate"]):
-            return "DOMOTIC"
-
-        # --- 2. HARD ROUTING: CHITCHAT ---
-        # Solo saluti/frasi sociali strette. Le domande brevi non sono chitchat.
-        if self._is_chitchat_input(user_input):
-            return "CHITCHAT"
-
-        # --- 3. FALLBACK LLM ---
         return await self._llm_routing(user_input)
 
     async def _llm_routing(self, user_input: str) -> str:
-        """Routing tramite LLM (Groq -> Ollama)."""
-        try:
-            # PRIORITÀ GROQ PER ROUTING
-            if os.getenv("GROQ_API_KEY"):
-                messages = [
-                    {"role": "system", "content": ROUTER_PROMPT},
-                    {"role": "user", "content": user_input},
-                ]
-                response_text = await self._call_groq(messages, json_mode=False)
-                if response_text:
-                    intent = response_text.strip().upper()
-                    for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
-                        if category in intent:
-                            if category == "CHITCHAT" and not self._is_chitchat_input(user_input):
-                                print("[ROUTER] CHITCHAT rifiutato: richiesta non sociale -> REASONING")
-                                return "REASONING"
-                            print(f"[ROUTER] Intent rilevato (Groq): {category}")
-                            return category
+        result = await self._call_groq(
+            [{"role": "system", "content": ROUTER_PROMPT}, {"role": "user", "content": user_input}],
+            json_mode=False,
+        )
+        intent = str(result or "").strip().upper()
+        if intent == "CHITCHAT" and not self._is_chitchat_input(user_input):
+            return "REASONING"
+        return intent if intent in SPECIALIST_PROMPTS else "REASONING"
 
-            # FALLBACK OLLAMA
-            if not is_ollama_enabled():
-                print("[ROUTER] Ollama disabilitato, uso fallback CHITCHAT")
-                return "CHITCHAT"
-            client = ollama.AsyncClient()
-            response = await client.generate(
-                model=MODELS["router"],
-                system=ROUTER_PROMPT,
-                prompt=user_input,
-                stream=False,
-                options={
-                    "temperature": 0.0,
-                    "num_predict": 10,
-                },
-                keep_alive="10m",
-            )
-            intent = response.get("response", "CHITCHAT").strip().upper()
-            for category in ["DOMOTIC", "REASONING", "CHITCHAT"]:
-                if category in intent:
-                    if category == "CHITCHAT" and not self._is_chitchat_input(user_input):
-                        print("[ROUTER] CHITCHAT rifiutato: richiesta non sociale -> REASONING")
-                        return "REASONING"
-                    print(f"[ROUTER] Intent rilevato: {category}")
-                    return category
-            return "CHITCHAT" if self._is_chitchat_input(user_input) else "REASONING"
-        except Exception as e:
-            print(f"[ROUTER] Errore routing LLM: {e}")
-            return "CHITCHAT" if self._is_chitchat_input(user_input) else "REASONING"
-
-    def _clean_json(self, text: str) -> dict:
-        """
-        Pulisce il testo dalla formattazione markdown (code fences)
-        e ritorna un JSON valido. Fallback a _fallback_parse se parse fallisce.
-        """
-        # Rimuovi markdown code fences
-        text = re.sub(r"```(?:json)?\s*", "", text).strip()
-        # Estrai il primo oggetto JSON completo
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            text = match.group(0)
+    @staticmethod
+    def _clean_json(text: str) -> dict:
+        if not isinstance(text, str):
+            return {}
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE)
         try:
-            result = json.loads(text)
-            # Salvataggio layout per propagazione
-            layout = {
-                "type": result.get("layout", "orb"),
-                "params": result.get("layout_params", {}),
-            }
-            task = asyncio.current_task()
-            if task:
-                self._current_task_layout[task] = layout
-            else:
-                self._last_layout = layout
-            return result
+            return json.loads(text)
         except json.JSONDecodeError:
-            result = self._fallback_parse(text)
-            layout = {"type": "orb", "params": {}}
-            task = asyncio.current_task()
-            if task:
-                self._current_task_layout[task] = layout
-            else:
-                self._last_layout = layout
-            return result
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    pass
+        return {}
 
     async def _call_groq(self, messages, json_mode=True):
-        """Chiamata primaria a Groq."""
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             return None
-
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {api_key}"}
-
-        # Scegli il modello in base al contenuto dei messaggi (se router o meno)
-        # Se json_mode è False, probabilmente siamo nel routing
-        model_env = "GROQ_ROUTER_MODEL" if not json_mode else "GROQ_MODEL"
-        default_model = "llama-3.1-8b-instant" if not json_mode else "llama-3.3-70b-versatile"
-        model = os.getenv(model_env, default_model)
-
         payload = {
-            "model": model,
+            "model": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
             "messages": messages,
             "temperature": 0.1,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
-
-        # Fix 3: Groq token limit stretto per DOMOTIC
-        if not json_mode:
-            payload["max_tokens"] = 8  # router
-        elif len(messages) > 0 and "DOMOTIC" in str(messages[0]["content"])[:50]:
-            payload["max_tokens"] = 300  # domotic: risposta corta basta
-        elif len(messages) > 0 and "CHITCHAT" in str(messages[0].get("content", ""))[:60]:
-            payload["max_tokens"] = 300  # chitchat: risposte brevi
-        else:
-            payload["max_tokens"] = 800
-
         try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
-                self._last_groq_error_status = None
-                return data["choices"][0]["message"]["content"]
-        except httpx.HTTPStatusError as e:
-            self._last_groq_error_status = e.response.status_code
-            print(f"[GROQ] Errore: {e}")
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json=payload,
+                )
+            self._last_groq_error_status = response.status_code if response.status_code >= 400 else None
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            return self._clean_json(content) if json_mode else content
+        except httpx.HTTPStatusError as exc:
+            self._last_groq_error_status = exc.response.status_code
             return None
-        except Exception as e:
-            self._last_groq_error_status = None
-            print(f"[GROQ] Errore: {e}")
+        except Exception:
             return None
 
-    async def _call_groq_fallback(self, messages: list) -> dict:
-        """Chiamata di fallback a Groq se Ollama non è disponibile."""
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            print("[LLM] Groq fallback saltato: GROQ_API_KEY non trovata.")
-            return {}
-
-        print("[LLM] Utilizzo fallback Groq (Llama 3.3 70B)...")
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": messages,
-            "response_format": {"type": "json_object"},
-            "temperature": 0.1,
-            "max_tokens": 1000,
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=12.0) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
-                text = data["choices"][0]["message"]["content"]
-                return self._clean_json(text)
-        except Exception as e:
-            print(f"[LLM] Errore critico Groq fallback: {e}")
-            return {}
+    async def _call_groq_fallback(self, messages: list) -> dict | None:
+        result = await self._call_groq(messages, json_mode=True)
+        return result if isinstance(result, dict) else None
 
     async def _call_llm(self, user_input: str, progress_cb=None) -> dict:
-        """Pipeline specialistica ottimizzata: Router e Retrieval in parallelo."""
-        # 1. Avvia Routing e Retrieval semantico in parallelo per risparmiare tempo
-        routing_task = asyncio.create_task(self._route_intent(user_input))
-        context_task = asyncio.create_task(self.memory.get_context(query=user_input, top_k=5))
-
-        # Aspetta il risultato del router
-        intent = await routing_task
-
-        # 2. Selezione Specialista
-        model_key = intent.lower()
-        model_name = MODELS.get(model_key, MODELS["chitchat"])
-        system_prompt = SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)
-
-        print(f"[LLM] {model_key.upper()} -> {model_name}")
-
-        # 3. Chiamata allo Specialista
-        try:
-            # Se è CHITCHAT, limitiamo il contesto per velocità estrema
-            if intent == "CHITCHAT":
-                context = await self.memory.get_context(query=None, top_k=2)  # No embedding search for chitchat
-            else:
-                context = await context_task
-
-            prompt = f"{context}\nUtente: {user_input}"
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ]
-
-            # PRIORITÀ GROQ
-            if os.getenv("GROQ_API_KEY"):
-                response_text = await self._call_groq(messages, json_mode=True)
-                if response_text:
-                    return self._clean_json(response_text)
-
-            # FALLBACK OLLAMA
-            if not is_ollama_enabled():
-                print("[LLM] Ollama disabilitato, salto fallback")
-                return None
+        intent = await self._route_intent(user_input)
+        context = await self.memory.get_context(user_input)
+        messages = [
+            {"role": "system", "content": SPECIALIST_PROMPTS[intent]},
+            {"role": "user", "content": f"{context}\n\nRICHIESTA: {user_input}"},
+        ]
+        if is_ollama_enabled():
             try:
-                client = ollama.AsyncClient()
-                response = await client.generate(
-                    model=model_name,
-                    system=system_prompt,
-                    prompt=prompt,
-                    format="json",
-                    stream=False,
-                    options={"temperature": 0.3 if intent == "CHITCHAT" else 0.1},
-                    keep_alive="10m",
+                response = await ollama.AsyncClient().chat(
+                    model=MODELS.get(intent.lower(), MODELS["reasoning"]), messages=messages, format="json"
                 )
-
-                text = response.get("response", "{}")
-                result = self._clean_json(text)
-
-                if "reply" not in result and "response" in result:
-                    result["reply"] = result["response"]
-
-                return result
-
-            except (ollama.ResponseError, httpx.ConnectError, ConnectionError) as e:
-                print(f"[LLM] Ollama non raggiungibile ({e}). Provo fallback Groq...")
-                groq_res = await self._call_groq_fallback(messages)
-                if groq_res:
-                    return groq_res
-                raise  # Rilancia per il fallback parse se anche Groq fallisce
-
-        except Exception as e:
-            print(f"[LLM] Errore pipeline {intent}: {e}")
-            return self._fallback_parse(user_input)
+                return self._clean_json(response.get("message", {}).get("content", "{}"))
+            except Exception:
+                pass
+        fallback = await self._call_groq_fallback(messages)
+        if fallback:
+            return fallback
+        if self._last_groq_error_status == 429:
+            return {"actions": [], "reply": "Ho raggiunto il limite di richieste del servizio cloud. Riprova tra poco."}
+        return {"actions": [], "reply": "Il modello locale non e disponibile e il fallback cloud non ha risposto."}
 
     def _fallback_parse(self, user_input: str) -> dict:
-        """
-        Parser di fallback per quando Ollama non è disponibile.
-        Regole semplici basate su keyword.
-        """
-        lower = user_input.lower()
-        actions = []
-        reply = "Comando eseguito."
-
-        clean = self._strip_wake_prefix(lower)
-        direct = self._parse_direct_arduino_command(clean)
-        if direct:
-            action, ok_reply, _ = direct
-            actions.append(action)
-            return {"intent": lower[:30], "actions": actions, "reply": ok_reply}
-
-        light_words = ("luce", "luci", "led", "lampada", "lampade", "illuminazione")
-
-        if "accendi" in lower and any(word in lower for word in light_words):
-            actions.append({"tool": "arduino", "command": "LIGHT_ON"})
-            reply = "Luce accesa!"
-        elif "spegni" in lower and any(word in lower for word in light_words):
-            actions.append(
-                {
-                    "tool": "arduino",
-                    "op": "BATCH",
-                    "actions": [
-                        {"op": "SET", "target": "light", "value": 0},
-                        {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
-                        {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
-                    ],
-                }
-            )
-            reply = "Luci spente!"
-        elif ("chiudi" in lower or "chiudere" in lower) and "porta" in lower:
-            actions.append({"tool": "arduino", "op": "SET", "target": "servo", "value": 0})
-            reply = "Porta chiusa!"
-        elif ("chiudi" in lower or "chiudere" in lower) and any(word in lower for word in ("cancello", "cancellino")):
-            actions.append({"tool": "arduino", "op": "SET", "target": "servo2", "value": 0})
-            reply = "Cancellino chiuso!"
-        elif "apri" in lower and "servo" in lower:
-            actions.append({"tool": "arduino", "command": "SERVO_OPEN"})
-            reply = "Servo aperto!"
-        elif "aggiungi" in lower or "evento" in lower or "riunione" in lower:
-            from datetime import datetime
-
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-            actions.append(
-                {
-                    "tool": "calendar",
-                    "action": "add",
-                    "title": user_input,
-                    "time": now_str,
-                }
-            )
-            reply = f"Evento aggiunto al calendario ({now_str})."
-        elif "calendario" in lower or "eventi" in lower:
-            actions.append({"tool": "calendar", "action": "list"})
-            reply = "Ecco i tuoi prossimi eventi."
-        else:
-            actions.append({"tool": "none", "response": user_input})
-            reply = "Non ho Ollama attivo. Comando non riconosciuto."
-
-        return {"intent": lower[:30], "actions": actions, "reply": reply}
-
-    def _light_room_target_from_text(self, text: str) -> str | None:
-        room_targets = {
-            "salotto": "rgb1",
-            "soggiorno": "rgb1",
-            "camera": "rgb2",
-            "stanza": "rgb2",
-            "giardino": "rgb3",
-            "studio": "rgb3",
-            "esterno": "rgb3",
-            "fuori": "rgb3",
-        }
-        for room, target in room_targets.items():
-            if re.search(rf"\b{re.escape(room)}\b", text):
-                return target
-        return None
-
-    def _hard_route_light_command(self, user_input: str) -> dict | None:
-        """
-        Comandi luce deterministici.
-        Evita che il modello spenga tutte le luci quando viene citata una stanza.
-        """
-        text = self._strip_wake_prefix(user_input).lower().strip()
-
-        if not re.search(r"\b(luce|luci|led|lampad[ae]|illuminazione|rgb)\b", text):
-            return None
-
-        is_on = bool(re.search(r"\b(accendi|attiva|metti|imposta)\b", text))
-        is_off = bool(re.search(r"\b(spegni|spegner\w*|spieni|spenni|disattiva|togli|stop|ferma)\b", text))
-        color_value = self._rgb_value_from_text(text, default=None)
-        has_help_context = bool(
-            re.search(r"\b(come|cosa|che cosa)\s+(posso|faccio|fare|riparare|aggiustare)\b", text)
-            or re.search(r"\b(perche|perché|come mai|quanto|quale|quali|cos['’]?e|mi spieghi|spiegami)\b", text)
-            or re.search(
-                r"\b(riparare|riparo|aggiustare|aggiusto|funziona|rotto|rotta|guasto|guasta|problema|tutorial)\b",
-                text,
-            )
-        )
-        if has_help_context and not (is_on or is_off):
-            return None
-        if is_off:
-            value = 0
-        elif color_value is not None:
-            value = color_value
-        elif is_on:
-            value = {"r": 255, "g": 255, "b": 255}
-        else:
-            return None
-
-        effect = 0
-        if re.search(r"\b(pulse|pulsa|respiro)\b", text):
-            effect = 1
-        elif re.search(r"\b(rainbow|arcobaleno)\b", text):
-            effect = 2
-        elif re.search(r"\b(alert|allerta)\b", text):
-            effect = 3
-
-        target = self._light_room_target_from_text(text)
-        if target:
-            return {
-                "tool": "arduino",
-                "op": "SET",
-                "target": target,
-                "value": value,
-                "effect": effect,
-            }
-
-        if is_off:
-            return {
-                "tool": "arduino",
-                "op": "BATCH",
-                "actions": [
-                    {"op": "SET", "target": "light", "value": 0},
-                    {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
-                    {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
-                ],
-            }
-
-        # Solo se dice chiaramente tutte
-        all_words = ["tutte", "tutta casa", "casa", "ovunque"]
-
-        if any(w in text for w in all_words):
-            return {
-                "tool": "arduino",
-                "op": "BATCH",
-                "actions": [
-                    {"op": "SET", "target": "rgb1", "value": value, "effect": effect},
-                    {"op": "SET", "target": "rgb2", "value": value, "effect": effect},
-                    {"op": "SET", "target": "rgb3", "value": value, "effect": effect},
-                ],
-            }
-
-        if color_value is not None or re.search(r"\b(rgb|colore|colori|led)\b", text):
-            return {
-                "tool": "arduino",
-                "op": "SET",
-                "target": "rgb",
-                "value": value,
-                "effect": effect,
-            }
-
-        if is_on:
-            return {
-                "tool": "arduino",
-                "op": "BATCH",
-                "actions": [
-                    {"op": "SET", "target": "light", "value": 1},
-                    {"op": "SET", "target": "rgb", "value": {"r": 255, "g": 255, "b": 255}, "effect": 0},
-                ],
-            }
-
-        # Default: luce principale, non tutte
-        return {
-            "tool": "arduino",
-            "op": "SET",
-            "target": "light",
-            "value": 1 if is_on else 0,
-        }
-
-    # ── FASE 2: EXECUTOR ─────────────────────────────────
-    def _normalize_arduino_action_for_request(self, action: dict, source_text: str) -> dict:
-        if action.get("tool") != "arduino" or not source_text:
-            return action
-
-        text = source_text.lower()
-        if re.search(r"\b(tutte|tutta casa|casa|ovunque)\b", text):
-            return action
-
-        target = self._light_room_target_from_text(text)
-        if not target:
-            return action
-
-        normalized = action.copy()
-        if str(normalized.get("op", "SET")).upper() == "BATCH":
-            batch = []
-            changed = False
-            for item in normalized.get("actions", []):
-                if not isinstance(item, dict):
-                    batch.append(item)
-                    continue
-                sub_item = item.copy()
-                if sub_item.get("target") in {"rgb", "neopixel", ""}:
-                    sub_item["target"] = target
-                    changed = True
-                batch.append(sub_item)
-            if changed:
-                normalized["actions"] = batch
-            return normalized
-
-        if normalized.get("target") in {"rgb", "neopixel", ""}:
-            normalized["target"] = target
-        return normalized
+        return {"intent": "fallback", "actions": [], "reply": "Il modello non e disponibile per questa richiesta."}
 
     async def _execute_actions(self, actions: list, source_text: str = "") -> list:
-        """Esegui ogni azione tramite il ToolManager."""
         results = []
         for action in actions:
-            action = self._normalize_arduino_action_for_request(action, source_text)
             tool_name = action.get("tool", "none")
-            target = action.get("target", action.get("operation", ""))
-            print(f"[->] {tool_name}{': ' + target if target else ''}")
             result = await self.tool_manager.execute(action)
             results.append({"tool": tool_name, "result": result})
-            if result.get("status") == "error":
-                print(f"[x] {tool_name}: {result.get('message', result)}")
-
-            # --- BROADCAST AUTOMATICO PER DASHBOARD ---
-            if self.socket_manager:
-                # Mappa i tool ai messaggi websocket
-                ws_map = {
-                    "weather": "weather",
-                    "spotify": "spotify",
-                    "calendar": "calendar",
-                    "trading": "trading",
-                    "sys_monitor": "stats",
-                }
-
-                if tool_name in ws_map and result.get("status") == "ok":
-                    msg_type = ws_map[tool_name]
-                    payload = {"type": msg_type}
-                    if "data" in result:
-                        if isinstance(result["data"], dict):
-                            payload.update(result["data"])
-                        else:
-                            payload["data"] = result["data"]
-                    else:
-                        payload.update(result)
-                    payload.pop("status", None)
-                    payload.pop("message", None)
-                    await self.socket_manager.broadcast(payload)
-
-                # Arduino: aggiorna subito la dashboard con il nuovo stato
-                if tool_name == "arduino" and result.get("status") == "ok":
-                    st = result.get("state", {})
-                    if st:
-                        await self.socket_manager.broadcast(
-                            {
-                                "type": "state",
-                                "led": "on" if st.get("light") else "off",
-                                "servo": "open" if (st.get("servo") or 0) > 0 else "0",
-                                "servo2": st.get("servo2", 0),
-                                "rgb1": st.get("rgb1", [0, 0, 0]),
-                                "rgb2": st.get("rgb2", [0, 0, 0]),
-                                "rgb3": st.get("rgb3", [0, 0, 0]),
-                                "buzzer": st.get("buzzer", False),
-                                "buzz2_playing": st.get("buzz2_playing", False),
-                            }
-                        )
-
         return results
 
-    # ── FASE 3: VALIDATOR ────────────────────────────────
     def _validate_results(self, results: list) -> bool:
-        """Controlla che le azioni siano andate a buon fine."""
-        for r in results:
-            if r.get("result", {}).get("status") == "error":
-                print(f"[VALIDATOR] Errore in tool {r['tool']}: {r['result']}")
-                return False
-        return True
+        return all(item.get("result", {}).get("status") != "error" for item in results)
 
     def _set_final_layout(self, reply: str, layout: dict):
-        """Setta il layout finale per il task corrente (usato dai fast path)."""
         task = asyncio.current_task()
         final_data = (reply, layout)
         if task:
@@ -963,1016 +250,218 @@ class AgentCore:
         self._set_final_layout(reply, layout or {"type": "current", "params": {}})
         return reply
 
-    async def _broadcast_arduino_state(self, state: dict):
-        if not self.socket_manager or not state:
-            return
-        await self.socket_manager.broadcast(
-            {
-                "type": "state",
-                "led": "on" if state.get("light") else "off",
-                "servo": "open" if (state.get("servo") or 0) > 0 else "0",
-                "servo2": state.get("servo2", 0),
-                "rgb1": state.get("rgb1", [0, 0, 0]),
-                "rgb2": state.get("rgb2", [0, 0, 0]),
-                "rgb3": state.get("rgb3", [0, 0, 0]),
-                "buzzer": state.get("buzzer", False),
-                "buzz2_playing": state.get("buzz2_playing", False),
-            }
-        )
-
-    def _rgb_value_from_text(self, text: str, default=_RGB_DEFAULT_SENTINEL) -> dict | int | None:
-        colors = {
-            "nero mezzanotte": {"r": 0, "g": 0, "b": 20},
-            "blu elettrico": {"r": 0, "g": 80, "b": 255},
-            "blu notte": {"r": 0, "g": 0, "b": 60},
-            "verde acqua": {"r": 0, "g": 180, "b": 160},
-            "rosso sangue": {"r": 140, "g": 0, "b": 0},
-            "viola neon": {"r": 180, "g": 0, "b": 255},
-            "arancione tramonto": {"r": 255, "g": 90, "b": 20},
-            "marrone scuro": {"r": 80, "g": 45, "b": 25},
-            "marrone chiaro": {"r": 150, "g": 95, "b": 55},
-            "testa di moro": {"r": 55, "g": 30, "b": 20},
-            "verde smeraldo": {"r": 0, "g": 200, "b": 120},
-            "blu petrolio": {"r": 0, "g": 95, "b": 110},
-            "rosa antico": {"r": 190, "g": 95, "b": 120},
-            "bianco caldo": {"r": 255, "g": 213, "b": 128},
-            "bianco freddo": {"r": 210, "g": 235, "b": 255},
-            "rosso": {"r": 255, "g": 30, "b": 30},
-            "rossa": {"r": 255, "g": 30, "b": 30},
-            "rossi": {"r": 255, "g": 30, "b": 30},
-            "rosse": {"r": 255, "g": 30, "b": 30},
-            "verde": {"r": 0, "g": 255, "b": 153},
-            "verdi": {"r": 0, "g": 255, "b": 153},
-            "blu": {"r": 30, "g": 144, "b": 255},
-            "azzurro": {"r": 68, "g": 136, "b": 255},
-            "azzurri": {"r": 68, "g": 136, "b": 255},
-            "azzurra": {"r": 68, "g": 136, "b": 255},
-            "azzurre": {"r": 68, "g": 136, "b": 255},
-            "viola": {"r": 174, "g": 69, "b": 255},
-            "viole": {"r": 174, "g": 69, "b": 255},
-            "violette": {"r": 174, "g": 69, "b": 255},
-            "fucsia": {"r": 255, "g": 0, "b": 255},
-            "magenta": {"r": 255, "g": 0, "b": 255},
-            "arancio": {"r": 255, "g": 106, "b": 0},
-            "arancione": {"r": 255, "g": 106, "b": 0},
-            "arancioni": {"r": 255, "g": 106, "b": 0},
-            "ambra": {"r": 255, "g": 150, "b": 0},
-            "oro": {"r": 255, "g": 190, "b": 40},
-            "giallo": {"r": 255, "g": 213, "b": 128},
-            "gialla": {"r": 255, "g": 213, "b": 128},
-            "gialli": {"r": 255, "g": 213, "b": 128},
-            "gialle": {"r": 255, "g": 213, "b": 128},
-            "rosa": {"r": 255, "g": 90, "b": 160},
-            "turchese": {"r": 0, "g": 200, "b": 220},
-            "turchesi": {"r": 0, "g": 200, "b": 220},
-            "ciano": {"r": 0, "g": 255, "b": 255},
-            "bianco": {"r": 255, "g": 255, "b": 255},
-            "bianca": {"r": 255, "g": 255, "b": 255},
-            "bianchi": {"r": 255, "g": 255, "b": 255},
-            "bianche": {"r": 255, "g": 255, "b": 255},
-            "caldo": {"r": 255, "g": 213, "b": 128},
-            "nero": {"r": 0, "g": 0, "b": 0},
-            "neri": {"r": 0, "g": 0, "b": 0},
-            "nera": {"r": 0, "g": 0, "b": 0},
-            "nere": {"r": 0, "g": 0, "b": 0},
-            "marrone": {"r": 120, "g": 70, "b": 35},
-            "marroni": {"r": 120, "g": 70, "b": 35},
-            "cioccolato": {"r": 95, "g": 50, "b": 25},
-            "spento": 0,
-            "spenta": 0,
-        }
-        for name, value in sorted(colors.items(), key=lambda item: len(item[0]), reverse=True):
-            if re.search(rf"\b{name}\b", text):
-                return value
-        if default is _RGB_DEFAULT_SENTINEL:
-            return {"r": 255, "g": 255, "b": 255}
-        return default
-
-    def _zone_label(self, target: str) -> str:
-        return {
-            "rgb1": "Soggiorno",
-            "rgb2": "Camera",
-            "rgb3": "Giardino",
-            "rgb": "RGB",
-            "neopixel": "NeoPixel",
-        }.get(target, target)
-
-    def _parse_direct_arduino_command(self, text: str) -> tuple[dict, str, str] | None:
-        light_words = r"(luce|luci|led|lampad[ae]|illuminazione)"
-        open_words = r"(apri|aprire|alza)"
-        close_words = r"(chiudi|chiudere|abbassa)"
-        on_words = r"(accendi|attiva|metti|imposta)"
-        off_words = r"(spegni|spieni|spenni|disattiva|stop|ferma)"
-
-        if re.search(r"\b(stato|status)\b", text) and re.search(r"\b(arduino|casa|domotica|dispositivi)\b", text):
-            return (
-                {"tool": "arduino", "op": "GET", "target": "status"},
-                "Stato casa aggiornato.",
-                "Arduino non e' connesso.",
-            )
-
-        if re.search(r"\b(sensor[ei]|temperatura casa|umidit[àa])\b", text):
-            return (
-                {"tool": "arduino", "op": "GET", "target": "sensor_read"},
-                "Sensori letti.",
-                "Non riesco a leggere i sensori: Arduino non e' connesso.",
-            )
-
-        if re.search(rf"\b{on_words}\b", text) and re.search(rf"\b{light_words}\b", text):
-            light_color = self._rgb_value_from_text(text)
-            return (
-                {
-                    "tool": "arduino",
-                    "op": "BATCH",
-                    "actions": [
-                        {"op": "SET", "target": "light", "value": 1},
-                        {"op": "SET", "target": "rgb", "value": light_color, "effect": 0},
-                        {"op": "SET", "target": "neopixel", "value": light_color, "effect": 0},
-                    ],
-                },
-                "Luci accese.",
-                "Non riesco ad accendere le luci: Arduino non e' connesso.",
-            )
-
-        if re.search(rf"\b{off_words}\b", text) and re.search(rf"\b{light_words}\b", text):
-            return (
-                {
-                    "tool": "arduino",
-                    "op": "BATCH",
-                    "actions": [
-                        {"op": "SET", "target": "light", "value": 0},
-                        {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
-                        {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
-                    ],
-                },
-                "Luci spente.",
-                "Non riesco a spegnere le luci: Arduino non e' connesso.",
-            )
-
-        if re.search(rf"\b{open_words}\b", text) and re.search(r"\b(porta|servo)\b", text):
-            return (
-                {"tool": "arduino", "op": "SET", "target": "servo", "value": 90},
-                "Porta aperta.",
-                "Non riesco ad aprire la porta: Arduino non e' connesso.",
-            )
-        if re.search(rf"\b{close_words}\b", text) and re.search(r"\b(porta|servo)\b", text):
-            return (
-                {"tool": "arduino", "op": "SET", "target": "servo", "value": 0},
-                "Porta chiusa.",
-                "Non riesco a chiudere la porta: Arduino non e' connesso.",
-            )
-
-        if re.search(rf"\b{open_words}\b", text) and re.search(r"\b(cancello|cancellino|servo2)\b", text):
-            return (
-                {"tool": "arduino", "op": "SET", "target": "servo2", "value": 90},
-                "Cancellino aperto.",
-                "Non riesco ad aprire il cancellino: Arduino non e' connesso.",
-            )
-        if re.search(rf"\b{close_words}\b", text) and re.search(r"\b(cancello|cancellino|servo2)\b", text):
-            return (
-                {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0},
-                "Cancellino chiuso.",
-                "Non riesco a chiudere il cancellino: Arduino non e' connesso.",
-            )
-
-        zone = None
-        if re.search(r"\bsoggiorno\b", text):
-            zone = "rgb1"
-        elif re.search(r"\bcamera\b", text):
-            zone = "rgb2"
-        elif re.search(r"\b(giardino|studio|esterno|fuori)\b", text):
-            zone = "rgb3"
-        elif re.search(
-            r"\b(rgb|neopixel|colore|colori|luce|luci|led|lampad[ae]|illuminazione|effetto|effetti)\b", text
-        ):
-            zone = "rgb"
-
-        if zone and re.search(rf"\b{off_words}\b", text):
-            label = self._zone_label(zone)
-            return (
-                {"tool": "arduino", "op": "SET", "target": zone, "value": 0, "effect": 0},
-                f"{label} spento.",
-                f"Non riesco a spegnere {label}: Arduino non e' connesso.",
-            )
-        if zone and (
-            re.search(rf"\b{on_words}\b", text)
-            or re.search(
-                r"\b(nero mezzanotte|blu elettrico|blu notte|verde acqua|rosso sangue|viola neon|arancione tramonto|marrone scuro|marrone chiaro|testa di moro|verde smeraldo|blu petrolio|rosa antico|bianco caldo|bianco freddo|rosso|rossa|rossi|rosse|verde|verdi|blu|azzurro|azzurri|azzurra|azzurre|viola|viole|violette|fucsia|magenta|arancio|arancione|arancioni|ambra|oro|giallo|gialla|gialli|gialle|rosa|turchese|turchesi|ciano|bianco|bianca|bianchi|bianche|caldo|nero|neri|nera|nere|marrone|marroni|cioccolato|arcobaleno|rainbow|pulse|pulsa|respiro|alert|allerta|sfumatura)\b",
-                text,
-            )
-        ):
-            effect = 0
-            if re.search(r"\b(pulse|pulsa|respiro)\b", text):
-                effect = 1
-            elif re.search(r"\b(rainbow|arcobaleno)\b", text):
-                effect = 2
-            elif re.search(r"\b(alert|allerta)\b", text):
-                effect = 3
-            return (
-                {
-                    "tool": "arduino",
-                    "op": "SET",
-                    "target": zone,
-                    "value": self._rgb_value_from_text(text),
-                    "effect": effect,
-                },
-                f"{self._zone_label(zone)} aggiornato.",
-                f"Non riesco ad aggiornare {self._zone_label(zone)}: Arduino non e' connesso.",
-            )
-
-        if re.search(r"\b(luminosit[àa]|brightness)\b", text):
-            match = re.search(r"\b(\d{1,3})\b", text)
-            if match:
-                pct = max(0, min(100, int(match.group(1))))
-                value = round((pct / 100) * 255)
-                return (
-                    {"tool": "arduino", "op": "SET", "target": "brightness", "value": value},
-                    f"Luminosita' impostata al {pct} percento.",
-                    "Non riesco a impostare la luminosita': Arduino non e' connesso.",
-                )
-
-        if re.search(rf"\b{off_words}\b", text) and re.search(r"\b(buzzer|speaker|audio|suono|campanello)\b", text):
-            return (
-                {"tool": "arduino", "op": "SET", "target": "speaker", "melody": "off"},
-                "Buzzer spento.",
-                "Non riesco a spegnere il buzzer: Arduino non e' connesso.",
-            )
-        if re.search(r"\b(suona|beep|campanello|buzzer|speaker|audio|suono)\b", text):
-            melody = "beep"
-            for name in ("notify", "error", "welcome", "ok", "startup", "alarm", "wake_radar"):
-                if name in text:
-                    melody = name
-                    break
-            return (
-                {"tool": "arduino", "op": "SET", "target": "speaker", "melody": melody},
-                "Buzzer attivato.",
-                "Non riesco ad attivare il buzzer: Arduino non e' connesso.",
-            )
-
-        return None
-
     def _parse_direct_calendar_command(self, text: str) -> tuple[dict | None, str] | None:
-        if re.search(r"\b(prossim[oi]|mostra|vedi|leggi|lista|elenca|cos[' ]?ho|cosa ho|ho)\b", text) and re.search(
-            r"\b(calendario|eventi|agenda)\b", text
+        if re.search(r"\b(?:prossim[oi]|mostra|lista|elenca|cos[' ]?ho|cosa ho|ho)\b", text) and re.search(
+            r"\b(?:calendario|eventi|agenda)\b", text
         ):
             return ({"tool": "calendar", "action": "list"}, "Ecco i prossimi eventi.")
-
-        if not re.search(r"\b(cancella|elimina|rimuovi)\b", text) or not re.search(
-            r"\b(evento|appuntamento|calendario|agenda)\b", text
-        ):
-            return None
-
-        title = re.sub(r"^(maya|hey maya|ehi maya)\s+", "", text).strip()
-        title = re.sub(r"\b(cancella|elimina|rimuovi)\b", " ", title)
-        title = re.sub(
-            r"\b(evento|appuntamento|dal|dalla|nel|nella|sul|sulla|il|la|calendario|agenda|chiamato|chiamata|titolo)\b",
-            " ",
-            title,
-        )
-        title = re.sub(r"\s+", " ", title).strip(" .,;:-")
-        if not title:
-            return (None, "Dimmi il titolo dell'evento da cancellare.")
-        return ({"tool": "calendar", "action": "delete", "title": title}, f"Cancello l'evento '{title}'.")
+        if re.search(r"\b(?:cancella|elimina|rimuovi)\b", text) and re.search(r"\b(?:evento|appuntamento)\b", text):
+            title = re.sub(r"\b(?:cancella|elimina|rimuovi|evento|appuntamento|il|la)\b", " ", text)
+            title = re.sub(r"\s+", " ", title).strip(" .,;:-")
+            return ({"tool": "calendar", "action": "delete", "title": title}, f"Cancello l'evento '{title}'.") if title else (None, "Dimmi il titolo dell'evento da cancellare.")
+        return None
 
     async def _run_direct_calendar_command(self, parsed: tuple[dict | None, str]) -> str:
-        action, fallback_reply = parsed
+        action, fallback = parsed
         if action is None:
-            return fallback_reply
+            return fallback
         result = await self.tool_manager.execute(action)
-        if self.socket_manager and action.get("action") in {"list", "delete"}:
-            refreshed = await self.tool_manager.execute({"tool": "calendar", "action": "list"})
-            if refreshed.get("status") == "ok" and "events" in refreshed:
-                await self.socket_manager.broadcast({"type": "calendar_data", "events": refreshed["events"]})
-        return result.get("message", fallback_reply)
+        return result.get("message", fallback)
 
-    async def _run_direct_arduino_command(self, parsed: tuple[dict, str, str]) -> str:
-        action, ok_reply, error_reply = parsed
-        undo_action = None
-        if action.get("op") == "SET" and action.get("target") in {"servo", "servo2"}:
-            arduino_tool = self.tool_manager.tools.get("arduino")
-            state = arduino_tool.sim_state if arduino_tool else {}
-            if action["target"] in state:
-                undo_action = {
-                    "tool": "arduino",
-                    "op": "SET",
-                    "target": action["target"],
-                    "value": int(state.get(action["target"]) or 0),
-                }
-        result = await self.tool_manager.execute(action)
-        if result.get("status") == "ok":
-            await self._broadcast_arduino_state(result.get("state", {}))
-            if undo_action and undo_action.get("value") != action.get("value"):
-                self._last_reversible_command = {
-                    "type": "servo",
-                    "action": undo_action,
-                    "label": "porta" if action.get("target") == "servo" else "cancellino",
-                }
-            return ok_reply
-        return error_reply
+    def _parse_direct_structured_memory_command(self, text: str) -> tuple[str, dict] | None:
+        reminder = re.fullmatch(r"ricordami\s+(oggi|domani)(?:\s+alle\s+(\d{1,2})(?::(\d{2}))?)?\s+(?:che\s+)?(.+)", text)
+        if reminder:
+            day, hour, minute, content = reminder.groups()
+            due_at = datetime.now().astimezone().replace(second=0, microsecond=0)
+            if day == "domani":
+                due_at += timedelta(days=1)
+            due_at = due_at.replace(hour=int(hour or 9), minute=int(minute or 0))
+            return "reminder", {"content": content.strip(), "due_at": due_at}
+        note = re.fullmatch(r"(?:segnati|annota|prendi nota)(?:\s+che)?\s+(.+)", text)
+        if note:
+            content = note.group(1).strip()
+            lent = re.fullmatch(r"ho prestato (?:il|lo|la|i|gli|le)\s+(.+?)\s+a\s+(.+)", content)
+            if lent:
+                return "fact", {"subject": lent.group(1), "value": f"Prestato a {lent.group(2)}"}
+            return "note", {"content": content}
+        lookup = re.fullmatch(r"(?:dove|dov['’][eè])\s+(?:il|lo|la|i|gli|le)?\s*(.+?)[?!.]*", text)
+        return ("fact_lookup", {"query": lookup.group(1).strip()}) if lookup else None
 
-    async def _stop_alarm_direct(self) -> str:
-        previous = self.automation_engine.get_last_scene()
-        self.automation_engine._cancel_background_tasks("allarme")
-        if previous == "allarme":
-            clear_result = await self.automation_engine.clear_active_scene()
-            status = clear_result.get("status")
-        else:
-            action = {
-                "tool": "arduino",
-                "op": "BATCH",
-                "actions": [
-                    {"op": "SET", "target": "buzzer", "value": 0},
-                    {"op": "SET", "target": "speaker", "melody": "off"},
-                    {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
-                ],
-            }
-            clear_result = await self.tool_manager.execute(action)
-            status = clear_result.get("status")
-            await self._broadcast_arduino_state(clear_result.get("state", {}))
-        if self.socket_manager:
-            await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
-        return "Allarme fermato." if status == "ok" else "Allarme fermato con alcuni avvisi."
-
-    async def _open_dashboard_panel(self, layout: str) -> str:
-        labels = {"weather": "Meteo", "calendar": "Calendario", "news": "Notizie"}
-        if self.socket_manager:
-            await self.socket_manager.broadcast({"type": "layout", "layout": layout, "params": {}})
-        if layout == "calendar":
-            result = await self.tool_manager.execute({"tool": "calendar", "action": "list"})
-            if self.socket_manager and result.get("status") == "ok" and "events" in result:
-                await self.socket_manager.broadcast({"type": "calendar_data", "events": result["events"]})
-        elif layout == "weather":
-            result = await self.tool_manager.execute({"tool": "weather", "location": None})
-            if self.socket_manager and result.get("status") == "ok" and isinstance(result.get("data"), dict):
-                await self.socket_manager.broadcast({"type": "weather", **result["data"]})
-        elif layout == "news":
-            result = await self.tool_manager.execute({"tool": "news", "limit": 5})
-            if self.socket_manager and result.get("status") == "ok" and "news" in result:
-                await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
-        return f"Scheda {labels[layout]} aperta."
+    async def _run_direct_structured_memory_command(self, parsed: tuple[str, dict]) -> str:
+        operation, data = parsed
+        self.structured_memory.initialize()
+        if operation == "note":
+            self.structured_memory.add_note(data["content"])
+            return "Nota salvata."
+        if operation == "fact":
+            fact = self.structured_memory.remember_fact(data["subject"], data["value"])
+            return f"Segnato: {fact['subject']} — {fact['value']}."
+        if operation == "reminder":
+            reminder = self.structured_memory.add_reminder(data["content"], data["due_at"])
+            due_at = datetime.fromisoformat(reminder["due_at"]).astimezone()
+            return f"Promemoria impostato per il {due_at:%d/%m alle %H:%M}: {reminder['content']}."
+        facts = self.structured_memory.find_facts(data["query"])
+        return "\n".join(f"{fact['subject']}: {fact['value']}" for fact in facts) if facts else "Non ho trovato nulla nella memoria personale."
 
     def _parse_direct_weather_command(self, text: str) -> dict | None:
-        if re.search(r"\b(sensor[ei]|temperatura casa|umidit[àa]|dht)\b", text):
+        if text in {"temperatura casa", "temperatura in casa"}:
             return None
-
-        is_weather = (
-            re.search(r"\bche\s+tempo\s+fa\b", text)
-            or re.fullmatch(r"meteo(?:\s+(?:a|ad|di|per)\s+[a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ' -]{1,60})?", text)
-            or re.search(r"\bprevisioni\b", text)
-            or re.search(r"\b(sta\s+)?piovendo\b", text)
-            or re.search(r"\btemperatura\s+(?:fuori|esterna|a|di)\b", text)
-        )
-        if not is_weather:
-            return None
-
-        location = None
-        match = re.search(
-            r"\b(?:a|ad|di|per)\s+([a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ' -]{1,60})$",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if match:
-            location = match.group(1).strip(" ,.").title()
-
-        return {"tool": "weather", "location": location}
+        match = re.fullmatch(r"(?:che tempo fa|meteo|previsioni)(?:\s+(?:a|per)\s+(.+?))?[?!.]*", text)
+        return {"tool": "weather", "location": match.group(1).strip().title() if match and match.group(1) else None} if match else None
 
     async def _run_direct_weather_command(self, action: dict) -> str:
         result = await self.tool_manager.execute(action)
-        if result.get("status") != "ok" or not isinstance(result.get("data"), dict):
-            return f"Non riesco a recuperare il meteo: {result.get('message', 'servizio non disponibile')}"
-
-        data = result["data"]
-        if self.socket_manager:
-            await self.socket_manager.broadcast({"type": "weather", "data": data})
-
-        location = data.get("location") or action.get("location") or "la localita impostata"
+        data = result.get("data", {})
+        if result.get("status") != "ok" or not data:
+            return result.get("message", "Meteo non disponibile.")
+        location = data.get("location", action.get("location") or "la localita richiesta")
         temp = data.get("temp")
-        condition = data.get("condition") or "variabile"
-        wind = data.get("wind")
-
-        parts = [f"A {location}: {condition.lower()}"]
+        condition = data.get("condition")
+        parts = [f"A {location}"]
+        if condition:
+            parts.append(str(condition).lower())
         if temp is not None:
             parts.append(f"{round(float(temp))} gradi")
-        if wind is not None:
-            parts.append(f"vento {round(float(wind))} km/h")
         return ", ".join(parts) + "."
 
     def _parse_direct_news_command(self, text: str) -> dict | None:
-        if re.search(r"\b(news|notizie|ultime notizie)\b", text) and re.search(
-            r"\b(dimmi|dammi|leggi|racconta|mostra|ultime|oggi|giorno)\b", text
-        ):
-            return {"tool": "news", "limit": 5}
-        return None
+        return {"tool": "news", "limit": 5} if re.fullmatch(r"(?:dimmi\s+)?(?:le\s+)?(?:ultime\s+)?(?:news|notizie)[?!.]*", text) else None
 
     async def _run_direct_news_command(self, action: dict) -> str:
         result = await self.tool_manager.execute(action)
-        if result.get("status") != "ok":
-            return f"Non riesco a recuperare le notizie: {result.get('message', 'servizio non disponibile')}"
-        if self.socket_manager and "news" in result:
-            await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
-        return result.get("message", "Ecco le ultime notizie.")
+        return result.get("message", "Notizie non disponibili.")
 
     def _parse_direct_knowledge_command(self, text: str) -> dict | None:
-        patterns = [
-            r"\b(?:parlami|raccontami)\s+di\s+(.+)$",
-            r"\bdimmi\s+(?:qualcosa|tutto)\s+su\s+(.+)$",
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, text, flags=re.IGNORECASE)
-            if match:
-                query = match.group(1).strip(" .,!?:;")
-                if query:
-                    return {"tool": "search", "query": self._normalize_knowledge_query(query)}
-        return None
+        match = re.fullmatch(r"(?:parlami|raccontami)\s+di\s+(.+?)[?!.]*", text, flags=re.IGNORECASE)
+        if not match:
+            return None
+        return {"tool": "search", "query": self._normalize_knowledge_query(match.group(1).strip())}
 
-    def _normalize_knowledge_query(self, query: str) -> str:
-        aliases = {
-            "napoleone": "Napoleone Bonaparte",
-            "napoleone bonaparte": "Napoleone Bonaparte",
-            "manzoni": "Alessandro Manzoni",
-            "alessandro manzoni": "Alessandro Manzoni",
-        }
-        key = re.sub(r"\s+", " ", query.strip().lower())
-        return aliases.get(key, query.strip())
-
-    def _format_knowledge_reply(self, text: str) -> str:
-        clean = re.sub(r"\s+", " ", str(text or "")).strip()
-        clean = re.sub(r"\[[^\]]+\]", "", clean).strip()
-        if len(clean) <= 520:
-            return clean
-        sentences = re.split(r"(?<=[.!?])\s+", clean)
-        reply = ""
-        for sentence in sentences:
-            if not sentence:
-                continue
-            candidate = f"{reply} {sentence}".strip()
-            if len(candidate) > 520:
-                break
-            reply = candidate
-        return reply or clean[:517].rstrip() + "..."
+    @staticmethod
+    def _normalize_knowledge_query(query: str) -> str:
+        aliases = {"napoleone": "Napoleone Bonaparte", "manzoni": "Alessandro Manzoni"}
+        return aliases.get(query.casefold(), query)
 
     async def _run_direct_knowledge_command(self, action: dict) -> str:
         result = await self.tool_manager.execute(action)
-        if result.get("status") == "ok":
-            return self._format_knowledge_reply(result.get("message", ""))
-        return f"Non riesco a recuperare informazioni su {action.get('query', 'questo argomento')}."
+        return result.get("message", "Ricerca non disponibile.")
 
     def _capabilities_reply(self, text: str) -> str | None:
-        if not re.search(r"\b(cosa|che|tutto)\b.*\b(puoi fare|sai fare|funzioni|capacita)\b", text):
+        if not re.search(r"\b(?:cosa sai fare|funzioni|capacita|capabilities)\b", self._normalize_router_text(text)):
             return None
-        return (
-            "Posso gestire calendario, promemoria, note, ricerche web, meteo, ultime notizie, timer, "
-            "controllo Spotify e comandi di sistema."
-        )
+        return "Posso gestire calendario, memoria, meteo, notizie, timer, ricerca, Spotify, MQTT e funzioni di sistema."
 
-    async def _undo_last_reversible_command(self) -> str:
-        item = self._last_reversible_command
-        self._last_reversible_command = None
-        if not item:
-            return "Nessun comando servo o scena da annullare."
-        if item.get("type") == "scene":
-            result = await self.automation_engine.clear_active_scene()
-            if self.socket_manager:
-                await self.socket_manager.broadcast({"type": "scene_cleared", "scene": item.get("scene")})
-            return "Ultima scena annullata." if result.get("status") == "ok" else "Ultima scena annullata con avvisi."
-        if item.get("type") == "servo":
-            result = await self.tool_manager.execute(item["action"])
-            await self._broadcast_arduino_state(result.get("state", {}))
-            label = item.get("label", "servo")
-            return (
-                f"Ultimo comando {label} annullato."
-                if result.get("status") == "ok"
-                else f"Non riesco ad annullare {label}: Arduino non e' connesso."
-            )
-        return "Nessun comando annullabile."
+    async def _stop_alarm_direct(self) -> str:
+        self.automation_engine._cancel_background_tasks("allarme")
+        return "Allarme fermato."
 
-    # ── PROCESSO PRINCIPALE (ReAct Loop) ──────────────────────────────
+    async def _open_dashboard_panel(self, layout: str) -> str:
+        if self.socket_manager:
+            await self.socket_manager.broadcast({"type": "layout", "layout": layout})
+        return f"Pannello {layout} aperto."
+
     async def process(self, user_input: str, progress_cb=None):
-        """Pipeline completa ReAct: Ragiona → Agisci → Osserva."""
-        # Garbage collect completed tasks from caches to prevent memory leaks
-        for t in list(self._current_task_layout.keys()):
-            if t.done():
-                self._current_task_layout.pop(t, None)
-        for t in list(self._current_task_final_data.keys()):
-            if t.done():
-                self._current_task_final_data.pop(t, None)
-
-        # Salva input nella memoria (senza bloccare per embedding/database)
+        for cache in (self._current_task_layout, self._current_task_final_data):
+            for task in list(cache):
+                if task.done():
+                    cache.pop(task, None)
         await self.memory.add_turn("user", user_input, persist_db=False)
+        clean = self._strip_wake_prefix(user_input.strip()).lower()
+        original = self._strip_wake_prefix(user_input.strip())
 
-        # 0. Fast path: comandi Spotify diretti (bypass routing)
-        lower_input = user_input.strip().lower()
-        # Rimuovi prefissi vocali comuni
-        _clean = self._strip_wake_prefix(lower_input)
-        _clean_original = self._strip_wake_prefix(user_input.strip())
-
-        hard_action = self._hard_route_light_command(_clean)
-        if hard_action:
-            result = await self.tool_manager.execute(hard_action)
-            if result.get("status") == "ok":
-                await self._broadcast_arduino_state(result.get("state", {}))
-                if hard_action.get("op") == "BATCH":
-                    values = [item.get("value") for item in hard_action.get("actions", []) if isinstance(item, dict)]
-                    targets = [item.get("target") for item in hard_action.get("actions", []) if isinstance(item, dict)]
-                    if values and all(value == 0 for value in values):
-                        reply = "Luci spente."
-                    elif targets == ["light", "rgb"]:
-                        reply = "Luce accesa."
-                    else:
-                        reply = "Ho aggiornato tutte le luci."
-                else:
-                    target = hard_action.get("target")
-                    if target == "rgb3":
-                        reply = (
-                            "Ho spento la luce del giardino."
-                            if hard_action.get("value") == 0
-                            else "Ho acceso la luce del giardino."
-                        )
-                    elif target == "rgb2":
-                        reply = "Ho aggiornato la luce della camera."
-                    elif target == "rgb1":
-                        reply = "Ho aggiornato la luce del salotto."
-                    elif target == "rgb":
-                        reply = "Luci spente." if hard_action.get("value") == 0 else "Ho aggiornato le luci."
-                    elif target == "light":
-                        reply = (
-                            "Luce principale spenta." if hard_action.get("value") == 0 else "Luce principale accesa."
-                        )
-                    else:
-                        reply = "Ho aggiornato la luce principale."
-            else:
-                reply = "Non sono riuscita a controllare la luce."
-
-            for token in (w + " " for w in reply.split()):
-                yield token
-            return
-
-        direct_weather = self._parse_direct_weather_command(_clean)
-        if direct_weather:
-            reply = await self._run_direct_weather_command(direct_weather)
-            yield await self._reply_fast(reply, {"type": "weather", "params": {}})
-            return
-
-        direct_news = self._parse_direct_news_command(_clean)
-        if direct_news:
-            reply = await self._run_direct_news_command(direct_news)
-            yield await self._reply_fast(reply, {"type": "news", "params": {}})
-            return
-
-        direct_knowledge = self._parse_direct_knowledge_command(_clean_original)
-        if direct_knowledge:
-            reply = await self._run_direct_knowledge_command(direct_knowledge)
-            yield await self._reply_fast(reply, {"type": "chat", "params": {}})
-            return
-
-        capabilities_reply = self._capabilities_reply(_clean)
-        if capabilities_reply:
-            yield await self._reply_fast(capabilities_reply, {"type": "dashboard", "params": {}})
-            return
-
-        if re.search(r"\b(annulla|undo|ripristina)\b", _clean) and re.search(
-            r"\b(ultimo comando|ultimo|comando|azione)\b", _clean
-        ):
-            reply = await self._undo_last_reversible_command()
-            yield await self._reply_fast(reply)
-            return
-
-        if re.search(r"\b(ferma|stop|spegni|disattiva)\b", _clean) and re.search(
-            r"\b(allarme|alarme|all['’]?armi)\b", _clean
-        ):
-            reply = await self._stop_alarm_direct()
-            yield await self._reply_fast(reply)
-            return
-
-        dashboard_layout = None
-        if re.search(r"\b(apri|mostra|visualizza|vai a|vai alla)\b", _clean) and re.search(
-            r"\b(scheda|pannello|tab|pagina)?\s*(meteo|calendario|notizie|news)\b", _clean
-        ):
-            if re.search(r"\bmeteo\b", _clean):
-                dashboard_layout = "weather"
-            elif re.search(r"\b(calendario|agenda)\b", _clean):
-                dashboard_layout = "calendar"
-            elif re.search(r"\b(notizie|news)\b", _clean):
-                dashboard_layout = "news"
-        if dashboard_layout:
-            reply = await self._open_dashboard_panel(dashboard_layout)
-            yield await self._reply_fast(reply, {"type": dashboard_layout, "params": {}})
-            return
-
-        if _clean in ["apri chat", "apri la chat", "mostra chat", "mostra la chat", "apri console", "mostra console"]:
-            if self.socket_manager:
-                await self.socket_manager.broadcast({"type": "toggle_console", "action": "open"})
-            reply = "Console neurale aperta, signore."
-            yield await self._reply_fast(reply)
-            return
-
-        if _clean in [
-            "chiudi chat",
-            "nascondi chat",
-            "chiudi la chat",
-            "nascondi la chat",
-            "chiudi console",
-            "nascondi console",
-        ]:
-            if self.socket_manager:
-                await self.socket_manager.broadcast({"type": "toggle_console", "action": "close"})
-            reply = "Console minimizzata."
-            yield await self._reply_fast(reply)
-            return
-
-        spotify_action = None
-
-        # 0a. Comando esplicito: "spotify next", "spotify play", ecc.
-        if _clean.startswith("spotify "):
-            parts = _clean.split(None, 2)
-            command = parts[1] if len(parts) > 1 else "current"
-            extra = parts[2] if len(parts) > 2 else ""
-            spotify_action = {"tool": "spotify", "command": command}
-            if command == "search" and extra:
-                spotify_action["query"] = extra
-            elif command == "volume" and extra:
-                spotify_action["level"] = extra
-
-        # 0b. Linguaggio naturale: "metti X su spotify", "riproduci X", "play X"
-        if not spotify_action:
-            _pfx = r"(?:metti|riproduci|play|fammi sentire|cerca)\s+"
-            m = re.match(_pfx + r"(.+?)\s+(?:su|on)\s+spotify$", _clean) or re.match(_pfx + r"([^\n]{1,200})$", _clean)
-            if m and ("spotify" in _clean or any(w in _clean for w in ["metti", "riproduci", "fammi sentire"])):
-                query = m.group(1).strip()
-                # Rimuovi "di" come separatore artista (es. "ferrari di lilcr")
-                query = " ".join(part for part in query.split(" di ") if part) if " di " in query else query
-                spotify_action = {"tool": "spotify", "command": "search", "query": query}
-
-        if spotify_action:
-            result = await self.tool_manager.execute(spotify_action)
-            reply = result.get("message", str(result))
-            if self.socket_manager:
-                await self.socket_manager.broadcast({"type": "spotify", "data": result})
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        direct_calendar = self._parse_direct_calendar_command(_clean)
-        if direct_calendar:
-            reply = await self._run_direct_calendar_command(direct_calendar)
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        if _clean in ["spegni scena", "spegni la scena", "disattiva scena", "disattiva la scena", "stop scena"]:
-            clear_result = await self.automation_engine.clear_active_scene()
-            previous = clear_result.get("previous")
-            status = clear_result.get("status")
-            reply = "Scena disattivata." if previous and status == "ok" else "Scena disattivata con avvisi."
-            if not previous:
-                reply = "Nessuna scena attiva. Dispositivi spenti."
-            if self.socket_manager:
-                await self.socket_manager.broadcast({"type": "scene_cleared", "scene": previous})
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        direct_arduino = self._parse_direct_arduino_command(_clean)
-        if direct_arduino:
-            reply = await self._run_direct_arduino_command(direct_arduino)
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        if re.search(r"\b(chiudi|chiudere)\b", _clean) and re.search(r"\bporta\b", _clean):
-            action = {"tool": "arduino", "op": "SET", "target": "servo", "value": 0}
-            result = await self.tool_manager.execute(action)
-            reply = (
-                "Porta chiusa."
-                if result.get("status") == "ok"
-                else "Non riesco a chiudere la porta: Arduino non e' connesso."
-            )
-            st = result.get("state", {})
-            if self.socket_manager and st:
-                await self.socket_manager.broadcast(
-                    {
-                        "type": "state",
-                        "led": "on" if st.get("light") else "off",
-                        "servo": "open" if (st.get("servo") or 0) > 0 else "0",
-                        "servo2": st.get("servo2", 0),
-                        "rgb1": st.get("rgb1", [0, 0, 0]),
-                        "rgb2": st.get("rgb2", [0, 0, 0]),
-                        "rgb3": st.get("rgb3", [0, 0, 0]),
-                        "buzzer": st.get("buzzer", False),
-                        "buzz2_playing": st.get("buzz2_playing", False),
-                    }
-                )
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        if re.search(r"\b(chiudi|chiudere)\b", _clean) and re.search(r"\b(cancello|cancellino)\b", _clean):
-            action = {"tool": "arduino", "op": "SET", "target": "servo2", "value": 0}
-            result = await self.tool_manager.execute(action)
-            reply = (
-                "Cancellino chiuso."
-                if result.get("status") == "ok"
-                else "Non riesco a chiudere il cancellino: Arduino non e' connesso."
-            )
-            st = result.get("state", {})
-            if self.socket_manager and st:
-                await self.socket_manager.broadcast(
-                    {
-                        "type": "state",
-                        "led": "on" if st.get("light") else "off",
-                        "servo": "open" if (st.get("servo") or 0) > 0 else "0",
-                        "servo2": st.get("servo2", 0),
-                        "rgb1": st.get("rgb1", [0, 0, 0]),
-                        "rgb2": st.get("rgb2", [0, 0, 0]),
-                        "rgb3": st.get("rgb3", [0, 0, 0]),
-                        "buzzer": st.get("buzzer", False),
-                        "buzz2_playing": st.get("buzz2_playing", False),
-                    }
-                )
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        if re.search(r"\bspegni\b", _clean) and re.search(r"\b(luce|luci|led|lampad[ae]|illuminazione)\b", _clean):
-            action = {
-                "tool": "arduino",
-                "op": "BATCH",
-                "actions": [
-                    {"op": "SET", "target": "light", "value": 0},
-                    {"op": "SET", "target": "rgb", "value": 0, "effect": 0},
-                    {"op": "SET", "target": "neopixel", "value": 0, "effect": 0},
-                ],
-            }
-            result = await self.tool_manager.execute(action)
-            if result.get("status") == "ok":
-                reply = "Luci spente."
-                st = result.get("state", {})
-                if self.socket_manager and st:
-                    await self.socket_manager.broadcast(
-                        {
-                            "type": "state",
-                            "led": "on" if st.get("light") else "off",
-                            "servo": "open" if (st.get("servo") or 0) > 0 else "0",
-                            "servo2": st.get("servo2", 0),
-                            "rgb1": st.get("rgb1", [0, 0, 0]),
-                            "rgb2": st.get("rgb2", [0, 0, 0]),
-                            "rgb3": st.get("rgb3", [0, 0, 0]),
-                            "buzzer": st.get("buzzer", False),
-                            "buzz2_playing": st.get("buzz2_playing", False),
-                        }
-                    )
-            else:
-                reply = "Non riesco a spegnere le luci: Arduino non e' connesso."
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        # 1. Controlla automazioni (fast path)
-        auto_result = self._check_automation(user_input)
-        if auto_result is not None:
-            exec_result = await self.automation_engine.execute(auto_result, source="voice")
-            scene_name = auto_result.name
-            status = exec_result.get("status", "ok")
-
-            if status == "ok":
-                reply = f"Scena '{scene_name}' eseguita."
-                self._last_reversible_command = {"type": "scene", "scene": scene_name}
-            elif status == "skipped":
-                reason = exec_result.get("reason", "")
-                if reason == "cooldown":
-                    reply = (
-                        f"La scena '{scene_name}' è stata già eseguita di recente. Attendi un po' prima di riprovare."
-                    )
-                else:
-                    reply = f"La scena '{scene_name}' non può essere eseguita al momento (condizioni non soddisfatte)."
-            else:
-                reply = f"Scena '{scene_name}' completata con alcuni avvisi."
-
-            if self.socket_manager:
-                await self.socket_manager.broadcast({"type": "scene_executed", "scene": scene_name, "status": status})
-            await self.memory.add_turn("jarvis", reply, persist_db=False)
-            asyncio.create_task(self.memory.add_turn("jarvis", reply, persist_db=True))
-            self._set_final_layout(reply, {"type": "current", "params": {}})
-            yield reply
-            return
-
-        # 2. ReAct Loop
-        # 2a. Determina l'intent UNA VOLTA sola fuori dal loop (Pipeline specialistica)
-        intent = await self._route_intent(user_input)
-
-        max_steps = int(os.getenv("REACT_MAX_STEPS", "2"))
-        current_step = 0
-
-        # --- FAST PATH: CHITCHAT SINGLE-SHOT ---
-        if intent == "CHITCHAT":
-            system_prompt = SPECIALIST_PROMPTS["CHITCHAT"]
-            pref_context = self.learner.get_context_injection()
-            if pref_context:
-                system_prompt = system_prompt + f"\n\nPROFILO UTENTE:\n{pref_context}"
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_input},
-            ]
-
-            res_text = None
-            if os.getenv("GROQ_API_KEY"):
-                res_text = await self._call_groq(messages, json_mode=True)
-
-            if not res_text:
-                if not is_ollama_enabled():
-                    print("[LLM] Ollama disabilitato, salto chitchat")
-                    return
-                client = ollama.AsyncClient()
-                response = await client.chat(
-                    model=MODELS["chitchat"],
-                    messages=messages,
-                    format="json",
-                    options={"temperature": 0.7},
-                    keep_alive="10m",
-                )
-                res_text = response["message"]["content"]
-
-            result = self._clean_json(res_text)
-            final_reply = result.get("reply", "")
-            if final_reply:
-                for token in (w + " " for w in final_reply.split()):
-                    yield token
-                await self.memory.add_turn("jarvis", final_reply, persist_db=False)
-                asyncio.create_task(self.memory.add_turn("jarvis", final_reply, persist_db=True))
+        fast_paths = [
+            (self._parse_direct_weather_command(clean), self._run_direct_weather_command, "weather"),
+            (self._parse_direct_news_command(clean), self._run_direct_news_command, "news"),
+            (self._parse_direct_knowledge_command(original), self._run_direct_knowledge_command, "chat"),
+        ]
+        for parsed, runner, layout in fast_paths:
+            if parsed:
+                yield await self._reply_fast(await runner(parsed), {"type": layout, "params": {}})
                 return
 
-        context = await self.memory.get_context(query=user_input, top_k=5)
+        direct_memory = self._parse_direct_structured_memory_command(clean)
+        if direct_memory:
+            yield await self._reply_fast(await self._run_direct_structured_memory_command(direct_memory), {"type": "chat", "params": {}})
+            return
+        direct_calendar = self._parse_direct_calendar_command(clean)
+        if direct_calendar:
+            yield await self._reply_fast(await self._run_direct_calendar_command(direct_calendar), {"type": "calendar", "params": {}})
+            return
+        capabilities = self._capabilities_reply(clean)
+        if capabilities:
+            yield await self._reply_fast(capabilities, {"type": "dashboard", "params": {}})
+            return
+        if re.search(r"\b(?:ferma|stop|spegni|disattiva)\b", clean) and re.search(r"\b(?:allarme|alarme|all['’]?armi)\b", clean):
+            yield await self._reply_fast(await self._stop_alarm_direct())
+            return
 
-        # Inizializziamo la memoria di lavoro per il loop
-        base_system_prompt = SPECIALIST_PROMPTS.get(intent, DEFAULT_PROMPT)
-        pref_context = self.learner.get_context_injection()
-        if pref_context:
-            base_system_prompt = base_system_prompt + f"\n\nPROFILO UTENTE:\n{pref_context}"
+        automation = self._check_automation(clean)
+        if automation:
+            outcome = await self.automation_engine.execute(automation, source="manual")
+            yield await self._reply_fast(outcome.get("message", f"Automazione {automation.name} eseguita."))
+            return
 
-        history = [
-            {
-                "role": "system",
-                "content": base_system_prompt,
-            },
-            {
-                "role": "user",
-                "content": f"CONTESTO PASSATO RILEVANTE:\n{context}\n\nRichiesta utente: {user_input}",
-            },
-        ]
-
+        intent = await self._route_intent(user_input)
+        context = await self.memory.get_context(user_input)
+        history = [{"role": "system", "content": SPECIALIST_PROMPTS[intent]}, {"role": "user", "content": f"{context}\n\nRICHIESTA: {user_input}"}]
+        max_steps = int(os.getenv("REACT_MAX_STEPS", "2"))
         final_reply = ""
-        model_name = MODELS.get(intent.lower(), MODELS["domotic"])
-
-        print(f"[ReAct] {intent} <- '{user_input[:60]}'")
-
+        current_step = 0
         while current_step < max_steps:
             current_step += 1
-
-            # 2b. Chiedi all'LLM cosa fare
             try:
+                plan = None
                 full_response_text = ""
-
-                # PRIORITÀ GROQ
-                if os.getenv("GROQ_API_KEY"):
-                    full_response_text = await self._call_groq(history, json_mode=True)
-
-                # FALLBACK OLLAMA
-                if not full_response_text:
-                    if not is_ollama_enabled():
-                        print("[LLM] Ollama disabilitato, salto fallback planner")
-                        if getattr(self, "_last_groq_error_status", None) == 429:
-                            final_reply = "Groq ha raggiunto il limite di richieste. Riprova tra poco."
-                        else:
-                            final_reply = "Non riesco a contattare il modello in questo momento."
-                        yield final_reply
-                        break
-                    client = ollama.AsyncClient()
-
-                    # Streaming della risposta dell'LLM
-                    # Se è l'ultimo step o un'intent semplice, possiamo fare streaming della reply.
-                    # Ma qui riceviamo un JSON, quindi non possiamo streammare il JSON grezzo all'utente.
-                    # Lo streaming dei token ha senso solo se sappiamo che è la risposta finale.
-
-                    response = await client.chat(
-                        model=model_name,
-                        messages=history,
-                        format="json",
-                        options={"temperature": 0.1},
-                        keep_alive="10m",
-                        stream=False,
-                    )
-                    full_response_text = response["message"]["content"]
-
-                plan = self._clean_json(full_response_text)
-
-                actions = plan.get("actions", [])
-                thought = plan.get("thought", "")
-                reply = plan.get("reply", "")
-
-                if thought:
-                    print(f"[ReAct] Pensiero: {thought}")
-
-                # Se non ci sono azioni, abbiamo finito: streammiano la reply finale
-                if not actions:
-                    if reply:
-                        final_reply = reply
-                        # Stream the final reply token by token
-                        for token in (w + " " for w in final_reply.split()):
-                            yield token
-                    else:
-                        print("[ReAct] Reply vuota - richiamo pipeline specialistica.")
-                        fallback = await self._call_llm(user_input, progress_cb)
-                        final_reply = fallback.get("reply") or "Come posso aiutarti?"
-                        for token in (w + " " for w in final_reply.split()):
-                            yield token
+                if is_ollama_enabled():
+                    try:
+                        response = await ollama.AsyncClient().chat(model=MODELS.get(intent.lower(), MODELS["reasoning"]), messages=history, format="json")
+                        full_response_text = response.get("message", {}).get("content", "{}")
+                        plan = self._clean_json(full_response_text)
+                    except Exception:
+                        plan = None
+                if not plan:
+                    plan = await self._call_groq(history, json_mode=True)
+                    full_response_text = json.dumps(plan or {}, ensure_ascii=False)
+                if not plan:
+                    final_reply = "Ho raggiunto il limite di richieste del servizio cloud. Riprova tra poco." if self._last_groq_error_status == 429 else "Il modello non e disponibile."
+                    yield final_reply
                     break
-
-                # 2c. Eseguire azioni
-                if actions:
-                    # Streamma la frase "pre" (es. "Controllo il meteo...")
-                    # come primo token visibile all'utente
-                    if reply:
-                        yield reply + " "
-                        if progress_cb:
-                            await progress_cb(reply)
-
-                    results = await self._execute_actions(actions, user_input)
-                    self.learner.observe_command(user_input, actions)
-
-                    # 2d. Crea osservazione per il prossimo step
-                    observation = ""
-                    for res in results:
-                        tool = res["tool"]
-                        data = res["result"]
-                        status = data.get("status", "error")
-                        msg = data.get("message", "")
-                        compressed_msg = compress_tool_output(tool, str(msg))
-                        observation += f"Risultato tool '{tool}' ({status}): {compressed_msg}\n"
-
-                    # --- EARLY EXIT CHECK ---
-                    # Se abbiamo usato un solo tool (non critico), il risultato è OK e abbiamo già una reply
-                    # consistente, usciamo senza fare lo Step 2 (riformulazione).
-                    is_error = any(res.get("result", {}).get("status") == "error" for res in results)
-
-                    # Tool che richiedono riformulazione: i dati grezzi vanno
-                    # rielaborati dall'LLM in una risposta naturale (secondo step).
-                    needs_rephrase = [
-                        "none",
-                        "weather",
-                        "news",
-                        "search",
-                        "calendar",
-                    ]
-                    has_rephrase_tool = any(res["tool"] in needs_rephrase for res in results)
-
-                    if not is_error and not has_rephrase_tool and len(reply) > 15:
-                        final_reply = reply
-                        break
-
-                    # Aggiungi azione e osservazione alla storia
-                    history.append({"role": "assistant", "content": full_response_text})
-                    history.append(
-                        {
-                            "role": "user",
-                            "content": f"OSSERVAZIONE: {observation}\nContinua se necessario o fornisci la risposta finale.",
-                        }
-                    )
-
-            except Exception as e:
-                print(f"[ReAct] Errore step {current_step}: {e}")
-                final_reply = f"Errore durante l'elaborazione: {e}"
+                actions = plan.get("actions") or []
+                reply = plan.get("reply", "")
+                if not actions:
+                    final_reply = reply or "Come posso aiutarti?"
+                    for token in (word + " " for word in final_reply.split()):
+                        yield token
+                    break
+                if reply:
+                    yield reply + " "
+                    if progress_cb:
+                        await progress_cb(reply)
+                results = await self._execute_actions(actions, user_input)
+                self.learner.observe_command(user_input, actions)
+                is_error = any(item["result"].get("status") == "error" for item in results)
+                needs_rephrase = any(item["tool"] in {"none", "weather", "news", "search", "calendar"} for item in results)
+                if not is_error and not needs_rephrase and len(reply) > 15:
+                    final_reply = reply
+                    break
+                observation = "\n".join(
+                    f"Risultato tool '{item['tool']}' ({item['result'].get('status', 'error')}): {compress_tool_output(item['tool'], str(item['result'].get('message', '')))}"
+                    for item in results
+                )
+                history.append({"role": "assistant", "content": full_response_text})
+                history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua o fornisci la risposta finale."})
+            except Exception as exc:
+                final_reply = f"Errore durante l'elaborazione: {exc}"
                 yield final_reply
                 break
-
         if not final_reply and current_step >= max_steps:
             final_reply = "Mi dispiace, il ragionamento ha richiesto troppi passaggi."
             yield final_reply
-
-        # Salva risposta nella memoria (non-blocking)
         await self.memory.add_turn("jarvis", final_reply, persist_db=False)
         asyncio.create_task(self.memory.add_turn("jarvis", final_reply, persist_db=True))
-
-        # In un async generator non si può usare 'return value' prima di Python 3.10
-        # o in contesti specifici. Usiamo un attributo per passare il layout finale.
         task = asyncio.current_task()
-        layout = self._current_task_layout.pop(task, getattr(self, "_last_layout", {"type": "orb", "params": {}}))
-        final_data = (final_reply, layout)
+        layout = self._current_task_layout.pop(task, self._last_layout)
         if task:
-            self._current_task_final_data[task] = final_data
+            self._current_task_final_data[task] = (final_reply, layout)
         else:
-            self._last_final_data = final_data
+            self._last_final_data = (final_reply, layout)

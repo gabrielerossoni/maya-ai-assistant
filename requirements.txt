@@ -5,7 +5,6 @@ ollama>=0.3.0       # client ufficiale Python per Ollama
 fastapi>=0.100.0    # Web API e WebSocket
 uvicorn>=0.23.0     # Server asincrono per FastAPI
 websockets>=11.0    # WebSocket
-# pyserial>=3.5       # opzionale per seriale Arduino legacy
 # pyautogui>=0.9     # screenshot
 # tkinter             # GUI (incluso in Python standard)
 # Google Calendar
