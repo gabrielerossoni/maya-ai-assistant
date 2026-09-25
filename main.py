@@ -32,7 +32,6 @@ from core.broadcasters import (
     weather_broadcaster,
 )
 from core.context_manager import context as home_context
-from core.ngrok_manager import start_ngrok
 from core.ollama_manager import ensure_ollama_running
 from core.plugin_loader import PluginLoader
 from core.proactive_manager import ProactiveManager
@@ -137,19 +136,6 @@ async def lifespan(app: FastAPI):
     http_port = int(os.environ.get("MAYA_HTTP_PORT", "8000"))
 
     await agent.initialize()
-
-    # Avvia ngrok solo su opt-in esplicito.
-    if _env_enabled("MAYA_NGROK_ENABLED"):
-        ngrok_url = await asyncio.to_thread(start_ngrok, http_port)
-    else:
-        ngrok_url = None
-        print("[NGROK] Tunnel disattivato (MAYA_NGROK_ENABLED=false).")
-    if ngrok_url:
-        print(f"\n{'=' * 50}")
-        print(f"  \U0001f310 MAYA pubblica su: {ngrok_url}")
-        print(f"{'=' * 50}\n")
-    else:
-        print("[NGROK] Tunnel non avviato, solo accesso locale.")
 
     # Inizializza PluginLoader e ProactiveManager
     plugins_dir = os.path.join(os.getcwd(), "plugins")

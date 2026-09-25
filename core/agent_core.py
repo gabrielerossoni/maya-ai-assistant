@@ -85,27 +85,22 @@ Tool disponibili:
 - arduino: (op: SET/GET, target: light/servo/servo2/rgb/rgb1/rgb2/rgb3/neopixel/brightness/buzzer/buzzer2/speaker/sensor_read/status; servo=porta 0-180, servo2=cancello 0-180; RGB/neopixel accetta value=0xRRGGBB oppure {"r":0-255,"g":0-255,"b":0-255}, effect=0(solid)/1(pulse)/2(rainbow)/3(alert); brightness: 0-255; buzzer2/speaker: melody=beep/alarm/wake_radar/startup/ok/notify/error/welcome/off)
 - calendar: gestione eventi (action: add/list/delete, title, time "YYYY-MM-DD HH:MM")
 - network: disattivato di default; non usarlo salvo riattivazione esplicita con NETWORK_TOOL_ENABLED=true
-- system: comandi OS (shutdown, open_browser, screenshot)
+- system: comandi OS (shutdown, open_browser, screenshot, stats)
 - weather: meteo (location)
 - news: ultime notizie (limit)
-- wikipedia: ricerca concetti. FORMATO OBBLIGATORIO: {"tool": "wikipedia", "query": "argomento da cercare"}
 - notes: liste e appunti (operation: add/remove/list, item, category: todo/spesa)
-- trading: criptovalute e azioni (operation: price/chart, symbol, asset_type: crypto/stock)
 - timer: sveglie (minutes, seconds, message)
-- translate: traduci testo (text, target: es 'en', 'es')
-- search: ricerca web (query)
+- search: ricerca web e concetti (query)
 - spotify: controllo Spotify reale (command: play_pause/play/pause/next/prev/current/volume_up/volume_down/volume/search, "query" per cercare brano, "level" 0-100 per volume)
 - mqtt: controllo multi-room (room, device, state)
-- sys_monitor: statistiche cpu/ram
-- code_generator: genera nuovi tool (filename, code) solo se abilitato esplicitamente
+- sys_monitor: statistiche cpu/ram/gpu
 - none: risposta solo testuale
 
 REGOLE CRITICHE:
-1. NON RIFIUTARE MAI: Hai accesso a internet tramite i tool. Se l'utente chiede prezzi, meteo o notizie, usa i tool dedicati.
+1. NON RIFIUTARE MAI: Hai accesso a internet tramite i tool. Se l'utente chiede meteo o notizie, usa i tool dedicati.
 2. FORMATO: Rispondi SOLO con il JSON, nessun altro testo.
-3. Se l'utente chiede il valore di una moneta, usa sempre 'trading' con operation 'price'.
-4. Se usi un tool informativo (trading, weather, search, news), nella tua "reply" NON inventare MAI dati o cifre. Dì solo che stai recuperando le informazioni (es: "Certamente, controllo subito..."). I dati reali verranno aggiunti automaticamente dopo.
-5. Parametri tool: metti i parametri canonici al primo livello dell'action (es. {"tool":"translate","text":"ciao","target":"en"}). Non annidare i parametri in "parametro" se il tool ha un formato specifico. "parametro" Ã¨ solo compatibilitÃ  legacy: stringa singola, o dict legacy che il sistema puÃ² leggere ma che non devi generare.
+3. Se usi un tool informativo (weather, search, news), nella tua "reply" NON inventare MAI dati o cifre. Dì solo che stai recuperando le informazioni (es: "Certamente, controllo subito..."). I dati reali verranno aggiunti automaticamente dopo.
+4. Parametri tool: metti i parametri canonici al primo livello dell'action (es. {"tool":"weather","location":"Milano"}). Non annidare i parametri in "parametro" se il tool ha un formato specifico. "parametro" è solo compatibilità legacy: stringa singola, o dict legacy che il sistema può leggere ma che non devi generare.
 """
 
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
@@ -115,7 +110,7 @@ SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
 # ----------------------------------------------
 
 ROUTER_PROMPT = """Classifica l'intent dell'utente in UNA parola.
-- DOMOTIC: se chiede PREZZI, BITCOIN, CRIPTO, S&P500, BORSA, AZIONI, METEO, NOTIZIE, WIKIPEDIA, TRADUZIONI, LUCI, NOTE o CALENDARIO.
+- DOMOTIC: se chiede METEO, NOTIZIE, RICERCHE WEB, LUCI, NOTE o CALENDARIO.
 - REASONING: se chiede CODICE, spiegazioni, analisi, riassunti, definizioni o conoscenza generale.
 - CHITCHAT: SOLO saluti, ringraziamenti, frasi sociali brevi o domande rivolte a MAYA tipo "come stai".
 
@@ -1377,52 +1372,6 @@ class AgentCore:
             await self.socket_manager.broadcast({"type": "news", "articles": result["news"]})
         return result.get("message", "Ecco le ultime notizie.")
 
-    def _parse_direct_trading_command(self, text: str) -> dict | None:
-        if not re.search(r"\b(prezzo|quanto vale|valore|quotazione|vale)\b", text):
-            return None
-
-        assets = {
-            "bitcoin": ("btc", "crypto"),
-            "btc": ("btc", "crypto"),
-            "ethereum": ("eth", "crypto"),
-            "eth": ("eth", "crypto"),
-            "xrp": ("xrp", "crypto"),
-            "ripple": ("xrp", "crypto"),
-            "solana": ("sol", "crypto"),
-            "sol": ("sol", "crypto"),
-            "dogecoin": ("doge", "crypto"),
-            "doge": ("doge", "crypto"),
-            "spy": ("spy", "stock"),
-            "s&p500": ("spy", "stock"),
-            "s&p 500": ("spy", "stock"),
-            "sp500": ("spy", "stock"),
-            "nasdaq": ("qqq", "stock"),
-            "apple": ("aapl", "stock"),
-            "aapl": ("aapl", "stock"),
-            "tesla": ("tsla", "stock"),
-            "tsla": ("tsla", "stock"),
-            "nvidia": ("nvda", "stock"),
-            "nvda": ("nvda", "stock"),
-            "microsoft": ("msft", "stock"),
-            "msft": ("msft", "stock"),
-        }
-        for name, (symbol, asset_type) in assets.items():
-            if name in {"s&p500", "s&p 500"}:
-                matched = re.search(r"\bs\s*&\s*p\s*500\b", text)
-            else:
-                matched = re.search(rf"\b{re.escape(name)}\b", text)
-            if matched:
-                return {"tool": "trading", "operation": "price", "symbol": symbol, "asset_type": asset_type}
-        return None
-
-    async def _run_direct_trading_command(self, action: dict) -> str:
-        result = await self.tool_manager.execute(action)
-        if result.get("status") != "ok":
-            return f"Non riesco a recuperare il prezzo: {result.get('message', 'servizio non disponibile')}"
-        if self.socket_manager and isinstance(result.get("data"), dict):
-            await self.socket_manager.broadcast({"type": "trading", **result["data"]})
-        return result.get("message", "Prezzo recuperato.")
-
     def _parse_direct_knowledge_command(self, text: str) -> dict | None:
         patterns = [
             r"\b(?:parlami|raccontami)\s+di\s+(.+)$",
@@ -1433,7 +1382,7 @@ class AgentCore:
             if match:
                 query = match.group(1).strip(" .,!?:;")
                 if query:
-                    return {"tool": "wikipedia", "query": self._normalize_knowledge_query(query), "sentences": 3}
+                    return {"tool": "search", "query": self._normalize_knowledge_query(query)}
         return None
 
     def _normalize_knowledge_query(self, query: str) -> str:
@@ -1466,19 +1415,14 @@ class AgentCore:
         result = await self.tool_manager.execute(action)
         if result.get("status") == "ok":
             return self._format_knowledge_reply(result.get("message", ""))
-
-        search_result = await self.tool_manager.execute({"tool": "search", "query": action.get("query", "")})
-        if search_result.get("status") == "ok":
-            return self._format_knowledge_reply(search_result.get("message", ""))
         return f"Non riesco a recuperare informazioni su {action.get('query', 'questo argomento')}."
 
     def _capabilities_reply(self, text: str) -> str | None:
         if not re.search(r"\b(cosa|che|tutto)\b.*\b(puoi fare|sai fare|funzioni|capacita)\b", text):
             return None
         return (
-            "Posso controllare luci, RGB, cancellino, porta, buzzer e scene; leggere meteo, news, calendario, "
-            "timer, note, traduzioni, ricerche web, Wikipedia, prezzi crypto e azioni; controllare Spotify e "
-            "mostrare pannelli dashboard."
+            "Posso gestire calendario, promemoria, note, ricerche web, meteo, ultime notizie, timer, "
+            "controllo Spotify e comandi di sistema."
         )
 
     async def _undo_last_reversible_command(self) -> str:
@@ -1573,12 +1517,6 @@ class AgentCore:
         if direct_news:
             reply = await self._run_direct_news_command(direct_news)
             yield await self._reply_fast(reply, {"type": "news", "params": {}})
-            return
-
-        direct_trading = self._parse_direct_trading_command(_clean)
-        if direct_trading:
-            reply = await self._run_direct_trading_command(direct_trading)
-            yield await self._reply_fast(reply, {"type": "dashboard", "params": {"panel": "trading"}})
             return
 
         direct_knowledge = self._parse_direct_knowledge_command(_clean_original)
@@ -1995,14 +1933,10 @@ class AgentCore:
                     # rielaborati dall'LLM in una risposta naturale (secondo step).
                     needs_rephrase = [
                         "none",
-                        "code_generator",
                         "weather",
                         "news",
-                        "trading",
                         "search",
-                        "wikipedia",
                         "calendar",
-                        "translate",
                     ]
                     has_rephrase_tool = any(res["tool"] in needs_rephrase for res in results)
 

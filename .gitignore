@@ -7,6 +7,8 @@ __pycache__/
 .ai-rules/
 .antigravitycli/
 .codex/
+graphify-out/
+.graphifyignore
 
 # C extensions
 *.so
@@ -178,11 +180,13 @@ Thumbs.db
 # Project Specific
 .history/
 .dist/
+.docs/
 data/
 logs/
 scratch/
 *.db
 *.sqlite3
+graphify-out/cache/
 static/.prettierrc
 
 # Google OAuth

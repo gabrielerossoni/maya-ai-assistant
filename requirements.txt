@@ -1,25 +1,21 @@
-# JARVIS - Dipendenze Python
+# M.A.Y.A. - Dipendenze Python
 # Installa con: pip install -r requirements.txt
 
 ollama>=0.3.0       # client ufficiale Python per Ollama
-pyserial>=3.5       # comunicazione seriale con Arduino
 fastapi>=0.100.0    # Web API e WebSocket
 uvicorn>=0.23.0     # Server asincrono per FastAPI
 websockets>=11.0    # WebSocket
+# pyserial>=3.5       # opzionale per seriale Arduino legacy
 # pyautogui>=0.9     # screenshot
 # tkinter             # GUI (incluso in Python standard)
 # Google Calendar
 google-auth-oauthlib
 google-api-python-client
 
-# Nuove integrazioni Jarvis
 requests
 httpx>=0.27.0
-wikipedia
 feedparser
-deep-translator
 duckduckgo-search
-yfinance
 psutil
 GPUtil
 keyboard

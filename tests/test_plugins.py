@@ -11,7 +11,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.plugin_loader import PluginLoader
 from core.tool_manager import ToolManager
-from tools.code_generator_tool import CodeGeneratorTool
 
 
 class MockTool:
@@ -75,39 +74,3 @@ class TestTool:
     assert "test" in tool_manager.tools
     result = tool_manager.tools["test"].execute({})
     assert result["message"] == "plugin_works"
-
-
-@pytest.mark.asyncio
-async def test_code_generator_rejects_path_traversal(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    tool = CodeGeneratorTool()
-    tool.initialize()
-
-    result = await tool.execute(
-        {
-            "filename": "../escape_tool.py",
-            "code": "class EscapeTool:\n    def execute(self, action):\n        return {'status': 'ok'}\n",
-        }
-    )
-
-    assert result["status"] == "error"
-    assert not (tmp_path / "escape_tool.py").exists()
-
-
-def test_code_generator_not_registered_without_dev_mode(monkeypatch):
-    monkeypatch.delenv("DEV_MODE", raising=False)
-    monkeypatch.delenv("CODE_GENERATOR_ENABLED", raising=False)
-
-    manager = ToolManager()
-    manager.initialize()
-
-    assert "code_generator" not in manager.tools
-
-
-def test_code_generator_requires_explicit_opt_in(monkeypatch):
-    monkeypatch.setenv("CODE_GENERATOR_ENABLED", "true")
-
-    manager = ToolManager()
-    manager.initialize()
-
-    assert "code_generator" in manager.tools

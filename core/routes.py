@@ -91,12 +91,6 @@ _DIRECT_TOOL_ALLOWLIST = {
             "search",
         }
     },
-    "trading": {
-        "operations": {
-            "price",
-            "chart",
-        }
-    },
 }
 
 
@@ -125,10 +119,6 @@ def _validate_direct_tool_action(action: dict) -> tuple[bool, str]:
     elif tool_name == "spotify":
         if action.get("command") not in rule["commands"]:
             return False, f"comando Spotify non consentito: {action.get('command')}"
-
-    elif tool_name == "trading":
-        if action.get("operation") not in rule["operations"]:
-            return False, f"operazione trading non consentita: {action.get('operation')}"
 
     return True, ""
 
@@ -380,14 +370,6 @@ async def websocket_endpoint(websocket: WebSocket, agent, manager, voice_manager
                                     "events": result.get("events", []),
                                 }
                             )
-                        elif action.get("tool") == "trading" and result.get("status") == "ok":
-                            rdata = result.get("data", {})
-                            if rdata.get("overview"):
-                                # Broadcast ogni item singolarmente (accumulator nel frontend)
-                                for item in rdata.get("items", []):
-                                    await manager.broadcast({"type": "trading", **item})
-                            else:
-                                await manager.broadcast({"type": "trading", **rdata})
                         elif action.get("tool") == "spotify":
                             # Dopo next/prev/play_pause, aggiorna widget con brano corrente
                             await asyncio.sleep(0.5)  # attendi che Spotify aggiorni lo stato

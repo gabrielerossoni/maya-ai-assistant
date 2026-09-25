@@ -10,8 +10,6 @@ _TOOL_CHAR_LIMITS = {
     "news": 600,
     "weather": 400,
     "search": 800,
-    "wikipedia": 500,
-    "trading": 200,
 }
 _DEFAULT_LIMIT = 1000
 

@@ -9,7 +9,6 @@ import os
 
 from tools.arduino_tool import ArduinoTool
 from tools.calendar_tool import CalendarTool
-from tools.code_generator_tool import CodeGeneratorTool
 from tools.display_tool import DisplayTool
 from tools.mqtt_tool import MqttTool
 from tools.network_tool import NetworkTool
@@ -20,12 +19,8 @@ from tools.spotify_tool import SpotifyTool
 from tools.sys_monitor_tool import SysMonitorTool
 from tools.system_tool import SystemTool
 from tools.timer_tool import TimerTool
-from tools.trading_tool import TradingTool
-from tools.translate_tool import TranslateTool
 from tools.weather_tool import WeatherTool
-from tools.wikipedia_tool import WikipediaTool
 
-from .self_healer import SelfHealer
 from .token_juice import compress_tool_output
 
 
@@ -37,7 +32,6 @@ class ToolManager:
 
     def __init__(self):
         self.tools = {}
-        self.healer = SelfHealer(self)
 
     def register_tool(self, name: str, tool_instance: any):
         """Registra e inizializza un tool a runtime."""
@@ -65,11 +59,8 @@ class ToolManager:
             "calendar": CalendarTool(),
             "weather": WeatherTool(),
             "news": NewsTool(),
-            "wikipedia": WikipediaTool(),
             "notes": NotesTool(),
-            "trading": TradingTool(),
             "timer": TimerTool(),
-            "translate": TranslateTool(),
             "search": SearchTool(),
             "spotify": SpotifyTool(),
             "display": DisplayTool(),
@@ -77,12 +68,6 @@ class ToolManager:
             "mqtt": MqttTool(),
             "none": _NoOpTool(),
         }
-        if os.getenv("CODE_GENERATOR_ENABLED", os.getenv("DEV_MODE", "false")).strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        ):
-            self.tools["code_generator"] = CodeGeneratorTool()
         if os.getenv("NETWORK_TOOL_ENABLED", "false").strip().lower() in ("1", "true", "yes"):
             self.tools["network"] = NetworkTool()
         else:
@@ -123,14 +108,8 @@ class ToolManager:
             # Comprimi il campo message prima che arrivi al context LLM
             if isinstance(result, dict) and "message" in result:
                 result["message"] = compress_tool_output(tool_name, result["message"])
-            self.healer.record_success(tool_name)
             return result
         except Exception as e:
-            try:
-                source_file = inspect.getfile(tool.__class__)
-            except (TypeError, OSError):
-                source_file = ""
-            self.healer.record_error(tool_name, e, source_file)
             return {"status": "error", "message": str(e)}
 
 

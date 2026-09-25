@@ -31,6 +31,9 @@ class SystemTool:
             "volume_up": self._volume_up,
             "volume_down": self._volume_down,
             "lock_screen": self._lock_screen,
+            "stats": self._stats,
+            "sys_monitor": self._stats,
+            "status": self._stats,
         }
 
         handler = dispatch.get(command)
@@ -39,11 +42,36 @@ class SystemTool:
 
         try:
             result = handler()
-            return {"status": "ok", "command": command, "detail": result}
+            res = {"status": "ok", "command": command, "detail": result}
+            if isinstance(result, dict) and "message" in result:
+                res["message"] = result["message"]
+            if isinstance(result, dict) and "data" in result:
+                res["data"] = result["data"]
+            return res
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
     # ── Implementazioni ───────────────────────
+
+    def _stats(self):
+        import psutil
+        from core.gpu_stats import get_gpu_stats
+
+        cpu_usage = psutil.cpu_percent(interval=0.5)
+        ram = psutil.virtual_memory()
+        ram_usage = ram.percent
+        ram_total = ram.total / (1024**3)  # in GB
+        ram_used = ram.used / (1024**3)  # in GB
+
+        gpu_stats = get_gpu_stats()
+        msg = f"Utilizzo CPU: {cpu_usage}%\nUtilizzo RAM: {ram_usage}% ({ram_used:.1f}GB su {ram_total:.1f}GB)"
+        if gpu_stats.get("gpu_available"):
+            gpu_name = gpu_stats.get("gpu_name") or "GPU"
+            msg += f"\nUtilizzo {gpu_name}: {gpu_stats['gpu']}%"
+        else:
+            msg += "\nGPU: non rilevata"
+
+        return {"message": msg, "data": gpu_stats}
 
     def _shutdown(self):
         print("[SYSTEM] Spegnimento PC tra 30 secondi... (usa 'shutdown /a' per annullare)")
@@ -81,7 +109,7 @@ class SystemTool:
                 if self.os == "Windows"
                 else os.path.expanduser("~/Desktop")
             )
-            path = os.path.join(desktop, "jarvis_screenshot.png")
+            path = os.path.join(desktop, "maya_screenshot.png")
             pyautogui.screenshot(path)
             return f"screenshot salvato in {path}"
         except ImportError:
