@@ -100,7 +100,10 @@ async def lifespan(app: FastAPI):
         PluginLoader(agent.tool_manager, plugins_dir).start()
 
     proactive = ProactiveManager(
-        agent.tool_manager, manager, memory_manager=agent.memory, voice_manager=voice_manager,
+        agent.tool_manager,
+        manager,
+        memory_manager=agent.memory,
+        voice_manager=voice_manager,
         event_bus=agent.automation_engine.bus,
     )
     telegram = TelegramBot(agent, voice_manager, agent.audit)

@@ -1,5 +1,6 @@
 """Calendar adapter retaining current Google Calendar tool."""
 
+
 class CalendarProvider:
     def __init__(self, tool_manager):
         self.tool_manager = tool_manager

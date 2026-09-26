@@ -97,7 +97,9 @@ class AgentCore:
         self.automation_engine.socket_manager = self.socket_manager
         self.automation_engine.voice_manager = self.voice_manager
         self.automation_engine.register_all(build_default_automations())
-        self.automation_engine.register_all(load_yaml_automations(os.getenv("MAYA_AUTOMATIONS_FILE", "data/automations.yaml")))
+        self.automation_engine.register_all(
+            load_yaml_automations(os.getenv("MAYA_AUTOMATIONS_FILE", "data/automations.yaml"))
+        )
         asyncio.create_task(self.automation_engine.start_scheduler())
         for text in ("che tempo fa", "meteo", "ultime notizie", "spotify next"):
             self._intent_cache[text] = "DOMOTIC"
@@ -248,12 +250,21 @@ class AgentCore:
                 _, chat_id, user_id = source_text.split(":", 2)
                 if self.telegram_confirmation and chat_id:
                     await self.telegram_confirmation(chat_id, user_id, action)
-                self.audit.record("action_confirmation_required", details={"tool": tool_name, "reason": decision.reason})
-                results.append({"tool": tool_name, "result": {"status": "error", "message": "Azione sensibile: conferma richiesta."}})
+                self.audit.record(
+                    "action_confirmation_required", details={"tool": tool_name, "reason": decision.reason}
+                )
+                results.append(
+                    {
+                        "tool": tool_name,
+                        "result": {"status": "error", "message": "Azione sensibile: conferma richiesta."},
+                    }
+                )
                 continue
             result = await self.tool_manager.execute(action)
             if tool_name in self.permissions.SENSITIVE_TOOLS:
-                self.audit.record("sensitive_action_executed", details={"tool": tool_name, "status": result.get("status")})
+                self.audit.record(
+                    "sensitive_action_executed", details={"tool": tool_name, "status": result.get("status")}
+                )
             results.append({"tool": tool_name, "result": result})
         return results
 
@@ -454,7 +465,14 @@ class AgentCore:
         automation = self._check_automation(clean)
         if automation:
             if source.startswith("telegram:"):
-                sensitive = next((item.to_tool_action() for item in automation.scene.actions if not self.permissions.decide(item.to_tool_action()).allowed), None)
+                sensitive = next(
+                    (
+                        item.to_tool_action()
+                        for item in automation.scene.actions
+                        if not self.permissions.decide(item.to_tool_action()).allowed
+                    ),
+                    None,
+                )
                 if sensitive:
                     _, chat_id, user_id = source.split(":", 2)
                     if self.telegram_confirmation:

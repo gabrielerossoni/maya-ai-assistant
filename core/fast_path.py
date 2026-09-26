@@ -29,7 +29,11 @@ class FastPathRouter:
         if note:
             content = note.group(1).strip()
             lent = re.fullmatch(r"ho prestato (?:il|lo|la|i|gli|le)\s+(.+?)\s+a\s+(.+)", content)
-            return ("fact", {"subject": lent.group(1), "value": f"Prestato a {lent.group(2)}"}) if lent else ("note", {"content": content})
+            return (
+                ("fact", {"subject": lent.group(1), "value": f"Prestato a {lent.group(2)}"})
+                if lent
+                else ("note", {"content": content})
+            )
         malformed_lookup = re.fullmatch(r"dov['\uFFFD]\s+(?:il|lo|la|i|gli|le)?\s*(.+?)[?!.]*", text)
         if malformed_lookup:
             return "fact_lookup", {"query": malformed_lookup.group(1).strip()}
@@ -48,5 +52,9 @@ class FastPathRouter:
         if re.search(r"\b(?:cancella|elimina|rimuovi)\b", text) and re.search(r"\b(?:evento|appuntamento)\b", text):
             title = re.sub(r"\b(?:cancella|elimina|rimuovi|evento|appuntamento|il|la)\b", " ", text)
             title = re.sub(r"\s+", " ", title).strip(" .,;:-")
-            return ({"tool": "calendar", "action": "delete", "title": title}, f"Cancello l'evento '{title}'.") if title else (None, "Dimmi il titolo dell'evento da cancellare.")
+            return (
+                ({"tool": "calendar", "action": "delete", "title": title}, f"Cancello l'evento '{title}'.")
+                if title
+                else (None, "Dimmi il titolo dell'evento da cancellare.")
+            )
         return None

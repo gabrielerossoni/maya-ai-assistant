@@ -125,5 +125,6 @@ async def test_telegram_calendar_delete_requires_confirmation():
 
 def test_fast_path_rejects_invalid_reminder_time():
     assert FastPathRouter.structured_memory("ricordami domani alle 99:99 bolletta") == (
-        "invalid", {"message": "Orario promemoria non valido."}
+        "invalid",
+        {"message": "Orario promemoria non valido."},
     )

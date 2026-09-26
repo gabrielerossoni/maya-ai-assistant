@@ -1,5 +1,6 @@
 """Thin voice capability adapter."""
 
+
 class SpeechProvider:
     def __init__(self, voice_manager):
         self.voice_manager = voice_manager

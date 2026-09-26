@@ -128,7 +128,9 @@ class StructuredMemory:
 
     def release_reminder_claim(self, reminder_id: int) -> None:
         with closing(self._connect()) as connection:
-            connection.execute("UPDATE reminders SET delivery_claimed_at = NULL WHERE id = ? AND delivered_at IS NULL", (reminder_id,))
+            connection.execute(
+                "UPDATE reminders SET delivery_claimed_at = NULL WHERE id = ? AND delivered_at IS NULL", (reminder_id,)
+            )
             connection.commit()
 
     def schedule_daily_briefing(self, time_of_day: str) -> dict[str, str]:
@@ -163,7 +165,8 @@ class StructuredMemory:
     def mark_job_delivered(self, job_id: int) -> bool:
         with closing(self._connect()) as connection:
             cursor = connection.execute(
-                "UPDATE scheduled_jobs SET delivered_at = ? WHERE id = ? AND delivered_at IS NULL", (self._now(), job_id)
+                "UPDATE scheduled_jobs SET delivered_at = ? WHERE id = ? AND delivered_at IS NULL",
+                (self._now(), job_id),
             )
             connection.commit()
         return cursor.rowcount == 1

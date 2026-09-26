@@ -20,7 +20,8 @@ def load_yaml_automations(path: str | Path) -> list[Automation]:
             actions = [Action(str(item["tool"]), dict(item.get("params", {}))) for item in entry.get("actions", [])]
             triggers = [Trigger(**item) for item in entry.get("triggers", [])]
             scene = Scene(
-                name=str(entry["name"]), actions=actions,
+                name=str(entry["name"]),
+                actions=actions,
                 priority=Priority[str(entry.get("priority", "NORMAL")).upper()],
                 conditions=[Condition(dict(item)) for item in entry.get("conditions", [])],
             )

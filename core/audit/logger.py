@@ -30,7 +30,12 @@ class AuditLogger:
         with closing(self._connect()) as connection:
             connection.execute(
                 "INSERT INTO audit_log (created_at, event, actor, details) VALUES (?, ?, ?, ?)",
-                (datetime.now(timezone.utc).isoformat(timespec="seconds"), event, actor, json.dumps(details or {}, ensure_ascii=False)),
+                (
+                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    event,
+                    actor,
+                    json.dumps(details or {}, ensure_ascii=False),
+                ),
             )
             connection.commit()
 
@@ -46,7 +51,9 @@ class AuditLogger:
                 payload = json.loads(details)
             except json.JSONDecodeError:
                 payload = {"raw": details}
-            events.append({"id": event_id, "created_at": created_at, "event": event, "actor": actor, "details": payload})
+            events.append(
+                {"id": event_id, "created_at": created_at, "event": event, "actor": actor, "details": payload}
+            )
         return events
 
     def _connect(self) -> sqlite3.Connection:

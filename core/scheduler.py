@@ -13,8 +13,15 @@ Deliver = Callable[[str], Awaitable[None]]
 
 
 class PersistentScheduler:
-    def __init__(self, memory: StructuredMemory, deliver: Deliver, audit: AuditLogger | None = None, interval: float = 30):
-        self.memory, self.deliver, self.audit, self.interval = memory, deliver, audit or AuditLogger(memory.database_path), interval
+    def __init__(
+        self, memory: StructuredMemory, deliver: Deliver, audit: AuditLogger | None = None, interval: float = 30
+    ):
+        self.memory, self.deliver, self.audit, self.interval = (
+            memory,
+            deliver,
+            audit or AuditLogger(memory.database_path),
+            interval,
+        )
 
     async def tick(self, briefing_factory: Callable[[], Awaitable[str | None]] | None = None) -> None:
         for reminder in self.memory.claim_due_reminders():
@@ -25,7 +32,9 @@ class PersistentScheduler:
                 self.audit.record("reminder_delivered", details={"reminder_id": reminder["id"]})
             except Exception as exc:
                 self.memory.release_reminder_claim(reminder["id"])
-                self.audit.record("reminder_delivery_error", details={"reminder_id": reminder["id"], "type": type(exc).__name__})
+                self.audit.record(
+                    "reminder_delivery_error", details={"reminder_id": reminder["id"], "type": type(exc).__name__}
+                )
         if briefing_factory:
             for job in self.memory.claim_due_briefings(datetime.now().astimezone()):
                 try:

@@ -18,7 +18,9 @@ class TelegramBot:
     def __init__(self, agent, voice_manager=None, audit: AuditLogger | None = None):
         self.agent, self.voice_manager = agent, voice_manager
         self.token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-        self.allowed_users = {value.strip() for value in os.getenv("TELEGRAM_ALLOWED_USER_IDS", "").split(",") if value.strip()}
+        self.allowed_users = {
+            value.strip() for value in os.getenv("TELEGRAM_ALLOWED_USER_IDS", "").split(",") if value.strip()
+        }
         self.timeout = float(os.getenv("TELEGRAM_TIMEOUT_SECONDS", "15"))
         self.audit = audit or AuditLogger()
         self.confirmations = HumanLoop()
@@ -32,7 +34,11 @@ class TelegramBot:
         return bool(self.token and self.allowed_users)
 
     def health(self) -> dict[str, Any]:
-        return {"enabled": self.enabled, "authorized_users": len(self.allowed_users), "token_configured": bool(self.token)}
+        return {
+            "enabled": self.enabled,
+            "authorized_users": len(self.allowed_users),
+            "token_configured": bool(self.token),
+        }
 
     def _url(self, method: str) -> str:
         return f"https://api.telegram.org/bot{self.token}/{method}"
@@ -58,10 +64,14 @@ class TelegramBot:
 
     async def request_confirmation(self, chat_id: int | str, user_id: int | str, action: dict) -> None:
         token = self.confirmations.request(action, str(user_id))
-        keyboard = {"inline_keyboard": [[
-            {"text": "Conferma", "callback_data": f"confirm:{token}"},
-            {"text": "Annulla", "callback_data": f"cancel:{token}"},
-        ]]}
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "Conferma", "callback_data": f"confirm:{token}"},
+                    {"text": "Annulla", "callback_data": f"cancel:{token}"},
+                ]
+            ]
+        }
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 self._url("sendMessage"),
@@ -83,7 +93,9 @@ class TelegramBot:
             result = await self.agent.tool_manager.execute(action)
             chat_id = callback["message"]["chat"]["id"]
             await self.send(chat_id, result.get("message", "Azione completata."))
-            self.audit.record("telegram_confirmation_executed", actor=str(chat_id), details={"tool": action.get("tool")})
+            self.audit.record(
+                "telegram_confirmation_executed", actor=str(chat_id), details={"tool": action.get("tool")}
+            )
 
     async def _handle_voice(self, chat_id: int | str, user_id: int | str, voice: dict) -> None:
         if not self.voice_manager:
