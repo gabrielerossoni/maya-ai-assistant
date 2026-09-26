@@ -55,6 +55,7 @@ class SystemTool:
 
     def _stats(self):
         import psutil
+
         from core.gpu_stats import get_gpu_stats
 
         cpu_usage = psutil.cpu_percent(interval=0.5)

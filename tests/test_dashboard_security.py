@@ -327,4 +327,3 @@ class TestSceneControls:
         assert "setRgbCardState(dev, action._rgbIndex)" in html
         for label in ["ROSSO", "VERDE", "BLU", "VIOLA", "ARANCIO", "BIANCO"]:
             assert label in html
-

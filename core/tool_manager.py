@@ -9,7 +9,6 @@ import os
 
 from .token_juice import compress_tool_output
 
-
 _TOOL_SPECS = {
     "system": ("tools.system_tool", "SystemTool"),
     "calendar": ("tools.calendar_tool", "CalendarTool"),

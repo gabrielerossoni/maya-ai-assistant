@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from core.memory.structured import StructuredMemory
 from core.agent_core import AgentCore
+from core.memory.structured import StructuredMemory
 
 
 def test_structured_memory_persists_all_phase_one_data_types(tmp_path):
@@ -14,7 +14,12 @@ def test_structured_memory_persists_all_phase_one_data_types(tmp_path):
     preference = memory.set_preference("briefing_time", "08:00")
 
     assert memory.list_notes() == [
-        {"id": note["id"], "content": "Comprare il latte", "created_at": note["created_at"], "updated_at": note["created_at"]}
+        {
+            "id": note["id"],
+            "content": "Comprare il latte",
+            "created_at": note["created_at"],
+            "updated_at": note["created_at"],
+        }
     ]
     assert memory.due_reminders(datetime(2026, 9, 26, 10, tzinfo=timezone.utc)) == [reminder]
     assert memory.find_facts("trapano")[0]["value"] == fact["value"]
@@ -28,7 +33,11 @@ def test_remember_fact_updates_a_previous_subject(tmp_path):
     memory.remember_fact("Trapano", "Rientrato in garage")
 
     assert memory.find_facts("trapano") == [
-        {"subject": "trapano", "value": "Rientrato in garage", "updated_at": memory.find_facts("trapano")[0]["updated_at"]}
+        {
+            "subject": "trapano",
+            "value": "Rientrato in garage",
+            "updated_at": memory.find_facts("trapano")[0]["updated_at"],
+        }
     ]
 
 

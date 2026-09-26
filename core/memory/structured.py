@@ -71,9 +71,7 @@ class StructuredMemory:
         content = self._required_text(content, "Il contenuto del promemoria")
         due_at = self._as_utc_iso(due_at)
         with closing(self._connect()) as connection:
-            cursor = connection.execute(
-                "INSERT INTO reminders (content, due_at) VALUES (?, ?)", (content, due_at)
-            )
+            cursor = connection.execute("INSERT INTO reminders (content, due_at) VALUES (?, ?)", (content, due_at))
             connection.commit()
         return {"id": cursor.lastrowid, "content": content, "due_at": due_at}
 

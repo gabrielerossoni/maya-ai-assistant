@@ -131,7 +131,9 @@ class Automation:
     def matches_input(self, text: str) -> bool:
         normalized = self._normalize(text)
         candidates = [self.name, *self.aliases]
-        return any(re.search(rf"(?<!\w){re.escape(self._normalize(candidate))}(?!\w)", normalized) for candidate in candidates)
+        return any(
+            re.search(rf"(?<!\w){re.escape(self._normalize(candidate))}(?!\w)", normalized) for candidate in candidates
+        )
 
 
 class EventBus:
@@ -264,7 +266,11 @@ class AutomationEngine:
 
     async def execute_by_name(self, name: str, source: str = "manual") -> dict:
         automation = self.resolve_by_name(name)
-        return await self.execute(automation, source) if automation else {"status": "error", "message": f"Automazione '{name}' non trovata"}
+        return (
+            await self.execute(automation, source)
+            if automation
+            else {"status": "error", "message": f"Automazione '{name}' non trovata"}
+        )
 
     async def execute_actions(self, actions: list[Action], source: str = "manual") -> list[dict]:
         results = []
@@ -281,7 +287,9 @@ class AutomationEngine:
         last = {"status": "error", "message": "azione non eseguita"}
         for attempt in range(max(1, action.retry)):
             try:
-                last = await asyncio.wait_for(self._tool_manager.execute(action.to_tool_action()), timeout=action.timeout)
+                last = await asyncio.wait_for(
+                    self._tool_manager.execute(action.to_tool_action()), timeout=action.timeout
+                )
             except asyncio.TimeoutError:
                 last = {"status": "error", "message": "timeout"}
             except Exception as exc:
@@ -303,7 +311,11 @@ class AutomationEngine:
                     task.cancel()
 
     async def start_scheduler(self):
-        if self._scheduler_task and self._scheduler_task is not asyncio.current_task() and not self._scheduler_task.done():
+        if (
+            self._scheduler_task
+            and self._scheduler_task is not asyncio.current_task()
+            and not self._scheduler_task.done()
+        ):
             return
         self._scheduler_task = asyncio.current_task()
         while True:
@@ -312,7 +324,11 @@ class AutomationEngine:
             for automation in list(self._automations.values()):
                 for trigger in automation.triggers:
                     key = f"{automation.name}:{trigger.type}"
-                    if trigger.type == "time" and trigger.time == now.strftime("%H:%M") and self._last_trigger_minute.get(key) != minute:
+                    if (
+                        trigger.type == "time"
+                        and trigger.time == now.strftime("%H:%M")
+                        and self._last_trigger_minute.get(key) != minute
+                    ):
                         self._last_trigger_minute[key] = minute
                         asyncio.create_task(self.execute(automation, source=f"scheduler:{trigger.time}"))
                     elif trigger.type == "context" and trigger.context and context.matches(trigger.context):
@@ -342,7 +358,18 @@ def build_default_automations() -> list[Automation]:
     """Useful defaults that rely only on software/network services."""
     return [
         Automation(
-            Scene("buongiorno", [display_action("news"), news_action(5), display_action("weather"), weather_action(), background(calendar_action())], Priority.HIGH, cooldown=60),
+            Scene(
+                "buongiorno",
+                [
+                    display_action("news"),
+                    news_action(5),
+                    display_action("weather"),
+                    weather_action(),
+                    background(calendar_action()),
+                ],
+                Priority.HIGH,
+                cooldown=60,
+            ),
             aliases=["buon giorno", "morning"],
             triggers=[Trigger("time", time="07:00")],
         ),
@@ -352,7 +379,12 @@ def build_default_automations() -> list[Automation]:
             triggers=[Trigger("time", time="23:00")],
         ),
         Automation(
-            Scene("briefing", [display_action("weather"), weather_action(), news_action(3), background(calendar_action())], Priority.NORMAL, cooldown=1800),
+            Scene(
+                "briefing",
+                [display_action("weather"), weather_action(), news_action(3), background(calendar_action())],
+                Priority.NORMAL,
+                cooldown=1800,
+            ),
             aliases=["briefing", "riepilogo giornata"],
         ),
         Automation(

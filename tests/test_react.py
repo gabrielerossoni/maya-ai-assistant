@@ -15,7 +15,9 @@ def agent():
 
 @pytest.mark.asyncio
 async def test_process_direct_weather(agent):
-    agent.tool_manager.execute = AsyncMock(return_value={"status": "ok", "data": {"location": "Roma", "temp": 24, "condition": "Sereno"}})
+    agent.tool_manager.execute = AsyncMock(
+        return_value={"status": "ok", "data": {"location": "Roma", "temp": 24, "condition": "Sereno"}}
+    )
     response = "".join([token async for token in agent.process("che tempo fa")])
     assert agent.tool_manager.execute.call_args.args[0] == {"tool": "weather", "location": None}
     assert "24 gradi" in response
@@ -59,7 +61,11 @@ async def test_react_executes_mqtt_action_once(agent):
         patch("ollama.AsyncClient.chat", new_callable=AsyncMock) as chat,
         patch.object(agent, "_route_intent", return_value="DOMOTIC"),
     ):
-        chat.return_value = {"message": {"content": '{"actions":[{"tool":"mqtt","room":"studio","device":"light","state":"on"}],"reply":"Ho aggiornato il dispositivo."}'}}
+        chat.return_value = {
+            "message": {
+                "content": '{"actions":[{"tool":"mqtt","room":"studio","device":"light","state":"on"}],"reply":"Ho aggiornato il dispositivo."}'
+            }
+        }
         response = "".join([token async for token in agent.process("accendi luce studio")])
     assert response.count(reply) == 1
     assert agent.tool_manager.execute.call_count == 1

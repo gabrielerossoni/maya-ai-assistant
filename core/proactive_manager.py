@@ -28,9 +28,9 @@ class SysMonitorChecker(BaseChecker):
         cpu = psutil.cpu_percent()
         ram = psutil.virtual_memory().percent
         if cpu > self.cpu_threshold:
-            return f"Utilizzo CPU elevato: {cpu}%."
+            return f"Allerta Sistema: Utilizzo CPU elevato ({cpu}%)."
         if ram > self.ram_threshold:
-            return f"Utilizzo RAM elevato: {ram}%."
+            return f"Allerta Sistema: Utilizzo RAM elevato ({ram}%)."
         return None
 
 
@@ -82,16 +82,30 @@ class ContextPrefetchChecker(BaseChecker):
             if not tool:
                 continue
             try:
-                result = await tool.execute(action) if asyncio.iscoroutinefunction(tool.execute) else await asyncio.to_thread(tool.execute, action)
+                result = (
+                    await tool.execute(action)
+                    if asyncio.iscoroutinefunction(tool.execute)
+                    else await asyncio.to_thread(tool.execute, action)
+                )
                 if result.get("status") == "ok":
-                    await self.memory_manager.add_turn("system", f"[PREFETCH] {name}: {result.get('message', '')}", persist_db=False)
+                    await self.memory_manager.add_turn(
+                        "system", f"[PREFETCH] {name}: {result.get('message', '')}", persist_db=False
+                    )
             except Exception as exc:
                 print(f"[PREFETCH] {name}: {exc}")
         return None
 
 
 class ProactiveManager:
-    def __init__(self, tool_manager, websocket_manager=None, interval=60, memory_manager=None, voice_manager=None, initial_delay=60):
+    def __init__(
+        self,
+        tool_manager,
+        websocket_manager=None,
+        interval=60,
+        memory_manager=None,
+        voice_manager=None,
+        initial_delay=60,
+    ):
         self.tool_manager = tool_manager
         self.websocket_manager = websocket_manager
         self.memory_manager = memory_manager

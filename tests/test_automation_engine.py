@@ -2,7 +2,16 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from core.automation_engine import Action, Automation, AutomationEngine, EventBus, Priority, Scene, Trigger, build_default_automations
+from core.automation_engine import (
+    Action,
+    Automation,
+    AutomationEngine,
+    EventBus,
+    Priority,
+    Scene,
+    Trigger,
+    build_default_automations,
+)
 
 
 def test_registration_and_resolution_prefers_priority():
@@ -29,7 +38,10 @@ async def test_event_bus_dispatches_registered_automation():
     manager = AsyncMock()
     manager.execute.return_value = {"status": "ok"}
     engine = AutomationEngine(tool_manager=manager)
-    automation = Automation(Scene("sync", actions=[Action("calendar", {"action": "list"})]), triggers=[Trigger("event", event_name="refresh")])
+    automation = Automation(
+        Scene("sync", actions=[Action("calendar", {"action": "list"})]),
+        triggers=[Trigger("event", event_name="refresh")],
+    )
     engine.register(automation)
     await engine.bus.publish("refresh", {})
     manager.execute.assert_awaited_once()
@@ -38,4 +50,8 @@ async def test_event_bus_dispatches_registered_automation():
 def test_defaults_are_software_only():
     automations = build_default_automations()
     assert automations
-    assert all(action.tool in {"calendar", "display", "news", "spotify", "weather", "timer"} for automation in automations for action in automation.scene.actions)
+    assert all(
+        action.tool in {"calendar", "display", "news", "spotify", "weather", "timer"}
+        for automation in automations
+        for action in automation.scene.actions
+    )

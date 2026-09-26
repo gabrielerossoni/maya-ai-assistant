@@ -107,7 +107,11 @@ class AgentCore:
 
     def _is_chitchat_input(self, text: str) -> bool:
         normalized = self._normalize_router_text(text)
-        return bool(re.fullmatch(r"(?:ciao|hey|ehi|salve|buongiorno|buonasera|grazie)(?: maya)?(?: come stai| come va)?", normalized))
+        return bool(
+            re.fullmatch(
+                r"(?:ciao|hey|ehi|salve|buongiorno|buonasera|grazie)(?: maya)?(?: come stai| come va)?", normalized
+            )
+        )
 
     def _is_knowledge_question(self, text: str) -> bool:
         normalized = self._normalize_router_text(text)
@@ -258,7 +262,11 @@ class AgentCore:
         if re.search(r"\b(?:cancella|elimina|rimuovi)\b", text) and re.search(r"\b(?:evento|appuntamento)\b", text):
             title = re.sub(r"\b(?:cancella|elimina|rimuovi|evento|appuntamento|il|la)\b", " ", text)
             title = re.sub(r"\s+", " ", title).strip(" .,;:-")
-            return ({"tool": "calendar", "action": "delete", "title": title}, f"Cancello l'evento '{title}'.") if title else (None, "Dimmi il titolo dell'evento da cancellare.")
+            return (
+                ({"tool": "calendar", "action": "delete", "title": title}, f"Cancello l'evento '{title}'.")
+                if title
+                else (None, "Dimmi il titolo dell'evento da cancellare.")
+            )
         return None
 
     async def _run_direct_calendar_command(self, parsed: tuple[dict | None, str]) -> str:
@@ -269,7 +277,9 @@ class AgentCore:
         return result.get("message", fallback)
 
     def _parse_direct_structured_memory_command(self, text: str) -> tuple[str, dict] | None:
-        reminder = re.fullmatch(r"ricordami\s+(oggi|domani)(?:\s+alle\s+(\d{1,2})(?::(\d{2}))?)?\s+(?:che\s+)?(.+)", text)
+        reminder = re.fullmatch(
+            r"ricordami\s+(oggi|domani)(?:\s+alle\s+(\d{1,2})(?::(\d{2}))?)?\s+(?:che\s+)?(.+)", text
+        )
         if reminder:
             day, hour, minute, content = reminder.groups()
             due_at = datetime.now().astimezone().replace(second=0, microsecond=0)
@@ -301,13 +311,21 @@ class AgentCore:
             due_at = datetime.fromisoformat(reminder["due_at"]).astimezone()
             return f"Promemoria impostato per il {due_at:%d/%m alle %H:%M}: {reminder['content']}."
         facts = self.structured_memory.find_facts(data["query"])
-        return "\n".join(f"{fact['subject']}: {fact['value']}" for fact in facts) if facts else "Non ho trovato nulla nella memoria personale."
+        return (
+            "\n".join(f"{fact['subject']}: {fact['value']}" for fact in facts)
+            if facts
+            else "Non ho trovato nulla nella memoria personale."
+        )
 
     def _parse_direct_weather_command(self, text: str) -> dict | None:
         if text in {"temperatura casa", "temperatura in casa"}:
             return None
         match = re.fullmatch(r"(?:che tempo fa|meteo|previsioni)(?:\s+(?:a|per)\s+(.+?))?[?!.]*", text)
-        return {"tool": "weather", "location": match.group(1).strip().title() if match and match.group(1) else None} if match else None
+        return (
+            {"tool": "weather", "location": match.group(1).strip().title() if match and match.group(1) else None}
+            if match
+            else None
+        )
 
     async def _run_direct_weather_command(self, action: dict) -> str:
         result = await self.tool_manager.execute(action)
@@ -325,7 +343,11 @@ class AgentCore:
         return ", ".join(parts) + "."
 
     def _parse_direct_news_command(self, text: str) -> dict | None:
-        return {"tool": "news", "limit": 5} if re.fullmatch(r"(?:dimmi\s+)?(?:le\s+)?(?:ultime\s+)?(?:news|notizie)[?!.]*", text) else None
+        return (
+            {"tool": "news", "limit": 5}
+            if re.fullmatch(r"(?:dimmi\s+)?(?:le\s+)?(?:ultime\s+)?(?:news|notizie)[?!.]*", text)
+            else None
+        )
 
     async def _run_direct_news_command(self, action: dict) -> str:
         result = await self.tool_manager.execute(action)
@@ -381,17 +403,23 @@ class AgentCore:
 
         direct_memory = self._parse_direct_structured_memory_command(clean)
         if direct_memory:
-            yield await self._reply_fast(await self._run_direct_structured_memory_command(direct_memory), {"type": "chat", "params": {}})
+            yield await self._reply_fast(
+                await self._run_direct_structured_memory_command(direct_memory), {"type": "chat", "params": {}}
+            )
             return
         direct_calendar = self._parse_direct_calendar_command(clean)
         if direct_calendar:
-            yield await self._reply_fast(await self._run_direct_calendar_command(direct_calendar), {"type": "calendar", "params": {}})
+            yield await self._reply_fast(
+                await self._run_direct_calendar_command(direct_calendar), {"type": "calendar", "params": {}}
+            )
             return
         capabilities = self._capabilities_reply(clean)
         if capabilities:
             yield await self._reply_fast(capabilities, {"type": "dashboard", "params": {}})
             return
-        if re.search(r"\b(?:ferma|stop|spegni|disattiva)\b", clean) and re.search(r"\b(?:allarme|alarme|all['’]?armi)\b", clean):
+        if re.search(r"\b(?:ferma|stop|spegni|disattiva)\b", clean) and re.search(
+            r"\b(?:allarme|alarme|all['’]?armi)\b", clean
+        ):
             yield await self._reply_fast(await self._stop_alarm_direct())
             return
 
@@ -403,7 +431,10 @@ class AgentCore:
 
         intent = await self._route_intent(user_input)
         context = await self.memory.get_context(user_input)
-        history = [{"role": "system", "content": SPECIALIST_PROMPTS[intent]}, {"role": "user", "content": f"{context}\n\nRICHIESTA: {user_input}"}]
+        history = [
+            {"role": "system", "content": SPECIALIST_PROMPTS[intent]},
+            {"role": "user", "content": f"{context}\n\nRICHIESTA: {user_input}"},
+        ]
         max_steps = int(os.getenv("REACT_MAX_STEPS", "2"))
         final_reply = ""
         current_step = 0
@@ -414,7 +445,9 @@ class AgentCore:
                 full_response_text = ""
                 if is_ollama_enabled():
                     try:
-                        response = await ollama.AsyncClient().chat(model=MODELS.get(intent.lower(), MODELS["reasoning"]), messages=history, format="json")
+                        response = await ollama.AsyncClient().chat(
+                            model=MODELS.get(intent.lower(), MODELS["reasoning"]), messages=history, format="json"
+                        )
                         full_response_text = response.get("message", {}).get("content", "{}")
                         plan = self._clean_json(full_response_text)
                     except Exception:
@@ -423,7 +456,11 @@ class AgentCore:
                     plan = await self._call_groq(history, json_mode=True)
                     full_response_text = json.dumps(plan or {}, ensure_ascii=False)
                 if not plan:
-                    final_reply = "Ho raggiunto il limite di richieste del servizio cloud. Riprova tra poco." if self._last_groq_error_status == 429 else "Il modello non e disponibile."
+                    final_reply = (
+                        "Ho raggiunto il limite di richieste del servizio cloud. Riprova tra poco."
+                        if self._last_groq_error_status == 429
+                        else "Il modello non e disponibile."
+                    )
                     yield final_reply
                     break
                 actions = plan.get("actions") or []
@@ -440,7 +477,9 @@ class AgentCore:
                 results = await self._execute_actions(actions, user_input)
                 self.learner.observe_command(user_input, actions)
                 is_error = any(item["result"].get("status") == "error" for item in results)
-                needs_rephrase = any(item["tool"] in {"none", "weather", "news", "search", "calendar"} for item in results)
+                needs_rephrase = any(
+                    item["tool"] in {"none", "weather", "news", "search", "calendar"} for item in results
+                )
                 if not is_error and not needs_rephrase and len(reply) > 15:
                     final_reply = reply
                     break
@@ -449,7 +488,9 @@ class AgentCore:
                     for item in results
                 )
                 history.append({"role": "assistant", "content": full_response_text})
-                history.append({"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua o fornisci la risposta finale."})
+                history.append(
+                    {"role": "user", "content": f"OSSERVAZIONE: {observation}\nContinua o fornisci la risposta finale."}
+                )
             except Exception as exc:
                 final_reply = f"Errore durante l'elaborazione: {exc}"
                 yield final_reply

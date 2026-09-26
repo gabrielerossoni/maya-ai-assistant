@@ -109,7 +109,9 @@ async def lifespan(app: FastAPI):
     ]
 
     async def on_scene(_event: str, data: dict):
-        await manager.broadcast({"type": "scene_executed", "scene": data.get("scene"), "status": data.get("status", "ok")})
+        await manager.broadcast(
+            {"type": "scene_executed", "scene": data.get("scene"), "status": data.get("status", "ok")}
+        )
 
     agent.automation_engine.bus.subscribe("scene_executed", on_scene)
     try:
