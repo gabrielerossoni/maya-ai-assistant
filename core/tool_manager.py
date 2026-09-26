@@ -21,6 +21,8 @@ _TOOL_SPECS = {
     "display": ("tools.display_tool", "DisplayTool"),
     "sys_monitor": ("tools.sys_monitor_tool", "SysMonitorTool"),
     "mqtt": ("tools.mqtt_tool", "MqttTool"),
+    "browser": ("tools.browser_tool", "BrowserTool"),
+    "home_assistant": ("tools.home_assistant_tool", "HomeAssistantTool"),
 }
 
 

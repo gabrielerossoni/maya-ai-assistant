@@ -35,7 +35,10 @@ from core.routes import (
     health_check,
     websocket_endpoint,
 )
+from core.scheduler import PersistentScheduler
 from core.server_utils import pick_http_port
+from core.startup import startup_health
+from core.telegram_bot import TelegramBot
 from core.voice_manager import VoiceManager
 from core.websocket_manager import manager
 
@@ -87,6 +90,8 @@ async def lifespan(app: FastAPI):
     agent.loop = asyncio.get_running_loop()
     manager.loop = agent.loop
     await agent.initialize()
+    health = startup_health(agent.structured_memory.database_path)
+    print(f"[STARTUP] database={health['database']} ollama={health['ollama_enabled']} telegram={health['telegram']}")
 
     plugins_dir = os.path.join(os.path.dirname(__file__), "plugins")
     if _env_enabled("PLUGIN_LOADER_ENABLED") or _env_enabled("DEV_MODE"):
@@ -94,7 +99,33 @@ async def lifespan(app: FastAPI):
 
         PluginLoader(agent.tool_manager, plugins_dir).start()
 
-    proactive = ProactiveManager(agent.tool_manager, manager, memory_manager=agent.memory, voice_manager=voice_manager)
+    proactive = ProactiveManager(
+        agent.tool_manager, manager, memory_manager=agent.memory, voice_manager=voice_manager,
+        event_bus=agent.automation_engine.bus,
+    )
+    telegram = TelegramBot(agent, voice_manager, agent.audit)
+    agent.telegram_confirmation = telegram.request_confirmation
+
+    async def deliver(text: str):
+        await manager.broadcast({"type": "log", "text": text, "level": "warning"})
+        await telegram.deliver_default(text)
+
+    async def briefing() -> str | None:
+        calendar = await agent.tool_manager.execute({"tool": "calendar", "action": "list"})
+        events = calendar.get("events", []) if calendar.get("status") == "ok" else []
+        weather = await agent.tool_manager.execute({"tool": "weather"})
+        weather_text = weather.get("message", "") if weather.get("status") == "ok" else ""
+        parts = []
+        if events:
+            parts.append(f"Oggi hai {len(events)} impegni.")
+        if weather_text:
+            parts.append(weather_text)
+        return " ".join(parts) or None
+
+    briefing_time = os.getenv("MAYA_BRIEFING_TIME", "").strip()
+    if briefing_time:
+        agent.structured_memory.schedule_daily_briefing(briefing_time)
+    scheduler = PersistentScheduler(agent.structured_memory, deliver, agent.audit)
     mqtt_tool = agent.tool_manager.tools.get("mqtt")
     if mqtt_tool and hasattr(mqtt_tool, "set_ws_manager"):
         mqtt_tool.set_ws_manager(manager, agent.loop)
@@ -106,7 +137,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(spotify_broadcaster(agent, manager)),
         asyncio.create_task(news_broadcaster(agent, manager)),
         asyncio.create_task(weather_broadcaster(agent, manager)),
+        asyncio.create_task(scheduler.start(briefing)),
     ]
+    if telegram.enabled:
+        _bg_tasks.append(asyncio.create_task(telegram.start()))
 
     async def on_scene(_event: str, data: dict):
         await manager.broadcast(
@@ -197,10 +231,13 @@ if __name__ == "__main__":
             print(f"[MAYA] Istanza gia attiva su 127.0.0.1:{LOCK_PORT}.")
             raise SystemExit(1)
         install_signal_handlers(instance_guard)
-    host = "127.0.0.1"
+    host = os.getenv("MAYA_HTTP_HOST", "127.0.0.1").strip()
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        raise SystemExit("MAYA_HTTP_HOST deve restare loopback; usa Tailscale per accesso remoto.")
     port = pick_http_port(host)
     os.environ["MAYA_HTTP_PORT"] = str(port)
     if instance_guard:
         instance_guard.update_port(port)
-    threading.Thread(target=ensure_ollama_running, daemon=True).start()
+    if _env_enabled("OLLAMA_ENABLED", "true"):
+        threading.Thread(target=ensure_ollama_running, daemon=True).start()
     uvicorn.run("main:app", host=host, port=port, log_level="warning")

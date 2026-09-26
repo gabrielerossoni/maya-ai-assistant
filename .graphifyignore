@@ -12,6 +12,7 @@
 .vscode/
 data/
 .venv/
+.maya-venv/
 .tmp/
 .git/
 .coverage

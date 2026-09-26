@@ -14,13 +14,17 @@ import httpx
 import ollama
 from dotenv import load_dotenv
 
+from .audit.logger import AuditLogger
 from .automation_engine import Automation, AutomationEngine, build_default_automations
 from .automation_engine import engine as automation_engine
+from .fast_path import FastPathRouter
 from .memory.structured import StructuredMemory
 from .memory_manager import MemoryManager
+from .permissions.engine import PermissionEngine
 from .preference_learner import PreferenceLearner
 from .token_juice import compress_tool_output
 from .tool_manager import ToolManager
+from .yaml_automations import load_yaml_automations
 
 load_dotenv()
 os.environ["OLLAMA_HOST"] = os.getenv("OLLAMA_HOST", "127.0.0.1")
@@ -42,7 +46,7 @@ DEFAULT_PROMPT = """Sei MAYA, un assistente personale locale e operativo.
 Rispondi esclusivamente con JSON valido contenente intent, layout, layout_params, actions e reply.
 Usa i tool solo quando servono. Non inventare dati restituiti dai tool.
 Tool disponibili: calendar, weather, news, notes, timer, search, spotify, system, mqtt,
-display, sys_monitor e none. MQTT e l'unico canale domotico.
+display, sys_monitor, browser, home_assistant e none. MQTT e Home Assistant sono canali domotici.
 Le azioni devono avere il nome tool e i parametri canonici al primo livello.
 Quando non serve un tool usa actions=[] e una reply completa in italiano."""
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT_PERSONALITY", DEFAULT_PROMPT)
@@ -66,6 +70,9 @@ class AgentCore:
         self.tool_manager = ToolManager()
         self.memory = MemoryManager()
         self.structured_memory = StructuredMemory()
+        self.audit = AuditLogger(self.structured_memory.database_path)
+        self.permissions = PermissionEngine()
+        self.telegram_confirmation = None
         self.learner = PreferenceLearner()
         self.automation_engine: AutomationEngine = automation_engine
         self.socket_manager = None
@@ -81,6 +88,8 @@ class AgentCore:
     async def initialize(self):
         self.tool_manager.initialize()
         self.structured_memory.initialize()
+        self.structured_memory.migrate_legacy_notes()
+        self.audit.initialize()
         self.memory.load()
         await self.memory.migrate_json_to_chroma()
         self.automation_engine._tool_manager = self.tool_manager
@@ -88,6 +97,7 @@ class AgentCore:
         self.automation_engine.socket_manager = self.socket_manager
         self.automation_engine.voice_manager = self.voice_manager
         self.automation_engine.register_all(build_default_automations())
+        self.automation_engine.register_all(load_yaml_automations(os.getenv("MAYA_AUTOMATIONS_FILE", "data/automations.yaml")))
         asyncio.create_task(self.automation_engine.start_scheduler())
         for text in ("che tempo fa", "meteo", "ultime notizie", "spotify next"):
             self._intent_cache[text] = "DOMOTIC"
@@ -233,7 +243,17 @@ class AgentCore:
         results = []
         for action in actions:
             tool_name = action.get("tool", "none")
+            decision = self.permissions.decide(action)
+            if not decision.allowed and source_text.startswith("telegram:"):
+                _, chat_id, user_id = source_text.split(":", 2)
+                if self.telegram_confirmation and chat_id:
+                    await self.telegram_confirmation(chat_id, user_id, action)
+                self.audit.record("action_confirmation_required", details={"tool": tool_name, "reason": decision.reason})
+                results.append({"tool": tool_name, "result": {"status": "error", "message": "Azione sensibile: conferma richiesta."}})
+                continue
             result = await self.tool_manager.execute(action)
+            if tool_name in self.permissions.SENSITIVE_TOOLS:
+                self.audit.record("sensitive_action_executed", details={"tool": tool_name, "status": result.get("status")})
             results.append({"tool": tool_name, "result": result})
         return results
 
@@ -255,6 +275,9 @@ class AgentCore:
         return reply
 
     def _parse_direct_calendar_command(self, text: str) -> tuple[dict | None, str] | None:
+        return FastPathRouter.calendar(text)
+
+    def _parse_direct_calendar_command_legacy(self, text: str) -> tuple[dict | None, str] | None:
         if re.search(r"\b(?:prossim[oi]|mostra|lista|elenca|cos[' ]?ho|cosa ho|ho)\b", text) and re.search(
             r"\b(?:calendario|eventi|agenda)\b", text
         ):
@@ -269,14 +292,17 @@ class AgentCore:
             )
         return None
 
-    async def _run_direct_calendar_command(self, parsed: tuple[dict | None, str]) -> str:
+    async def _run_direct_calendar_command(self, parsed: tuple[dict | None, str], source: str = "local") -> str:
         action, fallback = parsed
         if action is None:
             return fallback
-        result = await self.tool_manager.execute(action)
+        result = (await self._execute_actions([action], source))[0]["result"]
         return result.get("message", fallback)
 
     def _parse_direct_structured_memory_command(self, text: str) -> tuple[str, dict] | None:
+        return FastPathRouter.structured_memory(text)
+
+    def _parse_direct_structured_memory_command_legacy(self, text: str) -> tuple[str, dict] | None:
         reminder = re.fullmatch(
             r"ricordami\s+(oggi|domani)(?:\s+alle\s+(\d{1,2})(?::(\d{2}))?)?\s+(?:che\s+)?(.+)", text
         )
@@ -300,6 +326,8 @@ class AgentCore:
     async def _run_direct_structured_memory_command(self, parsed: tuple[str, dict]) -> str:
         operation, data = parsed
         self.structured_memory.initialize()
+        if operation == "invalid":
+            return data["message"]
         if operation == "note":
             self.structured_memory.add_note(data["content"])
             return "Nota salvata."
@@ -382,7 +410,7 @@ class AgentCore:
             await self.socket_manager.broadcast({"type": "layout", "layout": layout})
         return f"Pannello {layout} aperto."
 
-    async def process(self, user_input: str, progress_cb=None):
+    async def process(self, user_input: str, progress_cb=None, source: str = "local"):
         for cache in (self._current_task_layout, self._current_task_final_data):
             for task in list(cache):
                 if task.done():
@@ -410,7 +438,7 @@ class AgentCore:
         direct_calendar = self._parse_direct_calendar_command(clean)
         if direct_calendar:
             yield await self._reply_fast(
-                await self._run_direct_calendar_command(direct_calendar), {"type": "calendar", "params": {}}
+                await self._run_direct_calendar_command(direct_calendar, source), {"type": "calendar", "params": {}}
             )
             return
         capabilities = self._capabilities_reply(clean)
@@ -425,6 +453,14 @@ class AgentCore:
 
         automation = self._check_automation(clean)
         if automation:
+            if source.startswith("telegram:"):
+                sensitive = next((item.to_tool_action() for item in automation.scene.actions if not self.permissions.decide(item.to_tool_action()).allowed), None)
+                if sensitive:
+                    _, chat_id, user_id = source.split(":", 2)
+                    if self.telegram_confirmation:
+                        await self.telegram_confirmation(chat_id, user_id, sensitive)
+                    yield await self._reply_fast("Azione sensibile: conferma richiesta.")
+                    return
             outcome = await self.automation_engine.execute(automation, source="manual")
             yield await self._reply_fast(outcome.get("message", f"Automazione {automation.name} eseguita."))
             return
@@ -474,7 +510,7 @@ class AgentCore:
                     yield reply + " "
                     if progress_cb:
                         await progress_cb(reply)
-                results = await self._execute_actions(actions, user_input)
+                results = await self._execute_actions(actions, source)
                 self.learner.observe_command(user_input, actions)
                 is_error = any(item["result"].get("status") == "error" for item in results)
                 needs_rephrase = any(

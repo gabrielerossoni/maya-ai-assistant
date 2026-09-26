@@ -111,6 +111,7 @@ class VoiceManager:
                 return
             except Exception as e_cpu:
                 print(f"[VOICE] Errore critico durante il caricamento di Whisper su CPU: {e_cpu}")
+
                 return
 
         try:
@@ -135,6 +136,15 @@ class VoiceManager:
                 print(f"[VOICE] Whisper caricato su CPU (modello: {model_size})")
             except Exception as e_cpu:
                 print(f"[VOICE] Errore critico durante il caricamento di Whisper su CPU: {e_cpu}")
+
+    def transcribe_file(self, file_path: str) -> str:
+        """Transcribe a Telegram temporary audio file with existing local Whisper model."""
+        if self.stt_model is None:
+            self._initialize_models()
+        if self.stt_model is None:
+            return ""
+        segments, _ = self.stt_model.transcribe(file_path, beam_size=5, language=self.whisper_language.strip() or None)
+        return " ".join(segment.text.strip() for segment in segments).strip()
 
     def get_dashboard_voice_status(self) -> str:
         """Stato voce da propagare sulla dashboard (WebSocket reconnect / piggyback)."""

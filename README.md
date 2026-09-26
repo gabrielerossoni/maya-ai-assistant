@@ -39,12 +39,12 @@ Dashboard / Voice / API
 
 ## Avvio
 
+Su Windows, dopo il primo setup, fai doppio clic su `MAYA.bat`: prepara `.maya-venv` se manca e avvia M.A.Y.A. in background.
+
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+./scripts/bootstrap.ps1
 Copy-Item .env.example .env
-python main.py
+./MAYA.bat
 ```
 
 La dashboard è disponibile all'indirizzo stampato all'avvio. Le variabili principali sono documentate in `.env.example`.

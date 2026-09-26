@@ -105,6 +105,7 @@ class ProactiveManager:
         memory_manager=None,
         voice_manager=None,
         initial_delay=60,
+        event_bus=None,
     ):
         self.tool_manager = tool_manager
         self.websocket_manager = websocket_manager
@@ -112,6 +113,7 @@ class ProactiveManager:
         self.voice_manager = voice_manager
         self.interval = interval
         self.initial_delay = initial_delay
+        self.event_bus = event_bus
         self.checkers: list[BaseChecker] = [SysMonitorChecker()]
         calendar = tool_manager.tools.get("calendar")
         if calendar:
@@ -120,6 +122,8 @@ class ProactiveManager:
             self.checkers.append(ContextPrefetchChecker(tool_manager, memory_manager))
 
     async def _broadcast_alert(self, alert: str):
+        if self.event_bus:
+            await self.event_bus.publish("proactive_alert", {"message": alert})
         if self.websocket_manager:
             await self.websocket_manager.broadcast({"type": "log", "text": f"[AVVISO] {alert}", "level": "warning"})
 
