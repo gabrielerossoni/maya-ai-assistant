@@ -1,5 +1,21 @@
 # M.A.Y.A. — Multitask Advanced Yielding Assistant
 
+AI assistant with a FastAPI dashboard, Ollama integration and modular tools. The repository preserves the Arduino Day smart-home prototype alongside software-first development.
+
+## Choose a version
+
+| Version | Where to start |
+| --- | --- |
+| Arduino Day prototype and default source | [main](https://github.com/gabrielerossoni/maya-ai-assistant/tree/main), documented below |
+| Preserved Arduino Day release | [v1.0-arduino-day-2026](https://github.com/gabrielerossoni/maya-ai-assistant/releases/tag/v1.0-arduino-day-2026) |
+| Software-first development | [dev README](https://github.com/gabrielerossoni/maya-ai-assistant/blob/dev/README.md) |
+
+The development branch has different setup instructions and a more decoupled hardware architecture. Do not mix its launcher, requirements or configuration with the historical prototype. The detailed Italian guide below describes the default-branch prototype; it is not a claim that every component is identical in `dev`.
+
+**Authors:** Gabriele Rossoni and Marcello Patrini. [License](LICENSE) · [Tests](tests/) · [Environment example](.env.example)
+
+## Arduino Day prototype guide
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-black?style=for-the-badge&logo=ollama&logoColor=white)
