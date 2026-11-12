@@ -697,6 +697,7 @@ brew services start mosquitto
 2. Registrarlo in `core/tool_manager.py`:
    ```python
    from tools.my_tool import MyTool
+
    # in initialize():
    self.tools["my_tool"] = MyTool()
    ```
